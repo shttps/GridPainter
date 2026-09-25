@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>GridPainter</title>
+<link rel="icon" href="logo.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="style.css">
+<script>
+  // тема до первой отрисовки — чтобы не мигало
+  try { document.documentElement.dataset.theme = localStorage.getItem('gp2.theme') || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'); } catch { document.documentElement.dataset.theme = 'light'; }
+</script>
+</head>
+<body>
+<main class="stage" id="stage">
+  <canvas id="canvas"></canvas>
+
+  <div class="empty-state" id="emptyState" hidden>
+    <div class="es-title">С чего начнём?</div>
+    <div class="es-sub">Рисуй инструментами снизу или начни с готового</div>
+    <div class="es-actions">
+      <button class="es-btn" data-add="image"><span class="es-ico" data-icon="image"></span><b>Картинка</b><small>мозаика, ASCII, line-art</small></button>
+      <button class="es-btn" id="esOpen"><span class="es-ico" data-icon="folder"></span><b>Открыть JSON</b><small>hero_grid_config.json</small></button>
+      <button class="es-btn" data-add="ascii"><span class="es-ico" data-icon="ascii"></span><b>+ ASCII</b><small>вставить текст-арт</small></button>
+    </div>
+  </div>
+
+  <header class="float bar bar-left">
+    <a class="brand" title="GridPainter"><img src="logo.svg" alt="" class="logo"><span>GridPainter</span></a>
+    <span class="sep"></span>
+    <label class="title-wrap" title="Название сетки в Доте">
+      <input class="title-input" id="configName" spellcheck="false">
+      <svg class="i chev" viewBox="0 0 24 24"><path d="M8 10l4 4 4-4"/></svg>
+    </label>
+    <span class="sep"></span>
+    <button class="btn ghost" id="btnOpen">Открыть JSON</button>
+    <div class="menu-wrap">
+      <button class="btn ghost" id="btnAdd">Добавить</button>
+      <div class="menu" id="addMenu">
+        <button data-add="image" data-icon="image">Картинку… <kbd>Ctrl V</kbd></button>
+        <button data-add="ascii" data-icon="ascii">ASCII из буфера</button>
+        <button data-add="lines" data-icon="lines">Генератор линий</button>
+        <hr>
+        <button data-add="hero" data-icon="heroes">Категорию героев</button>
+        <button data-add="text" data-icon="text">Текст</button>
+      </div>
+    </div>
+  </header>
+
+  <div class="float bar bar-right">
+    <button class="icon-btn" id="btnUndo" data-icon="undo" data-tip="Отменить · Ctrl+Z"></button>
+    <button class="icon-btn" id="btnRedo" data-icon="redo" data-tip="Повторить · Ctrl+Shift+Z"></button>
+    <span class="sep"></span>
+    <button class="icon-btn sm" id="zoomOut" data-tip="Отдалить · −">−</button>
+    <button class="btn ghost mono zoom-val" id="zoomVal" data-tip="Вписать · Shift+1">100%</button>
+    <button class="icon-btn sm" id="zoomIn" data-tip="Приблизить · +">+</button>
+    <span class="sep"></span>
+    <button class="btn ghost" id="btnPreview" data-tip="Как в игре · Tab">Превью</button>
+    <button class="icon-btn theme-btn" id="btnTheme" data-tip="Тема · Shift+T"></button>
+    <span class="badge" id="catCount" data-tip="Категорий в сетке">0 кат.</span>
+    <button class="btn primary" id="btnExport">Экспорт</button>
+  </div>
+
+  <aside class="float inspector" id="inspector"></aside>
+
+  <nav class="float dock" id="rail">
+    <span class="dock-ind" id="dockInd"></span>
+    <button data-tool="select" data-icon="cursor" data-tip="Выделение · V"></button>
+    <button data-tool="pan" data-icon="hand" data-tip="Рука · H / пробел"></button>
+    <span class="sep"></span>
+    <button data-tool="pencil" data-icon="pencil" data-tip="Карандаш · P"></button>
+    <button data-tool="line" data-icon="line" data-tip="Линия · L"></button>
+    <button data-tool="hv" data-icon="hv" data-tip="Гор. / верт. · I"></button>
+    <button data-tool="rect" data-icon="rect" data-tip="Прямоугольник · R"></button>
+    <button data-tool="ellipse" data-icon="ellipse" data-tip="Эллипс · O"></button>
+    <button data-tool="rhombus" data-icon="rhombus" data-tip="Ромб · D"></button>
+    <button data-tool="triangle" data-icon="triangle" data-tip="Треугольник · Y"></button>
+    <button data-tool="eraser" data-icon="eraser" data-tip="Ластик · E"></button>
+    <span class="sep"></span>
+    <button data-tool="text" data-icon="text" data-tip="Текст · T"></button>
+    <button data-tool="hero" data-icon="heroes" data-tip="Категория героев · G"></button>
+    <span class="sep"></span>
+    <button class="dock-help" id="btnHelp" data-tip="Горячие клавиши · ?">?</button>
+  </nav>
+
+  <div class="status"><span id="stCoords">x — · y —</span><span class="dot">·</span><span id="stTool"></span><span id="stSel"></span></div>
+</main>
+
+<div class="modal-root" id="modalRoot"></div>
+<div class="toasts" id="toasts"></div>
+<input type="file" id="fileImage" accept="image/*" hidden>
+<input type="file" id="fileJson" accept=".json,application/json" multiple hidden>
+<input type="file" id="fileBg" accept="image/*" hidden>
+<input type="file" id="fileFont" accept=".ttf,.otf,.woff,.woff2" hidden>
+
+<script src="heroes.js"></script>
+<script src="convert.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
