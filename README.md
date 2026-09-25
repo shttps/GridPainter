@@ -11,6 +11,8 @@
 
 <p align="center">
   <a href="https://shttps.github.io/setka-dota2-/"><b>▶ Открыть редактор онлайн</b></a>
+  &nbsp;·&nbsp;
+  Discord: <b>@ahttps</b>
 </p>
 
 <p align="center">
@@ -95,6 +97,10 @@ python update_heroes.py
 ```
 
 Скрипт берёт список героев из [OpenDota API](https://docs.opendota.com/), считает средний цвет каждого портрета и перезаписывает `heroes.js`.
+
+## Связаться со мной
+
+Discord: **@ahttps**. Пиши по вопросам, насчёт покупки/заказа сеток и с интересными предложениями.
 
 ## Благодарности
 

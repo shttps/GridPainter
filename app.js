@@ -1329,7 +1329,9 @@ function openHelp() {
     ['Ровно / квадрат', 'Shift при рисовании'], ['Стереть карандашом', 'ПКМ'], ['Выделить один элемент группы', 'Alt + клик'], ['Добавить к выделению', 'Shift + клик'],
     ['Группировать / разгруппировать', 'Ctrl+G / Ctrl+Shift+G'], ['Дублировать', 'Ctrl+D'], ['Копировать / вставить', 'Ctrl+C / Ctrl+V'], ['Удалить', 'Delete'],
     ['Сдвиг', 'Стрелки (Shift ×10)'], ['Отменить / повторить', 'Ctrl+Z / Ctrl+Shift+Z'], ['Зум', 'колесо, + / −'], ['Вписать холст', 'Shift+1'], ['Превью как в игре', 'Tab'], ['Вставить картинку', 'Ctrl+V']];
-  openModal(`${modalHead('Горячие клавиши')}<div class="modal-body"><div class="keys">${K.map(([a, b]) => `<span>${a}</span><span><kbd>${b}</kbd></span>`).join('')}</div></div>`);
+  openModal(`${modalHead('Горячие клавиши')}<div class="modal-body"><div class="keys">${K.map(([a, b]) => `<span>${a}</span><span><kbd>${b}</kbd></span>`).join('')}</div></div>
+    <div class="modal-foot"><span class="info">Автор · Discord <b style="color:var(--ink)">@ahttps</b> — связь, заказы, предложения</span><button class="btn sm" id="copyDiscord">Скопировать ник</button></div>`);
+  $('#copyDiscord').onclick = () => copyText('ahttps', 'Ник Discord скопирован');
 }
 
 // ---------- утилиты ----------
