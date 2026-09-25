@@ -487,7 +487,8 @@ function moveSelTo(x, y) {
 // Выделенные символы → текст ASCII по сетке плотности.
 function selAsAscii() {
   const glyphs = selEls().filter(e => e.t === 'glyph');
-  if (!glyphs.length) return '';
+  // строки текста (например, Брайль строками) — просто сверху вниз, как для профиля Steam
+  if (!glyphs.length) return steamText(selEls().filter(e => e.t === 'text').sort((a, b) => a.y - b.y).map(e => e.name));
   const cells = glyphs.map(e => ({ c: Math.floor((e.x + measure(e.name) / 2) / S.cellW), r: Math.floor((e.y + S.fontSize / 2) / S.cellH), ch: e.name }));
   const c0 = Math.min(...cells.map(q => q.c)), r0 = Math.min(...cells.map(q => q.r));
   const rows = [];
@@ -816,7 +817,7 @@ function renderInspector() {
       <button class="btn danger" data-act="del" data-icon="trash">Удалить</button>
     </div>`;
     body += `<div class="row2" style="grid-template-columns:1fr auto"><label class="num"><b>%</b><input class="input" type="number" id="scalePct" value="100" min="1" step="5"></label><button class="btn" data-act="scale">Масштаб</button></div>`;
-    if (list.some(e => e.t === 'glyph')) body += `<button class="btn block" data-act="copyascii" data-icon="copy">Копировать как ASCII</button>`;
+    if (list.some(e => e.t !== 'hero')) body += `<button class="btn block" data-act="copyascii" data-icon="copy">Копировать как ASCII</button>`;
     html += panel('sel', 'Выделение', body, list.length > 1 ? `· ${list.length}` : '').replace('class="panel"', `class="panel${hadSel ? '' : ' enter'}"`);
   }
 
@@ -968,7 +969,7 @@ const RAMPS = { classic: ' .:-=+*#%@', blocks: ' ░▒▓█', dots: ' .·•�
 let disabledHeroes = new Set(load('gp.disabled', []));
 
 function openImageModal(file) {
-  let img = null, result = null, split = 0.5, timer = 0;
+  let img = null, result = null, split = 0.5, timer = 0, steam = '';
   const m = openModal(`
     ${modalHead('Импорт картинки', `<div class="seg" id="ipMode" style="width:360px;margin-left:16px">
       <button data-m="mosaic">Мозаика из героев</button><button data-m="ascii">ASCII</button><button data-m="lineart">Line-art</button></div>`)}
@@ -1020,6 +1021,12 @@ function openImageModal(file) {
         ${sw('autoThreshold', 'Авто-порог', IP.autoThreshold)}${slider('threshold', 'Порог', 1, 254, 1, IP.threshold)}
         ${slider('lineH', 'Высота строки', 4, 40, 1, IP.lineH)}
         <div class="hint">Каждая строка — одна категория: очень экономно по количеству категорий.</div>
+        <div class="steam-box">
+          <div class="steam-head"><b>Steam · Custom Info Box</b><span class="badge" id="steamCount">—</span></div>
+          <div class="row2"><button class="btn sm" id="steamW" title="Рекомендуемая ширина Брайль-арта для информационного поля">Ширина 60</button><button class="btn sm" id="steamFit" title="Уменьшить ширину, пока текст не влезет в лимит Steam">Влезть в 8000</button></div>
+          <button class="btn primary block" id="steamCopy">Скопировать для Steam</button>
+          <div class="hint">Профиль → Редактировать → Витрины → «Своё информационное поле», вставь в поле текста. Если строки переносятся — уменьши ширину на 1–2 символа.</div>
+        </div>
       </div>
       ${common()}${sw('invert', 'Инвертировать', IP.invert)}${sw('dither', 'Дизеринг', IP.dither)}${bgCtl()}`,
     lineart: () => `
@@ -1069,6 +1076,24 @@ function openImageModal(file) {
       $('#palNone').onclick = () => { disabledHeroes = new Set(HEROES.map(h => h.id)); store('gp.disabled', [...disabledHeroes]); draw(); schedule(); };
     }
   }
+  // Steam: ширина по умолчанию, подгонка под лимит (бинпоиск по ширине — длина растёт с шириной), копирование
+  $('#ipCtl').addEventListener('click', e => {
+    const id = e.target.closest('button')?.id;
+    if (id === 'steamW') setBcols(60);
+    else if (id === 'steamFit') {
+      if (!img) return;
+      const len = cols => [...steamText(Convert.ascii(img, { ...IP, mode: 'braille', cols }, { w: S.areaW, h: S.areaH }, measure, S.fontSize).lines)].length;
+      if (len(IP.bcols) <= STEAM_LIMIT) { toast('Уже влезает в лимит Steam', 'ok'); return; }
+      let lo = 10, hi = IP.bcols;
+      while (hi - lo > 1) { const mid = (lo + hi) >> 1; len(mid) <= STEAM_LIMIT ? lo = mid : hi = mid; }
+      setBcols(lo); toast(`Ширина ${lo} — влезает в 8000 символов`, 'ok');
+    } else if (id === 'steamCopy') {
+      if (!steam) { toast('Сначала загрузи картинку', 'err'); return; }
+      const n = [...steam].length;
+      copyText(steam, n > STEAM_LIMIT ? `Скопировано, но ${n} символов — больше лимита Steam (8000). Нажми «Влезть в 8000»` : 'Скопировано — вставляй в Custom Info Box');
+    }
+  });
+  function setBcols(v) { IP.bcols = v; const el = $('#bcols'); if (el) { el.value = v; syncRange(el); } schedule(); }
   $('#ipMode').onclick = e => { const b = e.target.closest('button'); if (!b) return; IP.mode = b.dataset.m; buildControls(); schedule(); };
 
   function schedule() { store('gp2.import', IP); clearTimeout(timer); timer = setTimeout(compute, 70); }
@@ -1087,6 +1112,11 @@ function openImageModal(file) {
       result = Convert.ascii(img, { ...IP, mode: IP.amode, cols: IP.bcols }, area, measure, S.fontSize);
       if (result.th !== undefined && IP.autoThreshold) { const t = $('#threshold'); if (t) { t.value = IP.threshold = result.th; syncRange(t); } }
       info = `${result.els.length} категорий`;
+      if (result.lines) {
+        steam = steamText(result.lines);
+        const n = [...steam].length, c = $('#steamCount');
+        if (c) { c.textContent = `${n.toLocaleString('ru')} / 8 000`; c.classList.toggle('bad', n > STEAM_LIMIT); }
+      }
     } else {
       result = Convert.lineart(img, { ...IP, step: IP.lstep }, area, measure, S.fontSize);
       info = `${result.els.length} категорий` + (result.step > IP.lstep + 0.01 ? ` · шаг увеличен до ${result.step.toFixed(1)} из-за лимита` : '');
@@ -1139,6 +1169,22 @@ function openImageModal(file) {
   };
   buildControls();
   if (file) setImg(file); else draw();
+}
+
+// ----- Steam -----
+const STEAM_LIMIT = 8000;
+// Текст для Custom Info Box: без пустых строк по краям и хвостовых пустых символов,
+// а пустые строки внутри рисунка — одним «пустым Брайлем», чтобы Steam их не схлопнул.
+function steamText(lines) {
+  const blank = l => !/[^⠀ ]/.test(l);
+  let a = 0, b = lines.length;
+  while (a < b && blank(lines[a])) a++;
+  while (b > a && blank(lines[b - 1])) b--;
+  return lines.slice(a, b).map(l => l.replace(/ /g, BRAILLE_BLANK).replace(/⠀+$/, '') || BRAILLE_BLANK).join('\n');
+}
+function openSteamModal() {
+  Object.assign(IP, { mode: 'ascii', amode: 'braille', bcols: 60 });
+  openImageModal();
 }
 
 // ----- + ASCII -----
@@ -1381,6 +1427,7 @@ function doAdd(kind) {
   if (kind === 'image') openImageModal();
   else if (kind === 'ascii') openAsciiModal();
   else if (kind === 'lines') openLinesModal();
+  else if (kind === 'steam') openSteamModal();
   else if (kind === 'hero' || kind === 'text') {
     snapshot();
     const el = kind === 'hero'

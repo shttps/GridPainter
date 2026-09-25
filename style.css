@@ -377,3 +377,11 @@ input[type=range]::-moz-range-thumb { width: 14px; height: 14px; border-radius: 
   .bar-left .btn { padding: 0 8px; }
   .inspector { display: none; }
 }
+
+/* блок «для профиля Steam» в режиме Брайля */
+.steam-box { display: flex; flex-direction: column; gap: 10px; padding: 12px; border-radius: 12px; background: var(--field); }
+.steam-box .btn:not(.primary) { background: var(--card); }
+.steam-box .btn:not(.primary):hover { background: var(--field-hover); }
+.steam-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 12.5px; }
+.steam-head .badge { margin: 0; background: var(--card); }
+.steam-head .badge.bad { background: var(--bad-bg); }

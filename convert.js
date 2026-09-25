@@ -196,7 +196,7 @@ window.Convert = (() => {
       const lw = measure('⣿') * cols, totalH = lines.length * p.lineH;
       const x0 = (area.w - lw) / 2, y0 = Math.max(0, (area.h - totalH) / 2);
       lines.forEach((line, i) => { if (/[^⠀]/.test(line)) els.push({ t: 'text', name: line, x: x0, y: y0 + i * p.lineH }); });
-      return { els, th: Math.round(th) };
+      return { els, th: Math.round(th), lines };
     }
     const step = p.step;
     const cols = Math.max(1, Math.floor(fit.w / step)), rows = Math.max(1, Math.floor(fit.h / step));
