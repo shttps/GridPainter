@@ -1,5 +1,5 @@
 'use strict';
-/* GridPainter — редактор сетки героев Dota 2.
+/* Dota 2 Grid Studio — редактор сетки героев Dota 2.
    Элемент холста = одна категория в hero_grid_config.json:
      hero  — категория с героями (прямоугольник x/y/w/h + hero_ids)
      text  — текст в названии пустой категории (width = height = 0)
@@ -11,7 +11,7 @@ const clamp = (v, lo, hi) => v < lo ? lo : v > hi ? hi : v;
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const r6 = v => Math.round(v * 1e6) / 1e6;
 const { CARD_W, CARD_H, PAD } = Convert;
-const CDN = 'https://cdn.cloudflare.steamstatic.com/apps/dota2/images/dota_react/heroes/';
+const CDN = 'https://cdn.cloudflare.steamstatic.com/apps/dota2/images/';
 const BRAILLE_BLANK = '⠀';
 
 // ---------- иконки ----------
@@ -61,27 +61,43 @@ function applyIcons(root = document) {
 }
 
 // ---------- герои ----------
+// В сетке Дота показывает вертикальный портрет героя с saturation 0.7 (hero_grid_new.css).
+// Подбор мозаики сравнивает цвета уже приглушённых портретов — как их увидят в игре.
+const SAT = 0.7;
+function saturate(r, g, b, k = SAT) {
+  return [
+    (0.213 + 0.787 * k) * r + (0.715 - 0.715 * k) * g + (0.072 - 0.072 * k) * b,
+    (0.213 - 0.213 * k) * r + (0.715 + 0.285 * k) * g + (0.072 - 0.072 * k) * b,
+    (0.213 - 0.213 * k) * r + (0.715 - 0.715 * k) * g + (0.072 + 0.928 * k) * b,
+  ].map(v => clamp(Math.round(v), 0, 255));
+}
 const HEROES = window.HEROES.map(h => {
-  const r = parseInt(h.c.slice(0, 2), 16), g = parseInt(h.c.slice(2, 4), 16), b = parseInt(h.c.slice(4, 6), 16);
-  return { ...h, lab: Convert.rgbToLab(r, g, b), url: CDN + h.s + '.png' };
+  const [r, g, b] = saturate(parseInt(h.c.slice(0, 2), 16), parseInt(h.c.slice(2, 4), 16), parseInt(h.c.slice(4, 6), 16));
+  const wide = CDN + 'dota_react/heroes/' + h.s + '.png';
+  return { ...h, lab: Convert.rgbToLab(r, g, b), wide, url: h.v ? CDN + 'heroes/' + h.s + '_vert.jpg' : wide };
 });
 const HERO_IDX = new Map(HEROES.map((h, i) => [h.id, i]));
 const heroImgs = new Map();
 function heroImg(i) {
   let im = heroImgs.get(i);
-  if (!im) { im = new Image(); im.onload = requestRender; im.src = HEROES[i].url; heroImgs.set(i, im); }
+  if (!im) {
+    im = new Image(); im.onload = requestRender;
+    im.onerror = () => { if (im.src !== HEROES[i].wide) im.src = HEROES[i].wide; };
+    im.src = HEROES[i].url; heroImgs.set(i, im);
+  }
   return im;
 }
 
 // ---------- настройки и состояние ----------
 const S = Object.assign({
   configName: 'Моя сетка',
-  areaW: 1200, areaH: 600,
-  fontSize: 16,
-  glyphColor: '#f3efe6', textColor: '#e8e2d6',
+  areaW: 1204, areaH: 612,
   cellW: 10, cellH: 10,
   showGrid: true, snap: true,
 }, load('gp2.settings', {}));
+// старый размер по умолчанию → настоящий размер сетки в Доте (DOTAHeroGridNew 1204 × 678 минус подвал 66)
+if (S.areaW === 1200 && S.areaH === 600) { S.areaW = 1204; S.areaH = 612; }
+delete S.fontSize;
 
 const st = {
   els: [], sel: new Set(), nextId: 1, nextGroup: 1,
@@ -106,19 +122,36 @@ function persist() {
 }
 
 // ---------- шрифт и размеры ----------
+// Подпись категории в Доте (#HeroCategoryName): Radiance 16px semi-bold, ЗАГЛАВНЫМИ, разрядка 2px,
+// отступ слева 4px. Она стоит в строке высотой 20px, а список героев начинается под ней.
+// x/y элемента = x_position/y_position категории; подпись и герои рисуются со сдвигом, как в игре.
+const LBL = { size: 16, ls: 2, dx: 4, dy: 3 }, HEAD = 20;
 const fontFamily = () => (st.userFont ? '"GPUserFont", ' : '') + '"Radiance", "Segoe UI", Arial, sans-serif';
+const labelFont = () => `600 ${LBL.size}px ${fontFamily()}`;
+const up = s => String(s).toUpperCase();
+const HAS_LS = 'letterSpacing' in CanvasRenderingContext2D.prototype;
 const mctx = document.createElement('canvas').getContext('2d');
 let mcache = new Map();
 function measure(s) {
   let w = mcache.get(s);
-  if (w === undefined) { mctx.font = `${S.fontSize}px ${fontFamily()}`; w = mctx.measureText(s).width; mcache.set(s, w); }
+  if (w === undefined) { mctx.font = labelFont(); w = mctx.measureText(up(s)).width + LBL.ls * Math.max(0, [...s].length - 1); mcache.set(s, w); }
   return w;
 }
 function resetMeasure() { mcache = new Map(); }
-function bounds(e) {
-  if (e.t === 'hero') return { x: e.x, y: e.y, w: e.w, h: e.h };
-  return { x: e.x, y: e.y, w: Math.max(2, measure(e.name)), h: S.fontSize };
+// подпись с разрядкой; где canvas не умеет letterSpacing — по буквам
+function drawLabel(c, s, x, y) {
+  const t = up(s);
+  if (HAS_LS || t.length < 2) { c.fillText(t, x, y); return; }
+  for (const ch of t) { c.fillText(ch, x, y); x += c.measureText(ch).width + LBL.ls; }
 }
+function bounds(e) {
+  if (e.t === 'hero') return { x: e.x, y: e.y, w: e.w, h: e.h + HEAD };
+  return { x: e.x + LBL.dx, y: e.y + LBL.dy, w: Math.max(2, measure(e.name)), h: LBL.size };
+}
+// сдвиг видимой рамки относительно x/y элемента
+const boundsOff = e => e.t === 'hero' ? [0, 0] : [LBL.dx, LBL.dy];
+// центр видимого символа — по нему символ привязан к клетке сетки плотности
+const glyphCenter = e => ({ x: e.x + LBL.dx + measure(e.name) / 2, y: e.y + LBL.dy + LBL.size / 2 });
 function bboxOf(list) {
   let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
   for (const e of list) { const b = bounds(e); x0 = Math.min(x0, b.x); y0 = Math.min(y0, b.y); x1 = Math.max(x1, b.x + b.w); y1 = Math.max(y1, b.y + b.h); }
@@ -149,12 +182,28 @@ const canvas = $('#canvas'), ctx = canvas.getContext('2d');
 let renderQueued = false;
 function requestRender() { if (!renderQueued) { renderQueued = true; requestAnimationFrame(() => { renderQueued = false; render(); }); } }
 
-function drawCard(c, i, x, y, w, h) {
+// Картинка карточки: 51×83 минус отступ 4px с каждой стороны, обрезка «cover», saturation 0.7.
+// Готовим один раз на героя — дальше рисуем уже обрезанную и приглушённую картинку.
+const IMG_W = CARD_W - PAD, IMG_H = CARD_H - PAD, INSET = PAD / 2;
+const cardArts = new Map();
+function cardArt(i) {
   const im = heroImg(i);
-  if (im.complete && im.naturalWidth) {
-    const sh = im.naturalHeight, sw = sh * CARD_W / CARD_H;
-    c.drawImage(im, (im.naturalWidth - sw) / 2, 0, sw, sh, x, y, w, h);
-  } else { c.fillStyle = '#' + HEROES[i].c; c.fillRect(x, y, w, h); }
+  let cv = cardArts.get(i);
+  if (cv && cv.src === im.src) return cv;
+  if (!im.complete || !im.naturalWidth) return null;
+  const W = im.naturalWidth, H = im.naturalHeight, k = IMG_W / IMG_H;
+  const sw = W / H > k ? H * k : W, sh = W / H > k ? H : W / k;
+  cv = document.createElement('canvas'); cv.width = Math.round(sw); cv.height = Math.round(sh); cv.src = im.src;
+  const x = cv.getContext('2d');
+  x.filter = `saturate(${SAT})`;
+  x.drawImage(im, (W - sw) / 2, (H - sh) / 2, sw, sh, 0, 0, cv.width, cv.height);
+  cardArts.set(i, cv);
+  return cv;
+}
+function drawCard(c, i, x, y, w, h) {
+  const art = cardArt(i);
+  if (art) c.drawImage(art, x, y, w, h);
+  else { c.fillStyle = '#' + HEROES[i].c; c.fillRect(x, y, w, h); }
 }
 
 // Цвета холста для светлой и тёмной темы. Превью всегда как в игре: светлым по тёмному.
@@ -173,9 +222,10 @@ function renderEls(c, list, o) {
   for (const e of list) {
     if (e.t !== 'hero') continue;
     if (o.fade) c.globalAlpha = o.fade(e);
+    const ly = e.y + HEAD; // список героев — под строкой с названием
     if (o.editor) {
-      c.fillStyle = INK.boxFill; c.fillRect(e.x, e.y, e.w, e.h);
-      c.strokeStyle = INK.box; c.lineWidth = 1 / o.zoom; c.strokeRect(e.x, e.y, e.w, e.h);
+      c.fillStyle = INK.boxFill; c.fillRect(e.x, ly, e.w, e.h);
+      c.strokeStyle = INK.box; c.lineWidth = 1 / o.zoom; c.strokeRect(e.x, ly, e.w, e.h);
     }
     const n = e.heroes.length;
     if (n) {
@@ -183,38 +233,211 @@ function renderEls(c, list, o) {
       for (let k = 0; k < n; k++) {
         const i = HERO_IDX.get(e.heroes[k]);
         if (i === undefined) continue;
-        drawCard(c, i, e.x + (PAD / 2 + (k % L.c) * CARD_W) * s, e.y + (PAD / 2 + Math.floor(k / L.c) * CARD_H) * s, CARD_W * s, CARD_H * s);
+        drawCard(c, i, e.x + (PAD / 2 + (k % L.c) * CARD_W + INSET) * s, ly + (PAD / 2 + Math.floor(k / L.c) * CARD_H + INSET) * s, IMG_W * s, IMG_H * s);
       }
     }
+    // в редакторе — число героев рядом с названием, у безымянных одиночных категорий — пометка
     if (o.editor && (e.name || !e.g)) {
-      c.fillStyle = INK.label; c.font = `500 ${11 / o.zoom}px Geist, Inter, sans-serif`; c.textBaseline = 'bottom';
-      c.fillText(`${e.name || 'Без названия'} (${n})`, e.x, e.y - 3 / o.zoom);
+      c.fillStyle = INK.label; c.font = `500 ${11 / o.zoom}px Geist, Inter, sans-serif`; c.textBaseline = 'middle';
+      c.fillText(e.name ? `${n}` : `без названия · ${n}`, e.x + LBL.dx + (e.name ? measure(e.name) + 6 : 0), e.y + LBL.dy + LBL.size / 2);
     }
   }
-  c.font = `${S.fontSize}px ${fontFamily()}`; c.textBaseline = 'top';
+  // подписи: текст, символы и названия категорий героев — одним шрифтом, как в игре
+  c.font = labelFont(); c.textBaseline = 'top';
+  if (HAS_LS) c.letterSpacing = LBL.ls + 'px';
   for (const e of list) {
-    if (e.t === 'hero') continue;
+    if (!e.name) continue;
     if (o.fade) c.globalAlpha = o.fade(e);
-    c.fillStyle = o.editor ? (e.t === 'glyph' ? INK.glyph : INK.text) : (e.t === 'glyph' ? S.glyphColor : S.textColor);
-    c.fillText(e.name, e.x, e.y);
+    c.fillStyle = o.editor ? (e.t === 'glyph' ? INK.glyph : INK.text) : GAME.label;
+    drawLabel(c, e.name, e.x + LBL.dx, e.y + LBL.dy);
   }
+  if (HAS_LS) c.letterSpacing = '0px';
   c.globalAlpha = 1;
 }
 
-// Лист холста: белая бумага в редакторе, тёмная панель Доты в превью.
-function drawArea(c, editor) {
-  if (editor) { c.fillStyle = T.sheet; c.fillRect(0, 0, S.areaW, S.areaH); }
-  else {
-    const g = c.createLinearGradient(0, 0, 0, S.areaH);
-    g.addColorStop(0, '#1b1813'); g.addColorStop(1, '#100e0b');
-    c.fillStyle = g; c.fillRect(0, 0, S.areaW, S.areaH);
+// ---------- превью «как в игре» ----------
+// Экран «Герои» в Доте. Размеры сетки и подвала — из panorama/styles/hero_grid_new.css
+// (DOTAHeroGridNew 1204 × 678, из них подвал #Footer 66), остальное снято со скриншотов 16:9.
+// Всё в единицах сетки (x_position/y_position), поэтому зум и пан работают как в редакторе.
+const GAME = { label: '#808fa6', bg: '#1d140e' };
+const GRID = { w: 1204, h: 612, foot: 66 };
+const GAME_FRAME = { x: -237, y: -150, w: 1667, h: 938 };
+const viewRect = () => st.preview ? GAME_FRAME : { x: 0, y: 0, w: S.areaW, h: S.areaH };
+const heroWord = n => n % 10 === 1 && n % 100 !== 11 ? 'ГЕРОЯ' : 'ГЕРОЕВ';
+
+function drawDotaScreen(c) {
+  const F = GAME_FRAME, W = GRID.w, H = GRID.h, FB = H + GRID.foot;
+  const ui = fontFamily(), serif = 'Georgia, "Times New Roman", serif';
+  const font = (f, ls = 0) => { c.font = f; c.letterSpacing = ls + 'px'; };
+  const text = (s, x, y, color, align = 'left') => { c.fillStyle = color; c.textAlign = align; c.fillText(s, x, y); };
+  const box = (x, y, w, h, fill, stroke, r = 0) => {
+    c.beginPath(); r ? c.roundRect(x, y, w, h, r) : c.rect(x, y, w, h);
+    c.fillStyle = fill; c.fill();
+    if (stroke) { c.strokeStyle = stroke; c.lineWidth = 1; c.beginPath(); r ? c.roundRect(x + .5, y + .5, w - 1, h - 1, r) : c.rect(x + .5, y + .5, w - 1, h - 1); c.stroke(); }
+  };
+  const vgrad = (y0, y1, stops) => { const g = c.createLinearGradient(0, y0, 0, y1); stops.forEach((s, i) => g.addColorStop(i / (stops.length - 1), s)); return g; };
+  c.save();
+  c.beginPath(); c.rect(F.x, F.y, F.w, F.h); c.clip();
+  c.textBaseline = 'middle';
+
+  // фон страницы: тёплый коричневый, светлее под меню, к низу темнее
+  c.fillStyle = GAME.bg; c.fillRect(F.x, F.y, F.w, F.h);
+  let g = c.createRadialGradient(W / 2, -60, 0, W / 2, -60, F.w * .7);
+  g.addColorStop(0, 'rgba(64,46,28,.32)'); g.addColorStop(1, 'rgba(64,46,28,0)');
+  c.fillStyle = g; c.fillRect(F.x, F.y, F.w, F.h);
+  c.fillStyle = vgrad(H, F.y + F.h, ['#1b1715', '#150d09', '#0d0805', '#050302']); c.fillRect(F.x, H, F.w, F.y + F.h - H);
+
+  // верхнее меню
+  const ty = F.y, th = 52;
+  c.fillStyle = vgrad(ty, ty + th, ['#1d232d', '#11151c']); c.fillRect(F.x, ty, F.w, th);
+  box(F.x, ty + th - 1, F.w, 1, 'rgba(255,255,255,.05)');
+  // слот логотипа и активная вкладка — скошенные плашки
+  const slant = (x0, x1, fill) => { c.beginPath(); c.moveTo(x0 + 8, ty); c.lineTo(x1 + 8, ty); c.lineTo(x1, ty + th); c.lineTo(x0, ty + th); c.closePath(); c.fillStyle = fill; c.fill(); };
+  slant(-14, 60, vgrad(ty, ty + th, ['#2a303a', '#1a1f27']));
+  slant(94, 238, vgrad(ty, ty + th, ['#3b4654', '#252d38']));
+  c.strokeStyle = 'rgba(255,255,255,.07)'; c.lineWidth = 1;
+  for (const x of [60, 238, 383, 525, 675, 816]) { c.beginPath(); c.moveTo(x + 8, ty + 4); c.lineTo(x, ty + th - 4); c.stroke(); }
+  font(`bold 17px ${serif}`);
+  [['ГЕРОИ', 171], ['АРСЕНАЛ', 313], ['ПРОСМОТР', 456], ['БАЗА ЗНАНИЙ', 598], ['ИГРОТЕКА', 743]]
+    .forEach(([s, x], k) => text(s, x, ty + th / 2 + 1, k ? '#9aa3ae' : '#eef1f4', 'center'));
+  // справа — валюта и иконки профиля, приглушённо
+  c.fillStyle = '#c9772a'; c.beginPath(); c.moveTo(1090, ty + 14); c.lineTo(1099, ty + 20); c.lineTo(1099, ty + 33); c.lineTo(1090, ty + 38); c.lineTo(1081, ty + 33); c.lineTo(1081, ty + 20); c.fill();
+  font(`bold 17px ${ui}`); text('3 900', 1106, ty + 25, '#e7c27a');
+  c.fillStyle = '#3b5e9c'; c.beginPath(); c.arc(1195, ty + 29, 10, 0, 7); c.fill();
+  box(1250, ty + 14, 14, 22, '#59616d'); box(1268, ty + 12, 4, 26, '#59616d');
+
+  // подменю «ГЕРОИ / РУКОВОДСТВА / ТРЕНДЫ»
+  const sy = ty + th, sh = 44, sm = sy + sh / 2;
+  c.fillStyle = vgrad(sy, sy + sh, ['#130c07', '#0f0905']); c.fillRect(F.x, sy, F.w, sh);
+  box(F.x, sy + sh - 1, F.w, 1, 'rgba(255,220,180,.05)');
+  font(`600 15px ${ui}`, 3.4);
+  text('ГЕРОИ', 135, sm, '#ece9e4'); text('/', 216, sm, '#77736d'); text('РУКОВОДСТВА', 236, sm, '#a8a49e');
+  text('/', 399, sm, '#77736d'); text('ТРЕНДЫ', 442, sm, '#a8a49e');
+  c.strokeStyle = '#d9a441'; c.lineWidth = 1.6; c.beginPath();
+  for (let k = 0; k < 6; k++) { const a = Math.PI / 3 * k + Math.PI / 6; c.lineTo(427 + 8 * Math.cos(a), sm + 8 * Math.sin(a)); }
+  c.closePath(); c.stroke();
+  c.fillStyle = '#d9a441'; c.fillRect(424.5, sm - 1, 5, 2); c.fillRect(426, sm - 2.5, 2, 5);
+
+  // баны
+  font(`600 14px ${ui}`, 2.6); text('БАНЫ', 918, -22, '#b9bec6', 'right');
+  for (let k = 0; k < 4; k++) {
+    const x = 932 + k * 67.5, y = -41;
+    box(x, y, 60, 35, vgrad(y, y + 35, ['#232b37', '#161b23']), 'rgba(140,160,185,.22)');
+    c.strokeStyle = '#6d7887'; c.lineWidth = 1.8;
+    c.beginPath(); c.arc(x + 30, y + 17.5, 7.5, 0, 7); c.moveTo(x + 24.7, y + 12.2); c.lineTo(x + 35.3, y + 22.8); c.stroke();
   }
+
+  // #MissingHeroesButton: «НЕ ВИДНО N ГЕРОЕВ» внизу по центру сетки, фон #00000060, отступы 8 × 15
+  const used = new Set();
+  for (const e of st.els) if (e.t === 'hero') for (const id of e.heroes) if (HERO_IDX.has(id)) used.add(id);
+  const hidden = HEROES.length - used.size;
+  if (hidden > 0) {
+    font(`500 16px ${ui}`, 1);
+    const s = `НЕ ВИДНО ${hidden} ${heroWord(hidden)}`, w = c.measureText(s).width + 30;
+    box(W / 2 - w / 2, H - 36, w, 36, 'rgba(0,0,0,.376)');
+    text(s, W / 2, H - 17, '#b0bcc2', 'center');
+  }
+  // #Footer: верхняя граница — светлая линия, гаснущая к краям
+  g = c.createLinearGradient(0, 0, W, 0);
+  [[0, 0], [.06, .05], [.5, .1], [.94, .05], [1, 0]].forEach(([o, a]) => g.addColorStop(o, `rgba(225,238,255,${a})`));
+  c.fillStyle = g; c.fillRect(0, H, W, 1);
+
+  // «СОРТИРОВКА:» (обрезана по ширине 80, как в игре), кнопка с названием сетки и кнопка правки
+  const by = H + 20, bh = 34;
+  c.save(); c.beginPath(); c.rect(-4, by, 72, bh); c.clip();
+  font(`500 11px ${ui}`, 1); text('СОРТИРОВКА:', 68, by + bh / 2, 'rgba(128,143,166,.85)', 'right');
+  c.restore();
+  const btn = (x, w) => box(x, by, w, bh, vgrad(by, by + bh, ['#262c30', '#121719']), 'rgba(255,255,255,.16)', 3);
+  btn(75, 183); btn(265, 49);
+  c.save(); c.beginPath(); c.rect(80, by, 150, bh); c.clip();
+  font(`16px ${ui}`); text(S.configName || 'Моя сетка', 86, by + bh / 2 + 1, '#dae2e5');
+  c.restore();
+  c.fillStyle = '#dae2e5'; c.beginPath(); c.moveTo(235, by + 14); c.lineTo(249, by + 14); c.lineTo(242, by + 21); c.fill();
+  // карандаш на кнопке правки
+  c.save(); c.translate(289.5, by + bh / 2); c.rotate(Math.PI / 4);
+  c.fillStyle = '#dae2e5'; c.fillRect(-2.5, -9, 5, 13); c.beginPath(); c.moveTo(-2.5, 5); c.lineTo(2.5, 5); c.lineTo(0, 9); c.fill();
+  c.restore();
+
+  // фильтры: подписи и серые плашки с иконками (wash-color #616d7e)
+  const fy = H + 28, fh = 25;
+  const tile = (x, w, kind) => {
+    c.beginPath(); c.moveTo(x + 3, fy); c.lineTo(x + w, fy); c.lineTo(x + w - 3, fy + fh); c.lineTo(x, fy + fh); c.closePath();
+    c.fillStyle = '#7d8797'; c.fill();
+    const cx = x + w / 2, cy = fy + fh / 2;
+    c.fillStyle = c.strokeStyle = '#22272f'; c.lineWidth = 2; c.beginPath();
+    if (kind === 'd') { c.moveTo(cx, cy - 6); c.lineTo(cx + 6, cy); c.lineTo(cx, cy + 6); c.lineTo(cx - 6, cy); c.fill(); }
+    else if (kind === 'x') { c.moveTo(cx - 6, cy - 6); c.lineTo(cx + 6, cy + 6); c.moveTo(cx + 6, cy - 6); c.lineTo(cx - 6, cy + 6); c.stroke(); }
+    else if (kind === 'o') { c.arc(cx, cy, 6, 0, 7); c.stroke(); }
+    else if (kind === 's') { c.moveTo(cx - 6, cy - 6); c.lineTo(cx + 6, cy - 6); c.lineTo(cx + 5, cy + 2); c.lineTo(cx, cy + 7); c.lineTo(cx - 5, cy + 2); c.fill(); }
+    else { c.moveTo(cx - 6, cy + 6); c.lineTo(cx + 6, cy - 6); c.stroke(); c.beginPath(); c.arc(cx - 4, cy + 4, 2.5, 0, 7); c.fill(); }
+  };
+  font(`500 13px ${ui}`, 1.6);
+  const groups = [['ТИП', 611, 585, 29.5, 'x/'], ['СЛОЖНОСТЬ', 704, 677, 27.5, 'ddd'], ['МЕТКИ', 879, 769, 29.3, '/x/os/xs'], ['БИЛЕТЫ', 1143, 1129, 30, 'o']];
+  for (const [name, lx, x0, step, kinds] of groups) {
+    text(name, lx, H + 16, '#aab4c3', 'center');
+    [...kinds].forEach((k, i) => tile(x0 + i * step, step - 2, k));
+  }
+  text('НАКЛЕЙКИ', 1044, H + 16, '#aab4c3', 'center');
+  c.setLineDash([2.5, 2.5]); c.strokeStyle = '#7d8797'; c.lineWidth = 1.3;
+  c.beginPath(); c.arc(1044, fy + fh / 2, 11, 0, 7); c.stroke(); c.setLineDash([]);
+
+  // нижняя панель: группа, чат, «ИГРАТЬ»
+  const py = FB + 30;
+  box(-208, py, 316, 63, '#0e1014', 'rgba(255,255,255,.07)');
+  box(-198, py + 8, 40, 46, vgrad(py + 8, py + 54, ['#565b62', '#2f3338']));
+  c.fillStyle = '#c9ccd0'; c.beginPath(); c.arc(-178, py + 24, 8, 0, 7); c.fill(); c.fillRect(-190, py + 34, 24, 16);
+  for (let k = 0; k < 4; k++) {
+    box(-156 + k * 40, py + 8, 38, 46, '#1c2027');
+    c.fillStyle = '#343a43'; c.beginPath(); c.arc(-137 + k * 40, py + 24, 6, 0, 7); c.fill(); c.fillRect(-146 + k * 40, py + 32, 18, 12);
+  }
+  box(52, py + 9, 44, 44, '#1b1915', '#b99b5b');
+  c.strokeStyle = '#b99b5b'; c.lineWidth = 2.5;
+  for (let k = 0; k < 3; k++) { c.beginPath(); c.moveTo(62 + k * 9, py + 45); c.lineTo(80 + k * 9, py + 17); c.stroke(); }
+  c.fillStyle = '#15181d'; c.strokeStyle = 'rgba(255,255,255,.14)'; c.lineWidth = 1.5;
+  c.beginPath(); c.arc(142, py + 34, 23, 0, 7); c.fill(); c.stroke();
+  c.fillStyle = '#e6e8eb';
+  for (const dx of [-8, 0, 8]) { c.beginPath(); c.arc(142 + dx, py + 29, 3.2, 0, 7); c.fill(); c.fillRect(142 + dx - 3.5, py + 33, 7, 7); }
+
+  const cw = 596, cx0 = W / 2 - 6 - cw / 2, cy0 = FB + 62;
+  box(cx0, cy0, cw, 29, 'rgba(6,7,9,.9)', 'rgba(255,255,255,.06)');
+  font(`13px ${ui}`);
+  text('(Группа):', cx0 + 6, cy0 + 15, '#8fb3e4');
+  const lw = c.measureText('(Группа): ').width;
+  text('Введите сообщение или символ "/" для команд.', cx0 + 6 + lw, cy0 + 15, '#777d86');
+  c.fillStyle = '#9aa0a8'; c.beginPath(); c.arc(cx0 + cw - 68, cy0 + 14.5, 6.5, 0, 7); c.fill();
+  box(cx0 + cw - 50, cy0 + 4, 22, 21, '#2a2f37'); box(cx0 + cw - 25, cy0 + 4, 22, 21, '#2a2f37');
+  text('?', cx0 + cw - 14, cy0 + 15, '#b8bdc4', 'center');
+
+  const bx = 1093, bw = 288, bt = FB + 48, bh2 = 44;
+  box(bx, bt, bw, bh2, vgrad(bt, bt + bh2, ['#4f8f47', '#3a7437', '#2d5b2b']), 'rgba(170,220,150,.45)');
+  c.strokeStyle = 'rgba(255,255,255,.08)'; c.lineWidth = 1.2;
+  c.beginPath(); c.moveTo(bx + 20, bt + bh2); c.lineTo(bx + 70, bt); c.moveTo(bx + bw - 60, bt + bh2); c.lineTo(bx + bw - 10, bt); c.stroke();
+  font(`bold 22px ${serif}`, 4.5); text('ИГРАТЬ', bx + bw / 2 + 2, bt + bh2 / 2 + 1, '#eef4ea', 'center');
+
+  c.letterSpacing = '0px'; c.textAlign = 'left';
+  c.restore();
+}
+
+// Всё, что за пределами сетки, Дота прячет под прокрутку (#GridCategories { overflow: scroll }).
+function drawGameScrollbars(c) {
+  const bb = bboxOf(st.els);
+  if (!bb) return;
+  const bottom = bb.y + bb.h, right = bb.x + bb.w;
+  c.fillStyle = 'rgba(150,165,185,.55)';
+  if (bottom > GRID.h + 1) { c.beginPath(); c.roundRect(GRID.w + 2, 0, 5, GRID.h * GRID.h / bottom, 2.5); c.fill(); }
+  if (right > GRID.w + 1) { c.beginPath(); c.roundRect(0, GRID.h - 7, GRID.w * GRID.w / right, 5, 2.5); c.fill(); }
+}
+
+// Лист холста: белая бумага в редакторе, экран героев Доты в превью (подложки в игре нет).
+function drawArea(c, editor) {
+  if (!editor) { drawDotaScreen(c); return; }
+  c.fillStyle = T.sheet; c.fillRect(0, 0, S.areaW, S.areaH);
   const bg = st.bg;
   if (bg.img && bg.show) {
     const f = Convert.fitRect(bg.img.naturalWidth, bg.img.naturalHeight, S.areaW, S.areaH);
     c.globalAlpha = bg.opacity; c.drawImage(bg.img, f.x, f.y, f.w, f.h); c.globalAlpha = 1;
     // «приглушение» уводит подложку в цвет листа, чтобы рисунок поверх читался
-    if (bg.dim > 0) { c.fillStyle = editor ? `rgba(${T.fade},${bg.dim})` : `rgba(0,0,0,${bg.dim})`; c.fillRect(0, 0, S.areaW, S.areaH); }
+    if (bg.dim > 0) { c.fillStyle = `rgba(${T.fade},${bg.dim})`; c.fillRect(0, 0, S.areaW, S.areaH); }
   }
 }
 
@@ -232,11 +455,12 @@ function render() {
   ctx.fillStyle = T.dot;
   for (let y = oy; y < H; y += sg) for (let x = ox; x < W; x += sg) ctx.fillRect(x - 0.75, y - 0.75, 1.5, 1.5);
 
-  // тень листа
+  // тень листа (в превью — тень всего «экрана» игры)
+  const V = viewRect();
   ctx.save();
-  ctx.shadowColor = T.shadow; ctx.shadowBlur = 24; ctx.shadowOffsetY = 6;
-  ctx.fillStyle = editor ? T.sheet : '#100e0b';
-  ctx.fillRect(st.panX, st.panY, S.areaW * z, S.areaH * z);
+  ctx.shadowColor = editor ? T.shadow : 'rgba(0,0,0,.45)'; ctx.shadowBlur = editor ? 24 : 40; ctx.shadowOffsetY = editor ? 6 : 12;
+  ctx.fillStyle = editor ? T.sheet : GAME.bg;
+  ctx.fillRect(st.panX + V.x * z, st.panY + V.y * z, V.w * z, V.h * z);
   ctx.restore();
 
   ctx.setTransform(dpr * z, 0, 0, dpr * z, dpr * st.panX, dpr * st.panY);
@@ -255,13 +479,19 @@ function render() {
     if (t >= 1) st.fade = null;
     else { const a = 1 - (1 - t) ** 3, ids = st.fade.ids; fade = e => ids.has(e.id) ? a : 1; requestRender(); }
   }
-  renderEls(ctx, st.els, { editor, zoom: z, fade });
+  if (editor) renderEls(ctx, st.els, { editor, zoom: z, fade });
+  else {
+    ctx.save(); ctx.beginPath(); ctx.rect(0, 0, GRID.w, GRID.h); ctx.clip();
+    renderEls(ctx, st.els, { editor, zoom: z, fade });
+    ctx.restore();
+    drawGameScrollbars(ctx);
+  }
 
   if (st.ghost) {
     ctx.globalAlpha = 0.7; ctx.fillStyle = T.accent;
-    ctx.font = `${S.fontSize}px ${fontFamily()}`; ctx.textBaseline = 'top';
+    ctx.font = labelFont(); ctx.textBaseline = 'top';
     const ch = currentPen(), w = measure(ch);
-    for (const [cx, cy] of st.ghost) ctx.fillText(ch, cx * S.cellW + (S.cellW - w) / 2, cy * S.cellH + (S.cellH - S.fontSize) / 2);
+    for (const [cx, cy] of st.ghost) ctx.fillText(up(ch), cx * S.cellW + (S.cellW - w) / 2, cy * S.cellH + (S.cellH - LBL.size) / 2);
     ctx.globalAlpha = 1;
   }
 
@@ -269,21 +499,21 @@ function render() {
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   const sx = x => x * z + st.panX, sy = y => y * z + st.panY;
   ctx.strokeStyle = T.border; ctx.lineWidth = 1;
-  ctx.strokeRect(Math.round(sx(0)) + .5, Math.round(sy(0)) + .5, Math.round(S.areaW * z), Math.round(S.areaH * z));
+  ctx.strokeRect(Math.round(sx(V.x)) + .5, Math.round(sy(V.y)) + .5, Math.round(V.w * z), Math.round(V.h * z));
   // подпись листа, как в макете: «Холст · 1200 × 600»
   ctx.fillStyle = T.label; ctx.font = '11px "Geist Mono", Consolas, monospace'; ctx.textBaseline = 'bottom';
-  ctx.fillText(`${st.preview ? 'Превью' : 'Холст'} · ${S.areaW} × ${S.areaH}`, Math.round(sx(0)), Math.round(sy(0)) - 8);
+  ctx.fillText(editor ? `Холст · ${S.areaW} × ${S.areaH}` : 'Как в игре · экран «Герои», 16:9', Math.round(sx(V.x)), Math.round(sy(V.y)) - 8);
   if (editor && st.sel.size) {
     const list = selEls();
     ctx.strokeStyle = T.accent; ctx.lineWidth = 1;
-    if (list.length <= 3000) for (const e of list) { const b = bounds(e); ctx.strokeRect(sx(b.x) + .5, sy(b.y) + .5, b.w * z, b.h * z); }
+    if (list.length <= 150) for (const e of list) { const b = bounds(e); ctx.strokeRect(sx(b.x) + .5, sy(b.y) + .5, b.w * z, b.h * z); }
     const bb = bboxOf(list);
     if (list.length > 1) {
       ctx.setLineDash([4, 4]); ctx.strokeStyle = T.dash;
       ctx.strokeRect(Math.round(sx(bb.x)) - 4.5, Math.round(sy(bb.y)) - 4.5, bb.w * z + 9, bb.h * z + 9); ctx.setLineDash([]);
     }
     if (list.length === 1 && list[0].t === 'hero') {
-      const e = list[0], hx = sx(e.x + e.w), hy = sy(e.y + e.h);
+      const e = list[0], hx = sx(e.x + e.w), hy = sy(e.y + HEAD + e.h);
       ctx.fillStyle = T.sheet; ctx.strokeStyle = T.accent; ctx.lineWidth = 1.5;
       ctx.beginPath(); ctx.rect(hx - 4.5, hy - 4.5, 9, 9); ctx.fill(); ctx.stroke();
     }
@@ -318,13 +548,20 @@ function updateChrome() {
 // Вписываем лист в свободное место между плавающими панелями.
 function fitView(animate = true) {
   const W = canvas.clientWidth, H = canvas.clientHeight;
-  const ins = $('#inspector');
-  const right = ins.offsetWidth && W > 900 ? ins.offsetWidth + 28 : 0;
+  const ins = $('#inspector'), V = viewRect();
+  // в превью инспектор и док спрятаны — экран игры занимает всё место
+  const right = !st.preview && ins.offsetWidth && W > 900 ? ins.offsetWidth + 28 : 0;
   // отступ сверху — от нижнего края плавающих панелей (на узком экране их два ряда)
-  const top = Math.max(...$$('.bar').map(el => el.getBoundingClientRect().bottom)) + 42, bottom = 90, side = 40;
+  const top = Math.max(...$$('.bar').map(el => el.getBoundingClientRect().bottom)) + (st.preview ? 34 : 42), bottom = st.preview ? 66 : 90, side = st.preview ? 28 : 40;
   const aw = W - right - side * 2, ah = H - top - bottom;
-  const z = clamp(Math.min(aw / S.areaW, ah / S.areaH), 0.05, 20);
-  animateView(z, side + (aw - S.areaW * z) / 2, top + (ah - S.areaH * z) / 2, animate);
+  const z = clamp(Math.min(aw / V.w, ah / V.h), 0.05, 20);
+  animateView(z, side + (aw - V.w * z) / 2 - V.x * z, top + (ah - V.h * z) / 2 - V.y * z, animate);
+}
+function setPreview(on) {
+  st.preview = on;
+  document.body.classList.toggle('previewing', on);
+  canvas.style.cursor = on ? 'grab' : '';
+  fitView();
 }
 // Плавный переход вида: зум интерполируется логарифмически, чтобы скорость ощущалась ровной.
 let viewAnim = 0;
@@ -440,8 +677,8 @@ function transformSel(fn, charMap, swap) {
     const [nx, ny] = fn(b.x + b.w / 2 - cx, b.y + b.h / 2 - cy);
     if (e.t === 'hero' && swap) [e.w, e.h] = [e.h, e.w];
     if (e.t === 'glyph' && charMap) e.name = mapChars(e.name, charMap);
-    const nb = bounds(e);
-    e.x = cx + nx - nb.w / 2; e.y = cy + ny - nb.h / 2;
+    const nb = bounds(e), [ox, oy] = boundsOff(e);
+    e.x = cx + nx - nb.w / 2 - ox; e.y = cy + ny - nb.h / 2 - oy;
   }
   changed(true);
 }
@@ -453,8 +690,8 @@ function scaleList(list, k, ox, oy) {
     const b = bounds(e);
     const ncx = ox + (b.x + b.w / 2 - ox) * k, ncy = oy + (b.y + b.h / 2 - oy) * k;
     if (e.t === 'hero') { e.w *= k; e.h *= k; }
-    const nb = bounds(e);
-    e.x = ncx - nb.w / 2; e.y = ncy - nb.h / 2;
+    const nb = bounds(e), [bx, by] = boundsOff(e);
+    e.x = ncx - nb.w / 2 - bx; e.y = ncy - nb.h / 2 - by;
   }
 }
 function scaleSel(k) {
@@ -489,7 +726,7 @@ function selAsAscii() {
   const glyphs = selEls().filter(e => e.t === 'glyph');
   // строки текста (например, Брайль строками) — просто сверху вниз, как для профиля Steam
   if (!glyphs.length) return steamText(selEls().filter(e => e.t === 'text').sort((a, b) => a.y - b.y).map(e => e.name));
-  const cells = glyphs.map(e => ({ c: Math.floor((e.x + measure(e.name) / 2) / S.cellW), r: Math.floor((e.y + S.fontSize / 2) / S.cellH), ch: e.name }));
+  const cells = glyphs.map(e => { const p = glyphCenter(e); return { c: Math.floor(p.x / S.cellW), r: Math.floor(p.y / S.cellH), ch: e.name }; });
   const c0 = Math.min(...cells.map(q => q.c)), r0 = Math.min(...cells.map(q => q.r));
   const rows = [];
   for (const q of cells) {
@@ -505,7 +742,10 @@ const currentPen = () => st.customPen || st.pen;
 const DRAW_TOOLS = ['pencil', 'line', 'hv', 'rect', 'ellipse', 'rhombus', 'triangle'];
 const SHAPE_TOOLS = ['rect', 'ellipse', 'rhombus', 'triangle'];
 const cellOf = w => ({ x: Math.floor(w.x / S.cellW), y: Math.floor(w.y / S.cellH) });
-const glyphKey = e => Math.floor((e.x + measure(e.name) / 2) / S.cellW) + ',' + Math.floor((e.y + S.fontSize / 2) / S.cellH);
+const glyphKey = e => { const p = glyphCenter(e); return Math.floor(p.x / S.cellW) + ',' + Math.floor(p.y / S.cellH); };
+// позиция категории, при которой символ встанет по центру клетки (подпись в игре сдвинута на LBL.dx/dy)
+const cellX = (cx, w) => cx * S.cellW + (S.cellW - w) / 2 - LBL.dx;
+const cellY = cy => cy * S.cellH + (S.cellH - LBL.size) / 2 - LBL.dy;
 function glyphIndex() { const m = new Map(); for (const e of st.els) if (e.t === 'glyph') m.set(glyphKey(e), e); return m; }
 
 function lineCells(a, b) {
@@ -557,8 +797,8 @@ function toolCells(tool, a, b, shift) {
 function placeGlyph(idx, cx, cy, ch, g) {
   const key = cx + ',' + cy, old = idx.get(key);
   const w = measure(ch);
-  if (old) { if (old.name === ch) return false; old.name = ch; old.x = cx * S.cellW + (S.cellW - w) / 2; return true; }
-  const [e] = addEls([{ t: 'glyph', name: ch, x: cx * S.cellW + (S.cellW - w) / 2, y: cy * S.cellH + (S.cellH - S.fontSize) / 2, g }], { group: false, select: false });
+  if (old) { if (old.name === ch) return false; old.name = ch; old.x = cellX(cx, w); return true; }
+  const [e] = addEls([{ t: 'glyph', name: ch, x: cellX(cx, w), y: cellY(cy), g }], { group: false, select: false });
   idx.set(key, e);
   return true;
 }
@@ -584,14 +824,15 @@ function onHandle(w) {
   const e = selEls()[0];
   if (e.t !== 'hero') return null;
   const t = 7 / st.zoom;
-  return Math.abs(w.x - (e.x + e.w)) < t && Math.abs(w.y - (e.y + e.h)) < t ? e : null;
+  return Math.abs(w.x - (e.x + e.w)) < t && Math.abs(w.y - (e.y + HEAD + e.h)) < t ? e : null;
 }
 
 canvas.addEventListener('pointerdown', e => {
   if (document.activeElement && document.activeElement !== document.body) document.activeElement.blur();
   canvas.setPointerCapture(e.pointerId);
   const w = toWorld(e), tool = st.tool;
-  if (e.button === 1 || spaceDown || tool === 'pan') {
+  // в превью холст только двигается — редактировать нечем, панели спрятаны
+  if (e.button === 1 || spaceDown || tool === 'pan' || st.preview) {
     drag = { kind: 'pan', sx: e.clientX, sy: e.clientY, px: st.panX, py: st.panY };
     canvas.style.cursor = 'grabbing'; return;
   }
@@ -626,7 +867,7 @@ canvas.addEventListener('pointerdown', e => {
     st.rect = { kind: 'erase', x: w.x, y: w.y, w: 0, h: 0 };
   } else if (tool === 'text') {
     snapshot();
-    addEls([{ t: 'text', name: 'Текст', x: w.x, y: w.y - S.fontSize / 2 }], { group: false });
+    addEls([{ t: 'text', name: 'Текст', x: w.x - LBL.dx, y: w.y - LBL.size / 2 - LBL.dy }], { group: false });
     changed(true);
     setTimeout(() => { const f = $('#fName'); if (f) { f.focus(); f.select(); } });
   } else if (tool === 'hero') {
@@ -690,7 +931,8 @@ function endDrag(e) {
       let r = st.rect;
       if (r.w < 20 || r.h < 20) r = { x: d.a.x, y: d.a.y, w: (CARD_W * 4 + PAD), h: (CARD_H * 2 + PAD) };
       snapshot();
-      addEls([{ t: 'hero', name: 'Категория', ...r, heroes: [] }], { group: false });
+      // рамка — это список героев; строка с названием стоит над ним
+      addEls([{ t: 'hero', name: 'Категория', ...r, y: r.y - HEAD, heroes: [] }], { group: false });
       changed(true); break;
     }
     case 'pencil': if (d.any) changed(true); else st.undo.pop(); break;
@@ -719,7 +961,7 @@ canvas.addEventListener('wheel', e => {
 
 function updateCursor(w) {
   let c = '';
-  if (spaceDown || st.tool === 'pan') c = 'grab';
+  if (spaceDown || st.tool === 'pan' || st.preview) c = 'grab';
   else if (st.tool === 'select') c = onHandle(w) ? 'nwse-resize' : hitTest(w) ? 'move' : 'default';
   else if (st.tool === 'text') c = 'text';
   else c = 'crosshair';
@@ -834,11 +1076,9 @@ function renderInspector() {
 
   html += panel('canvas', 'Холст', `
     <div class="row2">${num('areaW', 'W', S.areaW, 'min="100" step="10"')}${num('areaH', 'H', S.areaH, 'min="100" step="10"')}</div>
-    ${slider('fontSize', 'Размер символа', 6, 40, 1, S.fontSize, 'px')}
-    <div class="row2" title="Цвета в режиме «Превью»"><label class="swatch"><input type="color" id="glyphColor" value="${S.glyphColor}">ASCII</label><label class="swatch"><input type="color" id="textColor" value="${S.textColor}">Текст</label></div>
     ${sw('showGrid', 'Сетка плотности', S.showGrid)}
     ${sw('snap', 'Привязка ASCII к сетке', S.snap)}
-    <button class="font-drop" id="btnFont"><b>Шрифт Radiance${st.userFont ? ' <i>загружен</i>' : ''}</b><span>${st.userFont ? 'Клик — загрузить другой. ' : 'Загрузи .ttf, чтобы превью совпадало с игрой. '}Размер и цвет влияют только на превью.</span></button>
+    <button class="font-drop" id="btnFont"><b>Шрифт Radiance${st.userFont ? ' <i>загружен</i>' : ''}</b><span>${st.userFont ? 'Клик — загрузить другой. ' : 'Загрузи .ttf, чтобы превью совпадало с игрой. '}Цвет и шрифт подписей в Доте не меняются — редактор показывает их как в игре.</span></button>
     ${st.userFont ? '<button class="link" id="btnFontReset">Сбросить шрифт</button>' : ''}
     <button class="link" id="btnClear">Очистить холст</button>`);
 
@@ -915,9 +1155,6 @@ function bindInspector(list) {
   for (const id of ['cellW', 'cellH']) on(id, 'change', ev => { S[id] = Math.max(2, +ev.target.value || 10); persist(); requestRender(); });
 
   for (const id of ['areaW', 'areaH']) on(id, 'change', ev => { S[id] = Math.max(100, +ev.target.value || 100); persist(); fitView(); });
-  on('fontSize', 'input', ev => { S.fontSize = +ev.target.value; resetMeasure(); syncRange(ev.target); persist(); requestRender(); });
-  on('glyphColor', 'input', ev => { S.glyphColor = ev.target.value; persist(); requestRender(); });
-  on('textColor', 'input', ev => { S.textColor = ev.target.value; persist(); requestRender(); });
   on('showGrid', 'change', ev => { S.showGrid = ev.target.checked; persist(); requestRender(); });
   on('snap', 'change', ev => { S.snap = ev.target.checked; persist(); });
   on('btnFont', 'click', () => $('#fileFont').click());
@@ -1082,7 +1319,7 @@ function openImageModal(file) {
     if (id === 'steamW') setBcols(60);
     else if (id === 'steamFit') {
       if (!img) return;
-      const len = cols => [...steamText(Convert.ascii(img, { ...IP, mode: 'braille', cols }, { w: S.areaW, h: S.areaH }, measure, S.fontSize).lines)].length;
+      const len = cols => [...steamText(Convert.ascii(img, { ...IP, mode: 'braille', cols }, { w: S.areaW, h: S.areaH }, measure, LBL.size).lines)].length;
       if (len(IP.bcols) <= STEAM_LIMIT) { toast('Уже влезает в лимит Steam', 'ok'); return; }
       let lo = 10, hi = IP.bcols;
       while (hi - lo > 1) { const mid = (lo + hi) >> 1; len(mid) <= STEAM_LIMIT ? lo = mid : hi = mid; }
@@ -1101,15 +1338,18 @@ function openImageModal(file) {
     if (!img) { draw(); return; }
     const area = { w: S.areaW, h: S.areaH };
     const t0 = performance.now();
+    const toCategories = els => { for (const e of els) { e.x -= LBL.dx; e.y -= LBL.dy; } };
     let info = '';
     if (IP.mode === 'mosaic') {
       const pool = HEROES.map((h, i) => i).filter(i => !disabledHeroes.has(HEROES[i].id));
-      result = Convert.mosaic(img, IP, area, HEROES, pool);
+      // над каждой полосой мозаики есть строка названия 20px — оставляем под неё место сверху
+      result = Convert.mosaic(img, IP, { w: area.w - 3, h: area.h - HEAD - 3 }, HEROES, pool); // −3: запас на SLACK, чтобы не появилась прокрутка
       const n = result.els.reduce((a, e) => a + e.heroes.length, 0);
       info = `${result.cols}×${result.rows} · ${n} героев (${result.uniq} разных) · ${result.els.length} категорий`;
       if (!pool.length) info = 'В палитре нет ни одного героя';
     } else if (IP.mode === 'ascii') {
-      result = Convert.ascii(img, { ...IP, mode: IP.amode, cols: IP.bcols }, area, measure, S.fontSize);
+      result = Convert.ascii(img, { ...IP, mode: IP.amode, cols: IP.bcols }, area, measure, LBL.size);
+      toCategories(result.els);
       if (result.th !== undefined && IP.autoThreshold) { const t = $('#threshold'); if (t) { t.value = IP.threshold = result.th; syncRange(t); } }
       info = `${result.els.length} категорий`;
       if (result.lines) {
@@ -1118,7 +1358,8 @@ function openImageModal(file) {
         if (c) { c.textContent = `${n.toLocaleString('ru')} / 8 000`; c.classList.toggle('bad', n > STEAM_LIMIT); }
       }
     } else {
-      result = Convert.lineart(img, { ...IP, step: IP.lstep }, area, measure, S.fontSize);
+      result = Convert.lineart(img, { ...IP, step: IP.lstep }, area, measure, LBL.size);
+      toCategories(result.els);
       info = `${result.els.length} категорий` + (result.step > IP.lstep + 0.01 ? ` · шаг увеличен до ${result.step.toFixed(1)} из-за лимита` : '');
     }
     $('#ipInfo').textContent = info + ` · ${Math.round(performance.now() - t0)} мс`;
@@ -1131,8 +1372,7 @@ function openImageModal(file) {
     const c = pv.getContext('2d');
     const z = Math.min((W - 40) / S.areaW, (H - 40) / S.areaH), ox = (W - S.areaW * z) / 2, oy = (H - S.areaH * z) / 2;
     c.setTransform(dpr * z, 0, 0, dpr * z, dpr * ox, dpr * oy);
-    const g = c.createLinearGradient(0, 0, 0, S.areaH); g.addColorStop(0, '#1b1813'); g.addColorStop(1, '#100e0b');
-    c.fillStyle = g; c.fillRect(0, 0, S.areaW, S.areaH);
+    c.fillStyle = GAME.bg; c.fillRect(0, 0, S.areaW, S.areaH);
     if (!img) return;
     const sx = S.areaW * split;
     c.save(); c.beginPath(); c.rect(sx, 0, S.areaW - sx, S.areaH); c.clip();
@@ -1208,7 +1448,7 @@ function openAsciiModal(prefill = '') {
       const sx = +$('#asX').value || S.cellW, sy = +$('#asY').value || S.cellH;
       lines.forEach((line, r) => [...line].forEach((ch, c) => {
         if (/\s/.test(ch) || ch === BRAILLE_BLANK) return;
-        els.push({ t: 'glyph', name: ch, x: c * sx + (sx - measure(ch)) / 2, y: r * sy + (sy - S.fontSize) / 2 });
+        els.push({ t: 'glyph', name: ch, x: c * sx + (sx - measure(ch)) / 2, y: r * sy + (sy - LBL.size) / 2 });
       }));
     } else {
       const lh = +$('#asLH').value || 14;
@@ -1310,10 +1550,10 @@ async function importJsonFiles(items) {
     snapshot();
     if (document.querySelector('input[name=imMode]:checked').value === 'replace') { st.els = []; S.configName = chosen[0].c.config_name || S.configName; $('#configName').value = S.configName; }
     const ids = [];
-    for (const x of chosen) ids.push(...addEls((x.c.categories || []).map(categoryToEl), { select: false }).map(e => e.id));
-    st.sel = new Set(ids);
+    for (const x of chosen) ids.push(...addEls((x.c.categories || []).map(categoryToEl), { select: false, group: false }).map(e => e.id));
+    st.sel.clear();
     changed(true); m.close(); setTool('select');
-    toast(`Импортировано ${ids.length} категорий из ${chosen.length} сет.`, 'ok');
+    toast(`Импортировано ${ids.length} категорий из ${chosen.length} сет. Каждую можно двигать отдельно, рамкой — выделить несколько.`, 'ok');
   };
 }
 function categoryToEl(c) {
@@ -1374,7 +1614,7 @@ function openHelp() {
   const K = [['Выделение / рука', 'V / H, пробел'], ['Карандаш, линия, гор./верт.', 'P, L, I'], ['Прямоуг., эллипс, ромб, треуг.', 'R, O, D, Y'], ['Ластик, текст, герои', 'E, T, G'],
     ['Ровно / квадрат', 'Shift при рисовании'], ['Стереть карандашом', 'ПКМ'], ['Выделить один элемент группы', 'Alt + клик'], ['Добавить к выделению', 'Shift + клик'],
     ['Группировать / разгруппировать', 'Ctrl+G / Ctrl+Shift+G'], ['Дублировать', 'Ctrl+D'], ['Копировать / вставить', 'Ctrl+C / Ctrl+V'], ['Удалить', 'Delete'],
-    ['Сдвиг', 'Стрелки (Shift ×10)'], ['Отменить / повторить', 'Ctrl+Z / Ctrl+Shift+Z'], ['Зум', 'колесо, + / −'], ['Вписать холст', 'Shift+1'], ['Превью как в игре', 'Tab'], ['Вставить картинку', 'Ctrl+V']];
+    ['Сдвиг', 'Стрелки (Shift ×10)'], ['Отменить / повторить', 'Ctrl+Z / Ctrl+Shift+Z'], ['Зум', 'колесо, + / −'], ['Вписать холст', 'Shift+1'], ['Как в игре / назад', 'Tab, Esc'], ['Вставить картинку', 'Ctrl+V']];
   openModal(`${modalHead('Горячие клавиши')}<div class="modal-body"><div class="keys">${K.map(([a, b]) => `<span>${a}</span><span><kbd>${b}</kbd></span>`).join('')}</div></div>
     <div class="modal-foot"><span class="info">Автор · Discord <b style="color:var(--ink)">@ahttps</b> — связь, заказы, предложения</span><button class="btn sm" id="copyDiscord">Скопировать ник</button></div>`);
   $('#copyDiscord').onclick = () => copyText('ahttps', 'Ник Discord скопирован');
@@ -1402,7 +1642,7 @@ async function loadFont(buf, silent) {
   try {
     const f = new FontFace('GPUserFont', buf); await f.load(); document.fonts.add(f);
     st.userFont = true; resetMeasure(); renderInspector(); requestRender();
-    if (!silent) toast('Шрифт загружен — превью текста теперь ближе к игре', 'ok');
+    if (!silent) toast('Шрифт загружен — превью «В игре» теперь точнее', 'ok');
     return true;
   } catch (e) { if (!silent) toast('Не удалось загрузить шрифт: ' + e.message, 'err'); return false; }
 }
@@ -1416,7 +1656,8 @@ $('#btnUndo').onclick = undo; $('#btnRedo').onclick = redo;
 $('#zoomIn').onclick = () => zoomAt(1.25, canvas.clientWidth / 2, canvas.clientHeight / 2, true);
 $('#zoomOut').onclick = () => zoomAt(0.8, canvas.clientWidth / 2, canvas.clientHeight / 2, true);
 $('#zoomVal').onclick = () => fitView();
-$('#btnPreview').onclick = () => { st.preview = !st.preview; requestRender(); };
+$('#btnPreview').onclick = () => setPreview(!st.preview);
+$('#btnBack').onclick = () => setPreview(false);
 $('#btnHelp').onclick = openHelp;
 $('#btnTheme').onclick = toggleTheme;
 const addMenu = $('#addMenu');
@@ -1503,6 +1744,9 @@ document.addEventListener('keydown', e => {
   if ($('#modalRoot').children.length) return;
   const k = e.key.toLowerCase(), ctrl = e.ctrlKey || e.metaKey;
   const code = e.code;
+  // в превью работают только вид, тема и выход — правки вслепую не нужны
+  if (st.preview && !['Tab', 'Escape', '+', '=', '-', '?'].includes(e.key) && code !== 'Space'
+    && !(e.shiftKey && (code === 'Digit1' || code === 'KeyT')) && !(ctrl && code === 'KeyS')) return;
   if (code === 'Space') { if (!spaceDown) { spaceDown = true; canvas.style.cursor = 'grab'; } e.preventDefault(); return; }
   if (ctrl && code === 'KeyZ') { e.preventDefault(); e.shiftKey ? redo() : undo(); return; }
   if (ctrl && code === 'KeyY') { e.preventDefault(); redo(); return; }
@@ -1513,8 +1757,8 @@ document.addEventListener('keydown', e => {
   if (ctrl && code === 'KeyS') { e.preventDefault(); openExportModal(); return; }
   if (ctrl) return;
   if (e.key === 'Delete' || e.key === 'Backspace') { e.preventDefault(); deleteSel(); return; }
-  if (e.key === 'Escape') { clearSel(); return; }
-  if (e.key === 'Tab') { e.preventDefault(); st.preview = !st.preview; requestRender(); return; }
+  if (e.key === 'Escape') { if (st.preview) setPreview(false); else clearSel(); return; }
+  if (e.key === 'Tab') { e.preventDefault(); setPreview(!st.preview); return; }
   if (e.key === '?') { openHelp(); return; }
   if (e.shiftKey && code === 'KeyT') { toggleTheme(); return; }
   if (e.shiftKey && code === 'Digit1') { fitView(); return; }
@@ -1540,7 +1784,17 @@ document.addEventListener('input', e => { if (e.target.type === 'range') syncRan
 (function init() {
   applyIcons();
   const saved = load('gp2.els', null);
-  if (Array.isArray(saved) && saved.length) { st.els = saved; reindex(); }
+  if (Array.isArray(saved) && saved.length) {
+    st.els = saved;
+    // генераторы дают группы одного типа; смешанная группа — это склеенный старым импортом файл
+    if (!load('gp2.fixImportGroups', false)) {
+      const types = new Map();
+      for (const e of st.els) if (e.g) (types.get(e.g) || types.set(e.g, new Set()).get(e.g)).add(e.t === 'hero' ? 'hero' : 'label');
+      for (const e of st.els) if (e.g && types.get(e.g).size > 1) e.g = 0;
+      store('gp2.fixImportGroups', true);
+    }
+    reindex();
+  }
   const font = load('gp2.font', null);
   if (font) {
     const bin = atob(font), u = new Uint8Array(bin.length);

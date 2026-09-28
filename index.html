@@ -3,11 +3,17 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>GridPainter</title>
+<title>Dota 2 Grid Studio — редактор сетки героев</title>
+<meta name="description" content="Рисуй ASCII-арт, line-art и мозаику из героев прямо в сетке героев Dota 2 и получай готовый hero_grid_config.json. Работает в браузере, без установки.">
+<meta name="theme-color" content="#121211">
+<meta property="og:title" content="Dota 2 Grid Studio">
+<meta property="og:description" content="Редактор кастомных сеток героев Dota 2: ASCII-арт, line-art и мозаика из героев с превью как в игре.">
+<meta property="og:type" content="website">
+<meta property="og:image" content="https://shttps.github.io/GridPainter/docs/ingame.webp">
 <link rel="icon" href="logo.svg" type="image/svg+xml">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500&display=swap">
-<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="style.css?v=5">
 <script>
   // тема до первой отрисовки — чтобы не мигало
   try { document.documentElement.dataset.theme = localStorage.getItem('gp2.theme') || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'); } catch { document.documentElement.dataset.theme = 'light'; }
@@ -28,7 +34,7 @@
   </div>
 
   <header class="float bar bar-left">
-    <a class="brand" title="GridPainter"><img src="logo.svg" alt="" class="logo"><span>GridPainter</span></a>
+    <a class="brand" title="Dota 2 Grid Studio"><img src="logo.svg" alt="" class="logo"><span>Grid Studio</span><em>Dota 2</em></a>
     <span class="sep"></span>
     <label class="title-wrap" title="Название сетки в Доте">
       <input class="title-input" id="configName" spellcheck="false">
@@ -58,7 +64,7 @@
     <button class="btn ghost mono zoom-val" id="zoomVal" data-tip="Вписать · Shift+1">100%</button>
     <button class="icon-btn sm" id="zoomIn" data-tip="Приблизить · +">+</button>
     <span class="sep"></span>
-    <button class="btn ghost" id="btnPreview" data-tip="Как в игре · Tab">Превью</button>
+    <button class="btn ghost" id="btnPreview" data-icon="eye" data-tip="Как в игре · Tab">В игре</button>
     <button class="icon-btn theme-btn" id="btnTheme" data-tip="Тема · Shift+T"></button>
     <span class="badge" id="catCount" data-tip="Категорий в сетке">0 кат.</span>
     <button class="btn primary" id="btnExport">Экспорт</button>
@@ -86,6 +92,8 @@
     <button class="dock-help" id="btnHelp" data-tip="Горячие клавиши · ?">?</button>
   </nav>
 
+  <div class="preview-hint" id="previewHint"><span>Так сетка выглядит в Доте · <kbd>Tab</kbd> или <kbd>Esc</kbd> — назад</span><button class="btn sm primary" id="btnBack">К редактору</button></div>
+
   <div class="status"><span id="stCoords">x — · y —</span><span class="dot">·</span><span id="stTool"></span><span id="stSel"></span></div>
 </main>
 
@@ -96,8 +104,8 @@
 <input type="file" id="fileBg" accept="image/*" hidden>
 <input type="file" id="fileFont" accept=".ttf,.otf,.woff,.woff2" hidden>
 
-<script src="heroes.js"></script>
-<script src="convert.js"></script>
-<script src="app.js"></script>
+<script src="heroes.js?v=5"></script>
+<script src="convert.js?v=5"></script>
+<script src="app.js?v=5"></script>
 </body>
 </html>

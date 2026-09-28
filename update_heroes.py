@@ -16,19 +16,36 @@ op = urllib.request.build_opener()
 op.addheaders = [("User-Agent", "Mozilla/5.0")]
 urllib.request.install_opener(op)
 
-CDN = "https://cdn.cloudflare.steamstatic.com/apps/dota2/images/dota_react/heroes/"
-CARD_W, CARD_H = 51, 83  # пропорции карточки героя в сетке (panorama hero_grid_new.css)
+CDN = "https://cdn.cloudflare.steamstatic.com/apps/dota2/images/"
+# В сетке игра показывает вертикальный портрет (heroimagestyle="portrait"), обрезанный «cover»
+# под картинку карточки: 51×83 минус отступ 4px с каждой стороны (panorama hero_grid_new.css).
+IMG_W, IMG_H = 51 - 8, 83 - 8
+
+
+def fetch(url):
+    return Image.open(io.BytesIO(urllib.request.urlopen(url).read())).convert("RGB")
+
+
+def cover_crop(im):
+    w, h = im.size
+    if w / h > IMG_W / IMG_H:
+        cw = h * IMG_W / IMG_H
+        return im.crop((int((w - cw) / 2), 0, int((w + cw) / 2), h))
+    ch = w * IMG_H / IMG_W
+    return im.crop((0, int((h - ch) / 2), w, int((h + ch) / 2)))
 
 
 def hero_color(h):
     short = h["name"].replace("npc_dota_hero_", "")
-    im = Image.open(io.BytesIO(urllib.request.urlopen(CDN + short + ".png").read())).convert("RGB")
-    w, H = im.size
-    cw = H * CARD_W / CARD_H  # центральный вертикальный кроп, как карточка в сетке
-    x0 = (w - cw) / 2
-    crop = im.crop((int(x0), 0, int(x0 + cw), H))
-    c = crop.resize((1, 1), Image.BOX).getpixel((0, 0))
-    return dict(id=h["id"], n=h["localized_name"], s=short, a=h["primary_attr"], c="%02x%02x%02x" % c)
+    try:
+        im, vert = fetch(CDN + "heroes/" + short + "_vert.jpg"), 1
+    except Exception:  # у новых героев вертикального портрета на CDN нет — берём широкий
+        im, vert = fetch(CDN + "dota_react/heroes/" + short + ".png"), 0
+    c = cover_crop(im).resize((1, 1), Image.BOX).getpixel((0, 0))
+    r = dict(id=h["id"], n=h["localized_name"], s=short, a=h["primary_attr"], c="%02x%02x%02x" % c)
+    if vert:
+        r["v"] = 1
+    return r
 
 
 def main():
