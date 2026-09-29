@@ -391,3 +391,17 @@ body:not(.previewing) .preview-hint { display: none; }
 .steam-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 12.5px; }
 .steam-head .badge { margin: 0; background: var(--card); }
 .steam-head .badge.bad { background: var(--bad-bg); }
+
+/* ---------- публикация в каталог ---------- */
+textarea.input.plain { min-height: 76px; font: 13px/1.45 var(--font); white-space: pre-wrap; }
+.pub-thumb { position: relative; border-radius: 12px; overflow: hidden; background: #1d140e; aspect-ratio: 1204 / 612; box-shadow: var(--shadow-sm); }
+.pub-thumb img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.pub-thumb span { position: absolute; left: 10px; bottom: 10px; padding: 3px 8px; border-radius: 7px; background: rgba(0, 0, 0, .55); color: #dfe4ea; font: 500 11px var(--mono); backdrop-filter: blur(4px); }
+.pub-done { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 8px; padding: 14px 0 6px; }
+.pub-done b { font-size: 16px; font-weight: 600; }
+.pub-done > span { color: var(--muted); max-width: 380px; }
+.pub-ok { display: grid; place-items: center; width: 44px; height: 44px; border-radius: 50%; background: var(--ok-bg); color: var(--ok); font-size: 20px; font-weight: 700; margin-bottom: 4px; }
+.pub-link { display: flex; gap: 8px; width: 100%; margin-top: 8px; }
+.pub-link .input { font: 12px var(--mono); }
+a.btn { text-decoration: none; }
+@media (max-width: 1100px) { #btnPublish { font-size: 0; gap: 0; padding: 0 9px; } }

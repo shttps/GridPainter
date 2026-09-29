@@ -50,6 +50,9 @@ const ICONS = {
   x: 'M6 6l12 12M18 6L6 18',
   save: 'M5 4h11l3 3v13H5zM8 4v5h7V4M8 20v-6h8v6',
   font: 'M5 19L10.5 5h3L19 19M7.5 13.5h9',
+  upload: 'M12 15V4M7.5 8.5L12 4l4.5 4.5M5 20h14',
+  link: 'M10 14a4 4 0 005.7 0l3-3a4 4 0 00-5.7-5.7l-1 1M14 10a4 4 0 00-5.7 0l-3 3a4 4 0 005.7 5.7l1-1',
+  grid: 'M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z',
 };
 const icon = n => `<svg class="i" viewBox="0 0 24 24"><path d="${ICONS[n] || ''}"/></svg>`;
 function applyIcons(root = document) {
@@ -1519,7 +1522,7 @@ async function pickJsonFiles() {
     return await new Promise(res => { const i = $('#fileJson'); i.value = ''; i.onchange = () => res([...i.files].map(file => ({ file, handle: null }))); i.click(); });
   } catch (e) { if (e.name !== 'AbortError') toast('Не удалось открыть: ' + e.message, 'err'); return []; }
 }
-async function importJsonFiles(items) {
+async function importJsonFiles(items, { remember = true } = {}) {
   const files = [];
   for (const { file, handle } of items) {
     try {
@@ -1529,7 +1532,7 @@ async function importJsonFiles(items) {
     } catch (e) { toast(`${file.name}: не похоже на hero_grid_config.json (${e.message})`, 'err'); }
   }
   if (!files.length) return;
-  if (!st.gridFile) st.gridFile = files[0];
+  if (remember && !st.gridFile) st.gridFile = files[0];
   const all = files.flatMap((f, fi) => f.data.configs.map((c, ci) => ({ f, fi, ci, c })));
   const m = openModal(`
     ${modalHead('Импорт сеток')}
@@ -1540,7 +1543,7 @@ async function importJsonFiles(items) {
         <label><input type="radio" name="imMode" value="replace" ${st.els.length ? '' : 'checked'}><b>Заменить холст</b><small>редактировать эти сетки</small></label>
         <label><input type="radio" name="imMode" value="add" ${st.els.length ? 'checked' : ''}><b>Добавить на холст</b><small>к тому, что уже есть</small></label>
       </div>
-      <div class="hint">Файл <b>${esc(st.gridFile.name)}</b> запомнен: при экспорте сетку можно дописать в него, не трогая остальные.</div>
+      ${remember ? `<div class="hint">Файл <b>${esc(st.gridFile.name)}</b> запомнен: при экспорте сетку можно дописать в него, не трогая остальные.</div>` : ''}
     </div>
     <div class="modal-foot"><button class="btn sm" id="imAll">Выбрать все</button><span class="info"></span><button class="btn" data-close>Отмена</button><button class="btn primary" id="imGo" data-icon="download">Импортировать</button></div>`);
   $('#imAll').onclick = () => $$('.cfg-list input').forEach(i => i.checked = true);
@@ -1610,6 +1613,55 @@ function openExportModal() {
   };
 }
 
+// ----- каталог сеток -----
+function openPublishModal() {
+  if (!st.els.length) { toast('Холст пустой — нарисуй что-нибудь или открой JSON, потом выкладывай', 'err'); return; }
+  const API = CatalogAPI, cats = st.els.map(elToCategory), info = GridRender.stats(cats);
+  let thumb;
+  try { thumb = GridRender.thumb(cats, { font: fontFamily() }); } catch (e) { toast('Не удалось сделать превью: ' + e.message, 'err'); return; }
+  const m = openModal(`
+    ${modalHead('Выложить в каталог')}
+    <div class="modal-body" id="pbBody">
+      <div class="pub-thumb"><img src="${thumb}" alt="Превью сетки"><span>${API.KINDS[info.kind]} · ${info.cats.toLocaleString('ru')} кат.</span></div>
+      <label class="field"><span>Название</span><input class="input" id="pbTitle" maxlength="60" value="${esc(S.configName)}"></label>
+      <label class="field"><span>Ник автора</span><input class="input" id="pbAuthor" maxlength="32" placeholder="Аноним" value="${esc(API.author())}"></label>
+      <label class="field"><span>Описание · необязательно</span><textarea class="input plain" id="pbDesc" maxlength="500" rows="3" placeholder="Что нарисовано, как лучше смотрится, пожелания"></textarea></label>
+      <div class="hint">${API.remote ? 'Сетку увидят все посетители каталога. Удалить её можно из этого же браузера.' : '<b>Демо-режим:</b> каталог ещё не подключён к базе, поэтому сетка сохранится только в этом браузере.'}
+        На карточке герои показаны цветными плитками, на странице сетки — настоящими портретами.</div>
+    </div>
+    <div class="modal-foot"><span class="info" id="pbInfo"></span><button class="btn" data-close>Отмена</button><button class="btn primary" id="pbGo" data-icon="upload">Опубликовать</button></div>`);
+  applyIcons(m.root);
+  const go = $('#pbGo');
+  go.onclick = async () => {
+    const title = $('#pbTitle').value.trim(), author = $('#pbAuthor').value.trim();
+    if (!title) { $('#pbTitle').focus(); toast('Дай сетке название', 'err'); return; }
+    go.disabled = true; $('#pbInfo').textContent = 'Публикую…';
+    try {
+      API.setAuthor(author);
+      const id = await API.publish({ title, author, description: $('#pbDesc').value, config: { config_name: title, categories: cats }, thumb });
+      const url = new URL('catalog.html?id=' + id, location.href).href;
+      $('#pbBody').innerHTML = `<div class="pub-done"><div class="pub-ok">✓</div><b>«${esc(title)}» в каталоге</b><span>Поделись ссылкой — по ней сетку можно посмотреть, скачать и открыть в редакторе.</span>
+        <div class="pub-link"><input class="input" readonly value="${esc(url)}"><button class="btn" id="pbCopy" data-icon="link">Копировать</button></div></div>`;
+      m.root.querySelector('.modal-foot').innerHTML = `<button class="btn" data-close>Закрыть</button><a class="btn primary" href="catalog.html?id=${id}" data-icon="grid">Открыть в каталоге</a>`;
+      applyIcons(m.root);
+      for (const b of $$('[data-close]', m.root)) b.onclick = m.close;
+      $('#pbCopy').onclick = () => copyText(url, 'Ссылка скопирована');
+    } catch (e) {
+      go.disabled = false; $('#pbInfo').textContent = '';
+      toast(e.message, 'err');
+    }
+  };
+}
+// editor.html?grid=<id> — сетка из каталога
+async function openCatalogGrid(id) {
+  try {
+    const g = await CatalogAPI.get(id);
+    CatalogAPI.hit(id);
+    const text = JSON.stringify({ version: 3, configs: [g.config] });
+    importJsonFiles([{ file: { name: g.title, text: async () => text }, handle: null }], { remember: false });
+  } catch (e) { toast(e.message, 'err'); }
+}
+
 function openHelp() {
   const K = [['Выделение / рука', 'V / H, пробел'], ['Карандаш, линия, гор./верт.', 'P, L, I'], ['Прямоуг., эллипс, ромб, треуг.', 'R, O, D, Y'], ['Ластик, текст, герои', 'E, T, G'],
     ['Ровно / квадрат', 'Shift при рисовании'], ['Стереть карандашом', 'ПКМ'], ['Выделить один элемент группы', 'Alt + клик'], ['Добавить к выделению', 'Shift + клик'],
@@ -1652,6 +1704,7 @@ $('#configName').value = S.configName;
 $('#configName').oninput = e => { S.configName = e.target.value; persist(); };
 $('#btnOpen').onclick = $('#esOpen').onclick = async () => importJsonFiles(await pickJsonFiles());
 $('#btnExport').onclick = openExportModal;
+$('#btnPublish').onclick = openPublishModal;
 $('#btnUndo').onclick = undo; $('#btnRedo').onclick = redo;
 $('#zoomIn').onclick = () => zoomAt(1.25, canvas.clientWidth / 2, canvas.clientHeight / 2, true);
 $('#zoomOut').onclick = () => zoomAt(0.8, canvas.clientWidth / 2, canvas.clientHeight / 2, true);
@@ -1809,4 +1862,12 @@ document.addEventListener('input', e => { if (e.target.type === 'range') syncRan
   setTool('select');
   // шрифты меняют ширину кнопок дока — переставим «таблетку», когда они загрузятся
   document.fonts.ready.then(moveDockInd);
+  // ссылки из каталога: ?grid=<id> — открыть сетку, ?publish — сразу окно публикации
+  const qs = new URLSearchParams(location.search);
+  if (qs.has('grid') || qs.has('publish')) {
+    history.replaceState(null, '', location.pathname);
+    if (qs.get('grid')) openCatalogGrid(qs.get('grid'));
+    else if (st.els.length) setTimeout(openPublishModal, 250);
+    else toast('Нарисуй сетку или открой свой JSON, потом нажми «В каталог» сверху', 'ok');
+  }
 })();
