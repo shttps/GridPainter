@@ -21,6 +21,17 @@ const ICONS = {
   link: 'M10 14a4 4 0 005.7 0l3-3a4 4 0 00-5.7-5.7l-1 1M14 10a4 4 0 00-5.7 0l-3 3a4 4 0 005.7 5.7l1-1',
   edit: 'M4 20l4.2-1L19 8.2 15.8 5 5 15.8zM13.5 7.3l3.2 3.2',
   x: 'M6 6l12 12M18 6L6 18',
+  check: 'M5 12.5l4.5 4.5L19 7.5',
+  file: 'M6 3.5h8l4.5 4.5v12.5H6zM14 3.5V8h4.5M9 13h6M9 16.5h4',
+  swap: 'M8 8l-4 4 4 4M16 8l4 4-4 4',
+  pencil: 'M4 20l4.2-1L19 8.2 15.8 5 5 15.8zM13.5 7.3l3.2 3.2',
+  line: 'M5 19L19 5',
+  rect: 'M4.5 5.5h15v13h-15z',
+  ellipse: 'M12 5.5c4.4 0 8 2.9 8 6.5s-3.6 6.5-8 6.5-8-2.9-8-6.5 3.6-6.5 8-6.5z',
+  rhombus: 'M12 3.5l8 8.5-8 8.5-8-8.5z',
+  triangle: 'M12 4.5l8.5 15h-17z',
+  text: 'M5 7V5h14v2M12 5v14M9 19h6',
+  eraser: 'M15.5 4l4.5 4.5-9.5 9.5H6.5L4 15.5zM9 20h11M11 8.5l4.5 4.5',
 };
 const icon = n => `<svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="${ICONS[n] || ''}"/></svg>`;
 function applyIcons(root = document) {
@@ -169,21 +180,57 @@ function setUrlId(id) {
 }
 
 // ---------- главная ----------
+// портрет героя в сетке — вертикальный, как в игре
+const portrait = h => 'https://cdn.cloudflare.steamstatic.com/apps/dota2/images/' + (h.v ? `heroes/${h.s}_vert.jpg` : `dota_react/heroes/${h.s}.png`);
+const heroImgTag = (h, lazy = true) => `<img src="${portrait(h)}" alt="${esc(h.n)}" title="${esc(h.n)}" ${lazy ? 'loading="lazy"' : ''} decoding="async">`;
+function shuffled(list, seed = 7) {
+  const a = list.slice();
+  for (let i = a.length - 1; i > 0; i--) { seed = (seed * 16807) % 2147483647; const j = seed % (i + 1); [a[i], a[j]] = [a[j], a[i]]; }
+  return a;
+}
+
+// ---------- главная ----------
 function initHome() {
-  // экран монитора: кнопка «play» показывает демо — рисунок в редакторе и тот же рисунок в игре
-  const screen = $('#screen'), img = $('#screenImg'), still = img.src;
-  $('#play').onclick = () => {
-    const on = !screen.classList.toggle('playing');
-    img.src = on ? still : 'docs/demo.gif';
-  };
-  screen.addEventListener('click', e => { if (screen.classList.contains('playing') && !e.target.closest('#play')) { screen.classList.remove('playing'); img.src = still; } });
   $('#authorChip').onclick = () => copyText('ahttps', 'Ник в Discord скопирован: ahttps');
+  const heroes = window.HEROES || [], still = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  // лёгкий наклон монитора за курсором
+  const hero = $('#hero'), device = $('#device');
+  if (!still && matchMedia('(pointer: fine)').matches) {
+    hero.addEventListener('pointermove', e => {
+      const r = hero.getBoundingClientRect(), x = (e.clientX - r.left) / r.width - .5, y = (e.clientY - r.top) / r.height - .5;
+      device.style.setProperty('--ry', (x * 8).toFixed(2) + 'deg'); device.style.setProperty('--rx', (-y * 5).toFixed(2) + 'deg');
+    });
+    hero.addEventListener('pointerleave', () => { device.style.setProperty('--ry', '0deg'); device.style.setProperty('--rx', '0deg'); });
+  }
+
+  // плашка «127 героев»: три портрета
+  const pick = shuffled(heroes, 11);
+  $('#fcFaces').innerHTML = pick.slice(0, 3).map(h => heroImgTag(h, false)).join('');
+  $('.fc-heroes b').textContent = `${heroes.length} ${plural(heroes.length, 'герой', 'героя', 'героев')}`;
+
+  // лента портретов: каждый ряд продублирован, чтобы прокрутка была бесконечной
+  const half = Math.ceil(pick.length / 2), rowA = pick.slice(0, half), rowB = pick.slice(half);
+  $('#mqA').innerHTML = [...rowA, ...rowA].map(h => heroImgTag(h)).join('');
+  $('#mqB').innerHTML = [...rowB, ...rowB].map(h => heroImgTag(h)).join('');
+
+  // мозаика: 8 × 3 портрета, проявляются, когда плитка доезжает до экрана
+  const mosaic = $('#mosaic');
+  mosaic.innerHTML = shuffled(heroes, 3).slice(0, 24).map((h, i) => heroImgTag(h).replace('<img', `<img style="transition-delay:${(i % 8) * 45 + Math.floor(i / 8) * 90}ms"`)).join('');
+  new IntersectionObserver((es, io) => { if (es.some(e => e.isIntersecting)) { mosaic.classList.add('in'); io.disconnect(); } }, { threshold: .3 }).observe(mosaic);
+
+  // «до / после»
+  const cmp = $('#compare'), range = $('input', cmp);
+  range.oninput = () => cmp.style.setProperty('--pos', range.value + '%');
 
   const box = $('#latest');
   box.innerHTML = skeletons(3);
-  API.list({ limit: 6 }).then(({ items }) => {
+  API.list({ limit: 6 }).then(({ items, total }) => {
+    // пустой каталог — не «0», а приглашение стать первым
+    $('#catNum').textContent = total ? num(total) : '#1';
+    $('.big-num span').textContent = total ? plural(total, 'сетка', 'сетки', 'сеток') + ' в каталоге' : 'стань первым автором';
     box.innerHTML = items.length ? items.map(cardHTML).join('') : `<div class="cards-empty"><b>Здесь пока пусто</b><span>Стань первым: нарисуй сетку в редакторе и нажми «В каталог».</span><a class="btn primary sm" href="editor.html">Открыть редактор</a></div>`;
-  }).catch(() => { box.closest('.section').hidden = true; });
+  }).catch(() => { box.closest('.section').hidden = true; $('#catNum').textContent = '∞'; });
   box.onclick = e => { const c = e.target.closest('.gcard[data-id]'); if (c) location.href = 'catalog.html?id=' + encodeURIComponent(c.dataset.id); };
 }
 

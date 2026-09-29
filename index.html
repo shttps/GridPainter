@@ -11,19 +11,19 @@
 <meta property="og:type" content="website">
 <meta property="og:image" content="https://shttps.github.io/GridPainter/docs/ingame.webp">
 <link rel="icon" href="logo.svg" type="image/svg+xml">
+<link rel="preload" href="docs/hero.gif" as="image" fetchpriority="high">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500&display=swap">
-<link rel="stylesheet" href="site.css?v=1">
+<link rel="stylesheet" href="site.css?v=2">
 </head>
 <body data-page="home">
 
-<section class="hero">
+<section class="hero" id="hero">
+  <div class="hero-bg" aria-hidden="true"><div class="bg-grid"></div><div class="orb orb-a"></div><div class="orb orb-b"></div></div>
+
   <div class="wrap">
     <header class="top">
-      <a class="logo" href="index.html" aria-label="Grid Studio — на главную">
-        <img src="logo.svg" alt="" width="26" height="26">
-        <span><b>Grid</b>Studio</span>
-      </a>
+      <a class="logo" href="index.html" aria-label="Grid Studio — на главную"><img src="logo.svg" alt="" width="26" height="26"><span><b>Grid</b>Studio</span></a>
       <nav class="nav">
         <a href="catalog.html">Каталог</a>
         <a href="editor.html">Редактор</a>
@@ -34,69 +34,145 @@
 
   <div class="wrap hero-main">
     <div class="hero-copy">
-      <h1>Твоя сетка героев Dota&nbsp;2.</h1>
+      <a class="eyebrow" href="catalog.html"><span class="dot"></span>Новое: каталог готовых сеток <span data-icon="arrow"></span></a>
+      <h1>Твоя сетка героев <span class="grad">Dota&nbsp;2.</span></h1>
       <p>Grid Studio — сайт, на котором вы можете создать свою сетку героев, используя встроенные инструменты и своё воображение.</p>
       <div class="hero-cta">
-        <a class="btn primary" href="editor.html"><span class="ico-box" data-icon="brush"></span>Создать свою сетку</a>
-        <a class="btn" href="catalog.html"><span class="ico-box" data-icon="grid"></span>Каталог сеток</a>
+        <a class="btn primary lg" href="editor.html"><span class="ico-box" data-icon="brush"></span>Создать свою сетку</a>
+        <a class="btn lg" href="catalog.html"><span class="ico-box" data-icon="grid"></span>Каталог сеток</a>
       </div>
+      <ul class="perks">
+        <li data-icon="check">Бесплатно</li>
+        <li data-icon="check">Прямо в браузере</li>
+        <li data-icon="check">Без установки</li>
+      </ul>
       <div class="authors">
         <span>Автор</span>
         <button class="author" id="authorChip" title="Скопировать ник в Discord"><span class="ava">A</span>@ahttps</button>
       </div>
     </div>
 
-    <div class="scene" aria-hidden="false">
+    <div class="scene" id="scene">
       <svg class="mark" viewBox="0 0 400 410" preserveAspectRatio="none" aria-hidden="true">
         <defs>
-          <linearGradient id="mk-top" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#3a3846"/><stop offset="1" stop-color="#23212c"/></linearGradient>
+          <linearGradient id="mk-top" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#3d3a4b"/><stop offset="1" stop-color="#211f2a"/></linearGradient>
           <linearGradient id="mk-side" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#1c1b24"/><stop offset="1" stop-color="#0d0d12"/></linearGradient>
+          <linearGradient id="mk-edge" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="rgba(201,188,255,0)"/><stop offset=".7" stop-color="rgba(201,188,255,.55)"/><stop offset="1" stop-color="rgba(201,188,255,.1)"/></linearGradient>
         </defs>
         <!-- скоба из логотипа, «выдавленная» в объём -->
         <path d="M20 20H380V390H344V56H20Z" fill="url(#mk-side)" transform="translate(9 9)"/>
         <path d="M20 20H380V390H344V56H20Z" fill="url(#mk-top)" stroke="rgba(255,255,255,.08)"/>
-        <path d="M20 20H380V390" fill="none" stroke="rgba(255,255,255,.2)" stroke-width="1.5"/>
+        <path d="M20 20H380V390" fill="none" stroke="url(#mk-edge)" stroke-width="1.6"/>
       </svg>
       <div class="slab"></div>
-      <div class="device">
-        <div class="screen" id="screen">
+      <div class="device" id="device">
+        <div class="screen">
           <div class="screen-in">
-            <img id="screenImg" src="docs/editor.webp" alt="Редактор Grid Studio: ASCII-арт в сетке героев" width="2000" height="1013">
+            <img src="docs/hero.gif" alt="Редактор Grid Studio: line-art Джаггернаута рисуется на холсте, потом тот же рисунок показан в экране героев Доты" width="1280" height="800" fetchpriority="high">
           </div>
-          <button class="play" id="play" aria-label="Показать, как это выглядит в игре">
-            <svg viewBox="0 0 100 100"><path d="M30 18.5c0-5 5.4-8.1 9.7-5.6l46.2 26.7c4.3 2.5 4.3 8.7 0 11.2L39.7 77.5C35.4 80 30 76.9 30 71.9z" fill="#fff"/></svg>
-          </button>
         </div>
+      </div>
+      <div class="float-card fc-file" aria-hidden="true">
+        <span class="fc-ico" data-icon="file"></span>
+        <span><b>hero_grid_config.json</b><small>экспорт готов</small></span>
+        <span class="fc-ok" data-icon="check"></span>
+      </div>
+      <div class="float-card fc-heroes" aria-hidden="true">
+        <span class="fc-faces" id="fcFaces"></span>
+        <span><b>127 героев</b><small>мозаика по цвету</small></span>
+      </div>
+      <div class="float-card fc-cats" aria-hidden="true">
+        <span><b>2 679</b><small>категорий в сетке</small></span>
+        <span class="fc-bars"><i></i><i></i><i></i><i></i><i></i></span>
       </div>
     </div>
   </div>
 
   <div class="wrap hero-foot">
     <a href="https://github.com/shttps/GridPainter" target="_blank" rel="noopener">Проект на GitHub <span data-icon="ext"></span></a>
+    <span class="scroll-cue" aria-hidden="true"><i></i></span>
     <span>shttps.github.io/GridPainter</span>
+  </div>
+</section>
+
+<section class="marquee" aria-label="Герои Dota 2">
+  <div class="mq-row" id="mqA"></div>
+  <div class="mq-row rev" id="mqB"></div>
+</section>
+
+<section class="section wrap">
+  <div class="section-head center">
+    <div><span class="kicker">Как это работает</span><h2>От идеи до сетки в игре — три шага</h2></div>
+  </div>
+  <ol class="steps">
+    <li class="step"><span class="step-n">01</span><b>Нарисуй или вставь картинку</b><span>Инструменты как в графическом редакторе, или Ctrl+V — и картинка станет line-art, ASCII или мозаикой из героев.</span></li>
+    <li class="step"><span class="step-n">02</span><b>Проверь «Как в игре»</b><span>Кнопка «В игре» показывает экран «Герои» Доты по её настоящим стилям: шрифт, отступы, прокрутка.</span></li>
+    <li class="step"><span class="step-n">03</span><b>Экспортируй и играй</b><span>Получи hero_grid_config.json и положи в папку игры. Или выложи сетку в каталог — пусть скачивают другие.</span></li>
+  </ol>
+</section>
+
+<section class="section wrap">
+  <div class="section-head">
+    <div><span class="kicker">Возможности</span><h2>Всё для твоей сетки</h2></div>
+    <a class="btn sm" href="editor.html">Открыть редактор <span data-icon="arrow"></span></a>
+  </div>
+  <div class="bento">
+    <article class="tile t-compare">
+      <div class="compare" id="compare" style="--pos:50%">
+        <img src="docs/lineart-src.webp" alt="Исходная картинка: Джаггернаут" width="810" height="918" loading="lazy">
+        <img class="after" src="docs/lineart-out.webp" alt="Он же в виде line-art из символов сетки" width="810" height="918" loading="lazy">
+        <span class="cmp-line"><span class="cmp-knob" data-icon="swap"></span></span>
+        <span class="cmp-tag l">Картинка</span><span class="cmp-tag r">Сетка</span>
+        <input type="range" min="0" max="100" value="50" aria-label="Сравнить картинку и результат">
+      </div>
+      <div class="tile-text"><span class="tile-ico" data-icon="image"></span><b>Картинка → line-art</b><span>Контуры через Canny, как в Photoshop. Символы сами поворачиваются по линии: <code>- \ | /</code>. Потяни ползунок.</span></div>
+    </article>
+    <article class="tile t-mosaic">
+      <div class="mosaic" id="mosaic" aria-hidden="true"></div>
+      <div class="tile-text"><span class="tile-ico" data-icon="grid"></span><b>Мозаика из героев</b><span>Каждая клетка — портрет, подобранный по цвету.</span></div>
+    </article>
+    <article class="tile t-ingame">
+      <div class="tile-img"><img src="docs/ingame.webp" alt="Сетка в экране «Герои» Dota 2" loading="lazy"></div>
+      <div class="tile-text"><span class="tile-ico" data-icon="eye"></span><b>Как в игре</b><span>Превью по стилям Доты — без запуска игры.</span></div>
+    </article>
+    <article class="tile t-tools">
+      <div class="tools" aria-hidden="true">
+        <span data-icon="pencil"></span><span data-icon="line"></span><span class="on" data-icon="rect"></span><span data-icon="ellipse"></span><span data-icon="rhombus"></span><span data-icon="triangle"></span><span data-icon="text"></span><span data-icon="eraser"></span>
+      </div>
+      <div class="tile-text"><span class="tile-ico" data-icon="brush"></span><b>Рисуй сам</b><span>Карандаш, фигуры, текст, группы, поворот и отражение.</span></div>
+    </article>
+    <article class="tile t-catalog">
+      <div class="big-num"><b id="catNum">—</b><span>сеток в каталоге</span></div>
+      <div class="tile-text"><span class="tile-ico" data-icon="upload"></span><b>Каталог от игроков</b><span>Скачивай чужие сетки и выкладывай свои в один клик.</span></div>
+      <a class="tile-link" href="catalog.html" aria-label="Открыть каталог"></a>
+    </article>
   </div>
 </section>
 
 <section class="section wrap">
   <div class="section-head">
-    <div><h2>Свежее в каталоге</h2><p>Сетки, которые выложили игроки. Открой любую в редакторе и доработай под себя.</p></div>
+    <div><span class="kicker">Каталог</span><h2>Свежие сетки</h2><p>Сетки, которые выложили игроки. Открой любую в редакторе и доработай под себя.</p></div>
     <a class="btn sm" href="catalog.html">Весь каталог <span data-icon="arrow"></span></a>
   </div>
   <div class="cards" id="latest"></div>
 </section>
 
-<section class="section wrap">
-  <div class="section-head"><div><h2>Что умеет редактор</h2></div></div>
-  <div class="features">
-    <div class="feature"><span class="fi" data-icon="image"></span><b>Картинка → сетка</b><span>Line-art по контурам, ASCII по яркости и мозаика из портретов героев. Вставь картинку через Ctrl+V и подкрути ползунки.</span></div>
-    <div class="feature"><span class="fi" data-icon="brush"></span><b>Рисуй сам</b><span>Карандаш, линии, фигуры, текст, категории героев, группы, поворот и отражение — как в графическом редакторе.</span></div>
-    <div class="feature"><span class="fi" data-icon="eye"></span><b>Как в игре</b><span>Режим «В игре» показывает экран «Герои» Доты по её настоящим стилям. Экспорт — готовый hero_grid_config.json.</span></div>
+<section class="wrap">
+  <div class="cta">
+    <div class="cta-bg" aria-hidden="true"></div>
+    <h2>Собери свою сетку за пять минут</h2>
+    <p>Открой редактор, вставь картинку — и заходи в Доту с новой сеткой.</p>
+    <div class="hero-cta center">
+      <a class="btn primary lg" href="editor.html"><span class="ico-box" data-icon="brush"></span>Создать свою сетку</a>
+      <a class="btn lg" href="catalog.html"><span class="ico-box" data-icon="grid"></span>Смотреть каталог</a>
+    </div>
   </div>
 </section>
 
 <footer class="wrap site-foot">
-  <span>© 2026 shttps · Dota 2 — товарный знак Valve Corporation, проект с Valve не связан.</span>
-  <a href="https://github.com/shttps/GridPainter" target="_blank" rel="noopener">GitHub</a>
+  <a class="logo" href="index.html"><img src="logo.svg" alt="" width="22" height="22"><span><b>Grid</b>Studio</span></a>
+  <nav class="foot-nav"><a href="editor.html">Редактор</a><a href="catalog.html">Каталог</a><a href="https://github.com/shttps/GridPainter" target="_blank" rel="noopener">GitHub</a></nav>
+  <span class="foot-note">© 2026 shttps · Discord @ahttps · Dota 2 — товарный знак Valve Corporation, проект с Valve не связан.</span>
 </footer>
 
 <div class="toasts" id="toasts"></div>
@@ -104,6 +180,6 @@
 <script src="config.js?v=6"></script>
 <script src="gridrender.js?v=6"></script>
 <script src="catalog-api.js?v=6"></script>
-<script src="site.js?v=1"></script>
+<script src="site.js?v=2"></script>
 </body>
 </html>
