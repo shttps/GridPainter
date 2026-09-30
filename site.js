@@ -6,43 +6,49 @@ const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': 
 const API = window.CatalogAPI;
 
 // ---------- иконки ----------
+// Та же система, что в редакторе: 24px, линия 1.75, скруглённые концы, currentColor.
+// Строка без «<» — это d у <path>, иначе — готовая разметка внутри <svg>.
 const ICONS = {
-  brush: 'M4 20c3 0 5-1.5 5-4a2.5 2.5 0 00-5 0M9.5 13.5L20 3M12 11l1.5 1.5',
-  grid: 'M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z',
-  upload: 'M12 15V4M7.5 8.5L12 4l4.5 4.5M5 20h14',
-  download: 'M12 4v11M7.5 10.5L12 15l4.5-4.5M5 20h14',
+  brush: 'M4 20l1-5L16 4l4 4L9 19zM13.5 6.5l4 4',
+  grid: '<rect x="3.5" y="3.5" width="17" height="17" rx="2"/><path d="M3.5 9.5h17M3.5 14.5h17M9.5 3.5v17M14.5 3.5v17"/>',
+  upload: 'M12 16V5M7 10l5-5 5 5M5 20h14',
+  download: 'M12 4v11M7 10l5 5 5-5M5 20h14',
   ext: 'M9 5H5v14h14v-4M13 4h7v7M20 4l-9 9',
   arrow: 'M5 12h14M13 6l6 6-6 6',
-  image: 'M4 5h16v14H4zM4 16l4.5-4.5 4 4 2.5-2.5L20 18M15.5 9.5h.01',
-  eye: 'M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12zM12 9.5a2.5 2.5 0 100 5 2.5 2.5 0 000-5z',
-  search: 'M10.5 4a6.5 6.5 0 100 13 6.5 6.5 0 000-13zM20 20l-4.8-4.8',
+  image: '<rect x="3.5" y="5" width="17" height="14" rx="2"/><circle cx="9" cy="10" r="1.5"/><path d="M20.5 16l-5-5-8.5 8"/>',
+  eye: '<path d="M2.5 12s3.5-6.5 9.5-6.5 9.5 6.5 9.5 6.5-3.5 6.5-9.5 6.5S2.5 12 2.5 12z"/><circle cx="12" cy="12" r="2.75"/>',
+  search: '<circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/>',
   heart: 'M12 20s-7.5-4.6-7.5-10A4.3 4.3 0 0112 7.3 4.3 4.3 0 0119.5 10c0 5.4-7.5 10-7.5 10z',
-  copy: 'M8.5 8.5h11v11h-11zM5 15.5V4.5h11',
+  copy: '<rect x="8.5" y="8.5" width="11" height="11" rx="2"/><path d="M5 15.5V6.5a2 2 0 012-2h8.5"/>',
   link: 'M10 14a4 4 0 005.7 0l3-3a4 4 0 00-5.7-5.7l-1 1M14 10a4 4 0 00-5.7 0l-3 3a4 4 0 005.7 5.7l1-1',
-  edit: 'M4 20l4.2-1L19 8.2 15.8 5 5 15.8zM13.5 7.3l3.2 3.2',
+  edit: 'M4 20l1-5L16 4l4 4L9 19zM13.5 6.5l4 4',
   x: 'M6 6l12 12M18 6L6 18',
   check: 'M5 12.5l4.5 4.5L19 7.5',
   file: 'M6 3.5h8l4.5 4.5v12.5H6zM14 3.5V8h4.5M9 13h6M9 16.5h4',
   swap: 'M8 8l-4 4 4 4M16 8l4 4-4 4',
-  pencil: 'M4 20l4.2-1L19 8.2 15.8 5 5 15.8zM13.5 7.3l3.2 3.2',
-  line: 'M5 19L19 5',
-  rect: 'M4.5 5.5h15v13h-15z',
-  ellipse: 'M12 5.5c4.4 0 8 2.9 8 6.5s-3.6 6.5-8 6.5-8-2.9-8-6.5 3.6-6.5 8-6.5z',
-  rhombus: 'M12 3.5l8 8.5-8 8.5-8-8.5z',
-  triangle: 'M12 4.5l8.5 15h-17z',
-  text: 'M5 7V5h14v2M12 5v14M9 19h6',
-  eraser: 'M15.5 4l4.5 4.5-9.5 9.5H6.5L4 15.5zM9 20h11M11 8.5l4.5 4.5',
+  cursor: 'M5.5 3.5L19 11.5 12.5 13 9.5 19.5z',
+  pencil: 'M4 20l1-5L16 4l4 4L9 19zM13.5 6.5l4 4',
+  line: '<path d="M6.5 17.5l11-11"/><circle cx="5" cy="19" r="1.75"/><circle cx="19" cy="5" r="1.75"/>',
+  rect: '<rect x="4" y="5.5" width="16" height="13" rx="1.5"/>',
+  ellipse: '<circle cx="12" cy="12" r="7.5"/>',
+  rhombus: 'M12 3.5l8.5 8.5-8.5 8.5-8.5-8.5z',
+  triangle: 'M12 4.5l8.5 14.5h-17z',
+  text: 'M5 6.5V4.5h14v2M12 4.5v15M9 19.5h6',
+  eraser: 'M8.5 19.5L4 15l9.5-9.5 5.5 5.5-9 8.5zM9 10.5l5 5M8.5 19.5H20',
+  heroes: '<rect x="4" y="4" width="6.5" height="6.5" rx="1.2"/><rect x="13.5" y="4" width="6.5" height="6.5" rx="1.2"/><rect x="4" y="13.5" width="6.5" height="6.5" rx="1.2"/><rect x="13.5" y="13.5" width="6.5" height="6.5" rx="1.2" fill="currentColor"/>',
 };
-const icon = n => `<svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="${ICONS[n] || ''}"/></svg>`;
+const icon = n => { const v = ICONS[n] || ''; return `<svg class="i" viewBox="0 0 24 24" aria-hidden="true">${v.startsWith('<') ? v : `<path d="${v}"/>`}</svg>`; };
 function applyIcons(root = document) {
   for (const el of $$('[data-icon]', root)) { if (!el.querySelector(':scope > svg.i')) el.insertAdjacentHTML('afterbegin', icon(el.dataset.icon)); }
 }
+// знак «штрих по сетке» для пустых состояний
+const MARK = '<svg class="empty-mark" viewBox="0 0 48 48" aria-hidden="true"><rect width="48" height="48" rx="12" class="mk-bg"/><path d="M13 35L35 13" class="mk-stroke"/></svg>';
 
 // ---------- мелочи ----------
 function toast(msg, kind = '') {
   const t = document.createElement('div'); t.className = 'toast ' + kind; t.textContent = msg;
   $('#toasts').appendChild(t);
-  setTimeout(() => t.remove(), kind === 'err' ? 5000 : 3000);
+  setTimeout(() => { t.classList.add('out'); setTimeout(() => t.remove(), 240); }, kind === 'err' ? 5000 : 3000);
 }
 async function copyText(s, ok) {
   try { await navigator.clipboard.writeText(s); toast(ok, 'ok'); } catch { toast('Не удалось скопировать', 'err'); }
@@ -219,9 +225,33 @@ function initHome() {
   mosaic.innerHTML = shuffled(heroes, 3).slice(0, 24).map((h, i) => heroImgTag(h).replace('<img', `<img style="transition-delay:${(i % 8) * 45 + Math.floor(i / 8) * 90}ms"`)).join('');
   new IntersectionObserver((es, io) => { if (es.some(e => e.isIntersecting)) { mosaic.classList.add('in'); io.disconnect(); } }, { threshold: .3 }).observe(mosaic);
 
-  // «до / после»
+  // «до / после»: пока не трогали — ползунок сам показывает разницу
   const cmp = $('#compare'), range = $('input', cmp);
-  range.oninput = () => cmp.style.setProperty('--pos', range.value + '%');
+  let touched = false;
+  range.oninput = () => { touched = true; cmp.style.setProperty('--pos', range.value + '%'); };
+  if (!still) new IntersectionObserver((es, io) => {
+    if (!es.some(e => e.isIntersecting)) return;
+    io.disconnect();
+    const t0 = performance.now();
+    const step = now => {
+      if (touched) return;
+      const t = Math.min(1, (now - t0) / 1800), pos = 50 + Math.sin(t * Math.PI * 2) * 22 * (1 - t);
+      cmp.style.setProperty('--pos', pos + '%'); range.value = pos;
+      if (t < 1) requestAnimationFrame(step);
+    };
+    requestAnimationFrame(step);
+  }, { threshold: .5 }).observe(cmp);
+
+  // док инструментов: оранжевая «таблетка» ходит по инструментам, как в редакторе
+  const dock = $('#toolsDemo'), ind = $('.tools-ind', dock), tools = $$('span', dock);
+  let cur = 0, timer = 0;
+  const place = () => { const b = tools[cur]; ind.style.transform = `translate(${b.offsetLeft}px, ${b.offsetTop}px)`; tools.forEach((x, k) => x.classList.toggle('on', k === cur)); };
+  place(); addEventListener('resize', place);
+  dock.addEventListener('mouseover', e => { const b = e.target.closest('span'); if (b) { cur = tools.indexOf(b); place(); } });
+  if (!still) new IntersectionObserver(es => {
+    clearInterval(timer);
+    if (es.some(e => e.isIntersecting)) timer = setInterval(() => { if (!dock.matches(':hover')) { cur = (cur + 1) % tools.length; place(); } }, 1500);
+  }, { threshold: .4 }).observe(dock);
 
   const box = $('#latest');
   box.innerHTML = skeletons(3);
@@ -229,7 +259,7 @@ function initHome() {
     // пустой каталог — не «0», а приглашение стать первым
     $('#catNum').textContent = total ? num(total) : '#1';
     $('.big-num span').textContent = total ? plural(total, 'сетка', 'сетки', 'сеток') + ' в каталоге' : 'стань первым автором';
-    box.innerHTML = items.length ? items.map(cardHTML).join('') : `<div class="cards-empty"><b>Здесь пока пусто</b><span>Стань первым: нарисуй сетку в редакторе и нажми «В каталог».</span><a class="btn primary sm" href="editor.html">Открыть редактор</a></div>`;
+    box.innerHTML = items.length ? items.map(cardHTML).join('') : `<div class="cards-empty">${MARK}<b>Здесь пока пусто</b><span>Стань первым: нарисуй сетку в редакторе и нажми «В каталог».</span><a class="btn primary sm" href="editor.html">Открыть редактор</a></div>`;
   }).catch(() => { box.closest('.section').hidden = true; $('#catNum').textContent = '∞'; });
   box.onclick = e => { const c = e.target.closest('.gcard[data-id]'); if (c) location.href = 'catalog.html?id=' + encodeURIComponent(c.dataset.id); };
 }
@@ -264,14 +294,17 @@ function initCatalog() {
   }
   const emptyHTML = () => f.q || f.kind !== 'all'
     ? `<div class="cards-empty"><b>Ничего не нашлось</b><span>${f.kind === 'mine' ? 'Ты ещё ничего не выкладывал из этого браузера.' : 'Попробуй другой запрос или фильтр.'}</span></div>`
-    : `<div class="cards-empty"><b>Здесь пока пусто</b><span>Стань первым: нарисуй сетку в редакторе и выложи её сюда.</span><a class="btn primary sm" href="editor.html?publish">Выложить сетку</a></div>`;
+    : `<div class="cards-empty">${MARK}<b>Здесь пока пусто</b><span>Стань первым: нарисуй сетку в редакторе и выложи её сюда.</span><a class="btn primary sm" href="editor.html?publish">Выложить сетку</a></div>`;
 
   let qt = 0;
   $('#q').oninput = e => { clearTimeout(qt); qt = setTimeout(() => { f.q = e.target.value; load(); }, 280); };
   $('#sort').onchange = e => { f.sort = e.target.value; load(); };
+  const chipInd = () => { const b = $('#kinds .chip.on'); $('#chipInd').style.cssText = `width:${b.offsetWidth}px;transform:translateX(${b.offsetLeft}px)`; };
+  chipInd(); document.fonts?.ready.then(chipInd); addEventListener('resize', chipInd);
   $('#kinds').onclick = e => {
     const b = e.target.closest('.chip'); if (!b || b.classList.contains('on')) return;
     $$('.chip', $('#kinds')).forEach(c => c.classList.toggle('on', c === b));
+    chipInd();
     f.kind = b.dataset.kind; load();
   };
   more.onclick = () => load(false);
@@ -290,5 +323,13 @@ function initCatalog() {
 }
 
 applyIcons();
+// блоки с data-reveal проявляются, когда доезжают до экрана
+{
+  const els = $$('[data-reveal]');
+  if ('IntersectionObserver' in window) {
+    const io = new IntersectionObserver(es => { for (const e of es) if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); } }, { threshold: .15, rootMargin: '0px 0px -40px 0px' });
+    els.forEach(el => io.observe(el));
+  } else els.forEach(el => el.classList.add('in'));
+}
 if (document.body.dataset.page === 'home') initHome();
 if (document.body.dataset.page === 'catalog') initCatalog();

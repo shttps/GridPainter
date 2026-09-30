@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Редактор · Dota 2 Grid Studio</title>
 <meta name="description" content="Рисуй ASCII-арт, line-art и мозаику из героев прямо в сетке героев Dota 2 и получай готовый hero_grid_config.json. Работает в браузере, без установки.">
-<meta name="theme-color" content="#121211">
+<meta name="theme-color" content="#0f0d0c">
 <meta property="og:title" content="Dota 2 Grid Studio">
 <meta property="og:description" content="Редактор кастомных сеток героев Dota 2: ASCII-арт, line-art и мозаика из героев с превью как в игре.">
 <meta property="og:type" content="website">
@@ -13,11 +13,11 @@
 <link rel="canonical" href="https://shttps.github.io/GridPainter/editor.html">
 <link rel="icon" href="logo.svg" type="image/svg+xml">
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500&display=swap">
-<link rel="stylesheet" href="style.css?v=6">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="style.css?v=8">
 <script>
-  // тема до первой отрисовки — чтобы не мигало
-  try { document.documentElement.dataset.theme = localStorage.getItem('gp2.theme') || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'); } catch { document.documentElement.dataset.theme = 'light'; }
+  // тема до первой отрисовки — чтобы не мигало; по умолчанию тёмная, как в макете
+  try { document.documentElement.dataset.theme = localStorage.getItem('gp2.theme') || 'dark'; } catch { document.documentElement.dataset.theme = 'dark'; }
 </script>
 </head>
 <body>
@@ -25,76 +25,110 @@
   <canvas id="canvas"></canvas>
 
   <div class="empty-state" id="emptyState" hidden>
-    <div class="es-title">С чего начнём?</div>
-    <div class="es-sub">Рисуй инструментами снизу или начни с готового</div>
+    <div class="es-title">Брось картинку сюда</div>
     <div class="es-actions">
-      <button class="es-btn" data-add="image"><span class="es-ico" data-icon="image"></span><b>Картинка</b><small>мозаика, ASCII, line-art</small></button>
-      <button class="es-btn" id="esOpen"><span class="es-ico" data-icon="folder"></span><b>Открыть JSON</b><small>hero_grid_config.json</small></button>
-      <button class="es-btn" data-add="ascii"><span class="es-ico" data-icon="ascii"></span><b>+ ASCII</b><small>вставить текст-арт</small></button>
+      <button class="pill" data-add="image" data-icon="image">Картинка</button>
+      <button class="pill" id="esOpen" data-icon="folder">JSON</button>
+      <button class="pill" data-add="ascii" data-icon="ascii">ASCII</button>
+      <a class="pill" href="catalog.html" data-icon="layers">Шаблоны</a>
     </div>
+    <div class="es-hint">или <kbd>Ctrl K</kbd> — все команды</div>
   </div>
 
-  <header class="float bar bar-left">
-    <a class="brand" href="index.html" title="На главную"><img src="logo.svg" alt="" class="logo"><span>Grid Studio</span><em>Dota 2</em></a>
-    <span class="sep"></span>
-    <label class="title-wrap" title="Название сетки в Доте">
-      <input class="title-input" id="configName" spellcheck="false">
-      <svg class="i chev" viewBox="0 0 24 24"><path d="M8 10l4 4 4-4"/></svg>
-    </label>
-    <span class="sep"></span>
-    <button class="btn ghost" id="btnOpen">Открыть JSON</button>
+  <!-- слева сверху: знак, название сетки, меню файла -->
+  <header class="float brand-pill" id="brandPill">
+    <a class="brand-logo" href="index.html" title="На главную">
+      <svg viewBox="0 0 48 48" aria-hidden="true"><rect width="48" height="48" rx="12" class="lg-bg"/><path d="M13 35L35 13" class="lg-stroke"/></svg>
+    </a>
+    <div class="brand-text">
+      <input class="title-input" id="configName" spellcheck="false" title="Название сетки в Доте" aria-label="Название сетки">
+      <span class="brand-sub">Grid Studio · <span id="saveState">сохранено</span></span>
+    </div>
     <div class="menu-wrap">
-      <button class="btn ghost" id="btnAdd">Добавить</button>
-      <div class="menu" id="addMenu">
-        <button data-add="image" data-icon="image">Картинку… <kbd>Ctrl V</kbd></button>
-        <button data-add="ascii" data-icon="ascii">ASCII из буфера</button>
-        <button data-add="lines" data-icon="lines">Генератор линий</button>
-        <button data-add="steam" data-icon="ascii">Арт для профиля Steam…</button>
+      <button class="icon-btn sm" id="btnMenu" data-icon="chev" aria-label="Меню"></button>
+      <div class="menu" id="mainMenu">
+        <button data-cmd="open" data-icon="folder">Открыть JSON…</button>
+        <button data-cmd="export" data-icon="download">Экспорт <kbd>Ctrl S</kbd></button>
+        <button data-cmd="publish" data-icon="upload">Выложить в каталог</button>
         <hr>
-        <button data-add="hero" data-icon="heroes">Категорию героев</button>
-        <button data-add="text" data-icon="text">Текст</button>
+        <button data-cmd="theme" data-icon="sun" id="menuTheme">Светлая тема <kbd>Shift T</kbd></button>
+        <button data-cmd="help" data-icon="help">Горячие клавиши <kbd>?</kbd></button>
+        <hr>
+        <a href="catalog.html" data-icon="grid">Каталог сеток</a>
+        <a href="index.html" data-icon="home">На главную</a>
       </div>
     </div>
   </header>
 
-  <div class="float bar bar-right">
-    <button class="icon-btn" id="btnUndo" data-icon="undo" data-tip="Отменить · Ctrl+Z"></button>
-    <button class="icon-btn" id="btnRedo" data-icon="redo" data-tip="Повторить · Ctrl+Shift+Z"></button>
-    <span class="sep"></span>
-    <button class="icon-btn sm" id="zoomOut" data-tip="Отдалить · −">−</button>
-    <button class="btn ghost mono zoom-val" id="zoomVal" data-tip="Вписать · Shift+1">100%</button>
-    <button class="icon-btn sm" id="zoomIn" data-tip="Приблизить · +">+</button>
-    <span class="sep"></span>
-    <button class="btn ghost" id="btnPreview" data-icon="eye" data-tip="Как в игре · Tab">В игре</button>
-    <button class="icon-btn theme-btn" id="btnTheme" data-tip="Тема · Shift+T"></button>
-    <span class="badge" id="catCount" data-tip="Категорий в сетке">0 кат.</span>
-    <button class="btn ghost" id="btnPublish" data-icon="upload" data-tip="Выложить в каталог сеток">В каталог</button>
-    <button class="btn primary" id="btnExport">Экспорт</button>
+  <!-- по центру: редактор / как в игре -->
+  <div class="float seg-switch" id="viewSwitch" role="tablist">
+    <span class="seg-ind" id="segInd"></span>
+    <button data-view="editor" class="on" data-icon="pencil" role="tab">Редактор</button>
+    <button data-view="game" data-icon="eye" role="tab" data-tip="Как в игре · Tab">В игре</button>
   </div>
+
+  <!-- справа сверху: команды, каталог, экспорт -->
+  <div class="top-actions">
+    <button class="float icon-btn box" id="btnCmd" data-icon="search" data-tip="Все команды · Ctrl K" aria-label="Команды"></button>
+    <button class="float btn box" id="btnPublish" data-icon="upload" data-tip="Выложить в каталог сеток">В каталог</button>
+    <button class="btn primary box" id="btnExport" data-icon="download">Экспорт</button>
+  </div>
+
+  <!-- слева: категории (объекты холста) -->
+  <aside class="float layers" id="layers">
+    <div class="layers-head">
+      <span>Категории</span>
+      <span class="badge" id="catCount" data-tip="Категорий в сетке">0</span>
+      <div class="menu-wrap">
+        <button class="icon-btn xs" id="btnAdd" data-icon="plus" aria-label="Добавить"></button>
+        <div class="menu" id="addMenu">
+          <button data-add="image" data-icon="image">Картинку… <kbd>Ctrl V</kbd></button>
+          <button data-add="ascii" data-icon="ascii">ASCII из буфера</button>
+          <button data-add="lines" data-icon="lines">Генератор линий</button>
+          <button data-add="steam" data-icon="font">Арт для профиля Steam…</button>
+          <hr>
+          <button data-add="hero" data-icon="heroes">Категорию героев</button>
+          <button data-add="text" data-icon="text">Текст</button>
+        </div>
+      </div>
+    </div>
+    <div class="layers-list" id="layersList"></div>
+    <div class="layers-foot">Каждая фигура на холсте станет категорией в игре</div>
+  </aside>
 
   <aside class="float inspector" id="inspector"></aside>
 
   <nav class="float dock" id="rail">
     <span class="dock-ind" id="dockInd"></span>
-    <button data-tool="select" data-icon="cursor" data-tip="Выделение · V"></button>
-    <button data-tool="pan" data-icon="hand" data-tip="Рука · H / пробел"></button>
+    <button data-tool="select" data-icon="cursor" data-tip="Выделение"><kbd>V</kbd></button>
+    <button data-tool="pan" data-icon="hand" data-tip="Рука · пробел"><kbd>H</kbd></button>
     <span class="sep"></span>
-    <button data-tool="pencil" data-icon="pencil" data-tip="Карандаш · P"></button>
-    <button data-tool="line" data-icon="line" data-tip="Линия · L"></button>
-    <button data-tool="hv" data-icon="hv" data-tip="Гор. / верт. · I"></button>
-    <button data-tool="rect" data-icon="rect" data-tip="Прямоугольник · R"></button>
-    <button data-tool="ellipse" data-icon="ellipse" data-tip="Эллипс · O"></button>
-    <button data-tool="rhombus" data-icon="rhombus" data-tip="Ромб · D"></button>
-    <button data-tool="triangle" data-icon="triangle" data-tip="Треугольник · Y"></button>
-    <button data-tool="eraser" data-icon="eraser" data-tip="Ластик · E"></button>
+    <button data-tool="pencil" data-icon="pencil" data-tip="Карандаш"><kbd>B</kbd></button>
+    <button data-tool="line" data-icon="line" data-tip="Линия"><kbd>L</kbd></button>
+    <button data-tool="hv" data-icon="hv" data-tip="Гор. / верт."><kbd>X</kbd></button>
+    <button data-tool="rect" data-icon="rect" data-tip="Прямоугольник"><kbd>R</kbd></button>
+    <button data-tool="ellipse" data-icon="ellipse" data-tip="Эллипс"><kbd>O</kbd></button>
+    <button data-tool="rhombus" data-icon="rhombus" data-tip="Ромб"><kbd>D</kbd></button>
+    <button data-tool="triangle" data-icon="triangle" data-tip="Треугольник"><kbd>Y</kbd></button>
+    <button data-tool="eraser" data-icon="eraser" data-tip="Ластик"><kbd>E</kbd></button>
     <span class="sep"></span>
-    <button data-tool="text" data-icon="text" data-tip="Текст · T"></button>
-    <button data-tool="hero" data-icon="heroes" data-tip="Категория героев · G"></button>
-    <span class="sep"></span>
-    <button class="dock-help" id="btnHelp" data-tip="Горячие клавиши · ?">?</button>
+    <button data-tool="text" data-icon="text" data-tip="Текст"><kbd>T</kbd></button>
+    <button data-tool="hero" data-icon="heroes" data-tip="Категория героев"><kbd>G</kbd></button>
   </nav>
 
-  <div class="preview-hint" id="previewHint"><span>Так сетка выглядит в Доте · <kbd>Tab</kbd> или <kbd>Esc</kbd> — назад</span><button class="btn sm primary" id="btnBack">К редактору</button></div>
+  <!-- слева снизу: история и масштаб -->
+  <div class="bottom-left">
+    <div class="float mini">
+      <button class="icon-btn sm" id="btnUndo" data-icon="undo" data-tip="Отменить · Ctrl+Z"></button>
+      <button class="icon-btn sm" id="btnRedo" data-icon="redo" data-tip="Повторить · Ctrl+Shift+Z"></button>
+    </div>
+    <div class="float mini">
+      <button class="icon-btn sm" id="zoomOut" data-icon="minus" data-tip="Отдалить · −"></button>
+      <button class="zoom-val" id="zoomVal" data-tip="Вписать · Shift+1">100%</button>
+      <button class="icon-btn sm" id="zoomIn" data-icon="plus" data-tip="Приблизить · +"></button>
+    </div>
+    <button class="float icon-btn box help-btn" id="btnHelp" data-icon="help" data-tip="Горячие клавиши · ?"></button>
+  </div>
 
   <div class="status"><span id="stCoords">x — · y —</span><span class="dot">·</span><span id="stTool"></span><span id="stSel"></span></div>
 </main>
@@ -111,6 +145,6 @@
 <script src="config.js?v=6"></script>
 <script src="gridrender.js?v=6"></script>
 <script src="catalog-api.js?v=6"></script>
-<script src="app.js?v=7"></script>
+<script src="app.js?v=9"></script>
 </body>
 </html>

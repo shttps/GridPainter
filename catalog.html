@@ -5,20 +5,20 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Каталог сеток · Grid Studio</title>
 <meta name="description" content="Готовые сетки героев Dota 2 от игроков: ASCII-арт, line-art и мозаики. Скачай hero_grid_config.json или открой в редакторе.">
-<meta name="theme-color" content="#0b0a0f">
+<meta name="theme-color" content="#0f0d0c">
 <meta property="og:title" content="Каталог сеток героев Dota 2 · Grid Studio">
 <meta property="og:description" content="Готовые сетки героев от игроков — смотри, скачивай, выкладывай свои.">
 <meta property="og:image" content="https://shttps.github.io/GridPainter/docs/ingame.webp">
 <link rel="icon" href="logo.svg" type="image/svg+xml">
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500&display=swap">
-<link rel="stylesheet" href="site.css?v=2">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="site.css?v=4">
 </head>
 <body data-page="catalog">
 
 <div class="wrap">
   <header class="top">
-    <a class="logo" href="index.html" aria-label="Grid Studio — на главную"><img src="logo.svg" alt="" width="26" height="26"><span><b>Grid</b>Studio</span></a>
+    <a class="logo" href="index.html" aria-label="Grid Studio — на главную"><svg viewBox="0 0 48 48" aria-hidden="true"><rect width="48" height="48" rx="12" class="mk-bg"/><path d="M13 35L35 13" class="mk-stroke"/></svg>Grid Studio<em>DOTA 2</em></a>
     <nav class="nav">
       <a href="catalog.html" aria-current="page">Каталог</a>
       <a href="editor.html">Редактор</a>
@@ -43,6 +43,7 @@
   <div class="toolbar">
     <label class="search"><span data-icon="search"></span><input class="input" id="q" type="search" placeholder="Название или автор" autocomplete="off"></label>
     <div class="chips" id="kinds" role="tablist">
+      <i class="chip-ind" id="chipInd"></i>
       <button class="chip on" data-kind="all">Все</button>
       <button class="chip" data-kind="ascii">ASCII</button>
       <button class="chip" data-kind="mosaic">Мозаика</button>
@@ -72,6 +73,6 @@
 <script src="config.js?v=6"></script>
 <script src="gridrender.js?v=6"></script>
 <script src="catalog-api.js?v=6"></script>
-<script src="site.js?v=2"></script>
+<script src="site.js?v=4"></script>
 </body>
 </html>

@@ -15,26 +15,39 @@ const CDN = 'https://cdn.cloudflare.steamstatic.com/apps/dota2/images/';
 const BRAILLE_BLANK = '⠀';
 
 // ---------- иконки ----------
+// Одна система: 24px, линия 1.75, скруглённые концы, цвет — currentColor.
+// Строка без «<» — это просто d у <path>, иначе — готовая разметка внутри <svg>.
 const ICONS = {
-  cursor: 'M5 3l14 8-6.5 1.8L9.7 19z',
-  hand: 'M8 12V5.5a1.5 1.5 0 013 0V11m0-6.5V4a1.5 1.5 0 013 0v7m0-5.5a1.5 1.5 0 013 0V14a6 6 0 01-6 6h-1.2a6 6 0 01-4.9-2.6L4 14.6a1.5 1.5 0 012.4-1.8L8 14.5',
-  pencil: 'M4 20l4.2-1L19 8.2 15.8 5 5 15.8zM13.5 7.3l3.2 3.2',
-  line: 'M5 19L19 5',
-  hv: 'M4 12h16M12 4v16',
-  rect: 'M4.5 5.5h15v13h-15z',
-  ellipse: 'M12 5.5c4.4 0 8 2.9 8 6.5s-3.6 6.5-8 6.5-8-2.9-8-6.5 3.6-6.5 8-6.5z',
-  rhombus: 'M12 3.5l8 8.5-8 8.5-8-8.5z',
-  triangle: 'M12 4.5l8.5 15h-17z',
-  eraser: 'M15.5 4l4.5 4.5-9.5 9.5H6.5L4 15.5zM9 20h11M11 8.5l4.5 4.5',
-  text: 'M5 7V5h14v2M12 5v14M9 19h6',
-  heroes: 'M4 4.5h4.5v7H4zM9.75 4.5h4.5v7h-4.5zM15.5 4.5H20v7h-4.5zM4 13h4.5v7H4zM9.75 13h4.5v7h-4.5z',
+  cursor: 'M5.5 3.5L19 11.5 12.5 13 9.5 19.5z',
+  hand: 'M12 3v18M3 12h18M9.5 5.5L12 3l2.5 2.5M9.5 18.5L12 21l2.5-2.5M5.5 9.5L3 12l2.5 2.5M18.5 9.5L21 12l-2.5 2.5',
+  pencil: 'M4 20l1-5L16 4l4 4L9 19zM13.5 6.5l4 4',
+  line: '<path d="M6.5 17.5l11-11"/><circle cx="5" cy="19" r="1.75"/><circle cx="19" cy="5" r="1.75"/>',
+  hv: 'M12 5v14M5 12h14',
+  rect: '<rect x="4" y="5.5" width="16" height="13" rx="1.5"/>',
+  ellipse: '<circle cx="12" cy="12" r="7.5"/>',
+  rhombus: 'M12 3.5l8.5 8.5-8.5 8.5-8.5-8.5z',
+  triangle: 'M12 4.5l8.5 14.5h-17z',
+  eraser: 'M8.5 19.5L4 15l9.5-9.5 5.5 5.5-9 8.5zM9 10.5l5 5M8.5 19.5H20',
+  text: 'M5 6.5V4.5h14v2M12 4.5v15M9 19.5h6',
+  heroes: '<rect x="4" y="4" width="6.5" height="6.5" rx="1.2"/><rect x="13.5" y="4" width="6.5" height="6.5" rx="1.2"/><rect x="4" y="13.5" width="6.5" height="6.5" rx="1.2"/><rect x="13.5" y="13.5" width="6.5" height="6.5" rx="1.2" fill="currentColor"/>',
   undo: 'M9 14L4 9l5-5M4 9h10.5a5.5 5.5 0 010 11H11',
   redo: 'M15 14l5-5-5-5M20 9H9.5a5.5 5.5 0 000 11H13',
-  image: 'M4 5h16v14H4zM4 16l4.5-4.5 4 4 2.5-2.5L20 18M15.5 9.5h.01',
-  folder: 'M3.5 6.5h6l2 2h9v10h-17z',
-  download: 'M12 4v11M7.5 10.5L12 15l4.5-4.5M5 20h14',
-  eye: 'M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12zM12 9.5a2.5 2.5 0 100 5 2.5 2.5 0 000-5z',
+  image: '<rect x="3.5" y="5" width="17" height="14" rx="2"/><circle cx="9" cy="10" r="1.5"/><path d="M20.5 16l-5-5-8.5 8"/>',
+  folder: 'M3.5 7.5a2 2 0 012-2h4l2 2h7a2 2 0 012 2v8a2 2 0 01-2 2h-13a2 2 0 01-2-2z',
+  download: 'M12 4v11M7 10l5 5 5-5M5 20h14',
+  upload: 'M12 16V5M7 10l5-5 5 5M5 20h14',
+  eye: '<path d="M2.5 12s3.5-6.5 9.5-6.5 9.5 6.5 9.5 6.5-3.5 6.5-9.5 6.5S2.5 12 2.5 12z"/><circle cx="12" cy="12" r="2.75"/>',
+  search: '<circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/>',
+  layers: 'M12 4l9 4.5-9 4.5-9-4.5zM3 13l9 4.5 9-4.5',
+  grid: '<rect x="3.5" y="3.5" width="17" height="17" rx="2"/><path d="M3.5 9.5h17M3.5 14.5h17M9.5 3.5v17M14.5 3.5v17"/>',
+  font: 'M4 20V6.5M4 6.5h16M8 4v5M20 20H8M11 20v-7h9',
+  help: '<circle cx="12" cy="12" r="8.5"/><path d="M9.5 9.5a2.5 2.5 0 113.5 2.3c-.6.3-1 .8-1 1.5v.4M12 16.8v.1"/>',
   plus: 'M12 5v14M5 12h14',
+  minus: 'M5 12h14',
+  chev: 'M8 10l4 4 4-4',
+  home: 'M4 11l8-7 8 7M6.5 9v11h11V9',
+  sun: '<circle cx="12" cy="12" r="4"/><path d="M12 2.5v2M12 19.5v2M4.6 4.6l1.4 1.4M18 18l1.4 1.4M2.5 12h2M19.5 12h2M4.6 19.4L6 18M18 6l1.4-1.4"/>',
+  moon: 'M20 14.5A8 8 0 019.5 4a8 8 0 1010.5 10.5z',
   ascii: 'M5 7h1M9 7h1M13 7h1M5 12h1M17 12h1M9 17h1M13 17h1M17 7h1M9 12h1',
   lines: 'M7 4v2M7 9v2M7 14v2M7 19v1M12 4v16M17 4v2M17 9v2M17 14v2M17 19v1',
   rotl: 'M4 4v5h5M5 9a7.5 7.5 0 11-.5 5',
@@ -43,18 +56,17 @@ const ICONS = {
   flipv: 'M3 12h18M7 9l5-5 5 5zM7 15l5 5 5-5z',
   fill: 'M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5',
   trash: 'M4.5 7h15M9.5 7V4.5h5V7M6.5 7l1 13h9l1-13',
-  copy: 'M8.5 8.5h11v11h-11zM5 15.5V4.5h11',
+  copy: '<rect x="8.5" y="8.5" width="11" height="11" rx="2"/><path d="M5 15.5V6.5a2 2 0 012-2h8.5"/>',
   group: 'M4 4h7v7H4zM13 13h7v7h-7zM11 7.5h5.5V13',
   ungroup: 'M4 4h7v7H4zM13 13h7v7h-7z',
   dup: 'M8 8h12v12H8zM4 16V4h12M14 11v6M11 14h6',
   x: 'M6 6l12 12M18 6L6 18',
   save: 'M5 4h11l3 3v13H5zM8 4v5h7V4M8 20v-6h8v6',
-  font: 'M5 19L10.5 5h3L19 19M7.5 13.5h9',
-  upload: 'M12 15V4M7.5 8.5L12 4l4.5 4.5M5 20h14',
   link: 'M10 14a4 4 0 005.7 0l3-3a4 4 0 00-5.7-5.7l-1 1M14 10a4 4 0 00-5.7 0l-3 3a4 4 0 005.7 5.7l1-1',
-  grid: 'M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z',
+  fit: 'M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5M9 12h6',
+  trashAll: 'M4.5 7h15M9.5 7V4.5h5V7M6.5 7l1 13h9l1-13M10 11v5M14 11v5',
 };
-const icon = n => `<svg class="i" viewBox="0 0 24 24"><path d="${ICONS[n] || ''}"/></svg>`;
+const icon = n => { const v = ICONS[n] || ''; return `<svg class="i" viewBox="0 0 24 24" aria-hidden="true">${v.startsWith('<') ? v : `<path d="${v}"/>`}</svg>`; };
 function applyIcons(root = document) {
   for (const el of $$('[data-icon]', root)) {
     if (el.dataset.iconDone) continue;
@@ -118,10 +130,18 @@ function store(key, v) { try { localStorage.setItem(key, JSON.stringify(v)); ret
 let saveTimer = 0, saveWarned = false;
 function persist() {
   clearTimeout(saveTimer);
+  setSaveState('сохраняю', true);
   saveTimer = setTimeout(() => {
     store('gp2.settings', S);
-    if (!store('gp2.els', st.els) && !saveWarned) { saveWarned = true; toast('Проект слишком большой для автосохранения в браузере — не забудь экспорт.', 'err'); }
+    const ok = store('gp2.els', st.els);
+    setSaveState(ok ? 'сохранено' : 'не сохранено', false);
+    if (!ok && !saveWarned) { saveWarned = true; toast('Проект слишком большой для автосохранения в браузере — не забудь экспорт.', 'err'); }
   }, 600);
+}
+function setSaveState(text, saving) {
+  const el = document.getElementById('saveState');
+  if (!el) return;
+  el.textContent = text; el.classList.toggle('saving', saving);
 }
 
 // ---------- шрифт и размеры ----------
@@ -210,15 +230,16 @@ function drawCard(c, i, x, y, w, h) {
 }
 
 // Цвета холста для светлой и тёмной темы. Превью всегда как в игре: светлым по тёмному.
+// Тёплый графит из макета 1b: oklch(0.13 / 0.16 / 0.3 0.005 60) и акцент oklch(0.68 0.19 38), переведённые в hex.
 const CANVAS_THEMES = {
-  light: { bg: '#efeee9', dot: '#d2d0c8', sheet: '#ffffff', shadow: 'rgba(20,20,18,.08)', grid: 'rgba(20,20,18,.055)', border: 'rgba(20,20,18,.1)',
-    label: '#9a988f', glyph: '#1b1b19', text: '#34332f', dash: '#141413', fade: '255,255,255', accent: '#ef5a36',
-    box: 'rgba(239,90,54,.55)', boxFill: 'rgba(239,90,54,.045)', boxLabel: '#c8431f' },
-  dark: { bg: '#121211', dot: '#2e2d2a', sheet: '#1a1a18', shadow: 'rgba(0,0,0,.55)', grid: 'rgba(255,255,255,.05)', border: 'rgba(255,255,255,.09)',
-    label: '#6f6d66', glyph: '#ecebe5', text: '#cfcdc5', dash: '#f1f0eb', fade: '26,26,24', accent: '#ff6a45',
-    box: 'rgba(255,106,69,.6)', boxFill: 'rgba(255,106,69,.06)', boxLabel: '#ff8d6d' },
+  light: { bg: '#f3efed', dot: '#d1cdc9', sheet: '#fdfcfb', shadow: 'rgba(40,30,20,.14)', grid: 'rgba(40,30,20,.06)', border: 'rgba(40,30,20,.1)',
+    label: '#8b8580', glyph: '#1c1a18', text: '#353230', dash: '#1c1a18', fade: '253,252,251', accent: '#e04f1a',
+    box: 'rgba(224,79,26,.55)', boxFill: 'rgba(224,79,26,.045)', boxLabel: '#bf4213', hover: 'rgba(224,79,26,.35)' },
+  dark: { bg: '#080706', dot: '#302d2b', sheet: '#0f0d0c', shadow: 'rgba(0,0,0,.5)', grid: 'rgba(255,255,255,.04)', border: 'rgba(255,255,255,.07)',
+    label: '#76706c', glyph: '#f1eeeb', text: '#d3ccc7', dash: '#f1eeeb', fade: '15,13,12', accent: '#f56333',
+    box: 'rgba(245,99,51,.6)', boxFill: 'rgba(245,99,51,.06)', boxLabel: '#fb784f', hover: 'rgba(245,99,51,.4)' },
 };
-let T = CANVAS_THEMES[document.documentElement.dataset.theme] || CANVAS_THEMES.light;
+let T = CANVAS_THEMES[document.documentElement.dataset.theme] || CANVAS_THEMES.dark;
 const INK = { get glyph() { return T.glyph; }, get text() { return T.text; }, get box() { return T.box; }, get boxFill() { return T.boxFill; }, get label() { return T.boxLabel; } };
 function renderEls(c, list, o) {
   c.imageSmoothingQuality = 'high';
@@ -241,7 +262,7 @@ function renderEls(c, list, o) {
     }
     // в редакторе — число героев рядом с названием, у безымянных одиночных категорий — пометка
     if (o.editor && (e.name || !e.g)) {
-      c.fillStyle = INK.label; c.font = `500 ${11 / o.zoom}px Geist, Inter, sans-serif`; c.textBaseline = 'middle';
+      c.fillStyle = INK.label; c.font = `500 ${11 / o.zoom}px Onest, sans-serif`; c.textBaseline = 'middle';
       c.fillText(e.name ? `${n}` : `без названия · ${n}`, e.x + LBL.dx + (e.name ? measure(e.name) + 6 : 0), e.y + LBL.dy + LBL.size / 2);
     }
   }
@@ -453,20 +474,23 @@ function render() {
 
   // точечная «бумага» вокруг листа — двигается вместе с холстом
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  let gap = 24; while (gap * z < 14) gap *= 2; while (gap * z > 40) gap /= 2;
+  let gap = 20; while (gap * z < 14) gap *= 2; while (gap * z > 40) gap /= 2;
   const sg = gap * z, ox = ((st.panX % sg) + sg) % sg, oy = ((st.panY % sg) + sg) % sg;
   ctx.fillStyle = T.dot;
-  for (let y = oy; y < H; y += sg) for (let x = ox; x < W; x += sg) ctx.fillRect(x - 0.75, y - 0.75, 1.5, 1.5);
+  for (let y = oy; y < H; y += sg) for (let x = ox; x < W; x += sg) ctx.fillRect(x - 1, y - 1, 2, 2);
 
   // тень листа (в превью — тень всего «экрана» игры)
   const V = viewRect();
+  const RAD = 6; // скругление листа в экранных пикселях
   ctx.save();
-  ctx.shadowColor = editor ? T.shadow : 'rgba(0,0,0,.45)'; ctx.shadowBlur = editor ? 24 : 40; ctx.shadowOffsetY = editor ? 6 : 12;
+  ctx.shadowColor = editor ? T.shadow : 'rgba(0,0,0,.5)'; ctx.shadowBlur = editor ? 80 : 60; ctx.shadowOffsetY = editor ? 30 : 16;
   ctx.fillStyle = editor ? T.sheet : GAME.bg;
-  ctx.fillRect(st.panX + V.x * z, st.panY + V.y * z, V.w * z, V.h * z);
+  ctx.beginPath(); ctx.roundRect(st.panX + V.x * z, st.panY + V.y * z, V.w * z, V.h * z, RAD); ctx.fill();
   ctx.restore();
 
   ctx.setTransform(dpr * z, 0, 0, dpr * z, dpr * st.panX, dpr * st.panY);
+  ctx.save();
+  if (editor) { ctx.beginPath(); ctx.roundRect(0, 0, S.areaW, S.areaH, RAD / z); ctx.clip(); }
   drawArea(ctx, editor);
 
   if (editor && S.showGrid && S.cellW * z >= 6 && S.cellH * z >= 6) {
@@ -475,6 +499,7 @@ function render() {
     for (let y = S.cellH; y < S.areaH; y += S.cellH) { ctx.moveTo(0, y); ctx.lineTo(S.areaW, y); }
     ctx.stroke();
   }
+  ctx.restore();
   // только что добавленные элементы проявляются плавно
   let fade = null;
   if (st.fade) {
@@ -502,9 +527,18 @@ function render() {
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   const sx = x => x * z + st.panX, sy = y => y * z + st.panY;
   ctx.strokeStyle = T.border; ctx.lineWidth = 1;
-  ctx.strokeRect(Math.round(sx(V.x)) + .5, Math.round(sy(V.y)) + .5, Math.round(V.w * z), Math.round(V.h * z));
+  ctx.beginPath(); ctx.roundRect(Math.round(sx(V.x)) + .5, Math.round(sy(V.y)) + .5, Math.round(V.w * z), Math.round(V.h * z), RAD); ctx.stroke();
+  // наведение на строку в «Категориях» — пунктирная рамка вокруг объекта
+  if (editor && st.hoverIds) {
+    const list = st.els.filter(e => st.hoverIds.has(e.id));
+    if (list.length) {
+      const bb = bboxOf(list);
+      ctx.setLineDash([3, 3]); ctx.strokeStyle = T.hover;
+      ctx.strokeRect(Math.round(sx(bb.x)) - 3.5, Math.round(sy(bb.y)) - 3.5, bb.w * z + 7, bb.h * z + 7); ctx.setLineDash([]);
+    }
+  }
   // подпись листа, как в макете: «Холст · 1200 × 600»
-  ctx.fillStyle = T.label; ctx.font = '11px "Geist Mono", Consolas, monospace'; ctx.textBaseline = 'bottom';
+  ctx.fillStyle = T.label; ctx.font = '11px "JetBrains Mono", Consolas, monospace'; ctx.textBaseline = 'bottom';
   ctx.fillText(editor ? `Холст · ${S.areaW} × ${S.areaH}` : 'Как в игре · экран «Герои», 16:9', Math.round(sx(V.x)), Math.round(sy(V.y)) - 8);
   if (editor && st.sel.size) {
     const list = selEls();
@@ -523,8 +557,8 @@ function render() {
   }
   if (st.rect) {
     const r = st.rect;
-    ctx.fillStyle = r.kind === 'erase' ? 'rgba(217,59,43,.07)' : 'rgba(239,90,54,.06)';
-    ctx.strokeStyle = r.kind === 'erase' ? '#d93b2b' : '#ef5a36'; ctx.lineWidth = 1;
+    ctx.fillStyle = r.kind === 'erase' ? 'rgba(239,104,86,.08)' : T.boxFill;
+    ctx.strokeStyle = r.kind === 'erase' ? '#ef6856' : T.accent; ctx.lineWidth = 1;
     ctx.fillRect(sx(r.x), sy(r.y), r.w * z, r.h * z);
     ctx.setLineDash(r.kind === 'hero' ? [] : [4, 3]); ctx.strokeRect(sx(r.x) + .5, sy(r.y) + .5, r.w * z, r.h * z); ctx.setLineDash([]);
   }
@@ -535,7 +569,7 @@ let lastCount = -1;
 function updateChrome() {
   $('#zoomVal').textContent = Math.round(st.zoom * 100) + '%';
   const n = st.els.length, b = $('#catCount');
-  b.textContent = n.toLocaleString('ru') + ' кат.';
+  b.textContent = n.toLocaleString('ru');
   if (n !== lastCount) { b.classList.remove('bump'); void b.offsetWidth; if (lastCount >= 0) b.classList.add('bump'); lastCount = n; }
   b.classList.toggle('bad', n > 6000); b.classList.toggle('warn', n > 2500 && n <= 6000);
   // пустое состояние лежит прямо на листе
@@ -543,7 +577,6 @@ function updateChrome() {
   es.hidden = n > 0 || !!st.bg.img || st.preview;
   if (!es.hidden) Object.assign(es.style, { left: st.panX + 'px', top: st.panY + 'px', width: S.areaW * st.zoom + 'px', height: S.areaH * st.zoom + 'px' });
   $('#btnUndo').disabled = !st.undo.length; $('#btnRedo').disabled = !st.redo.length;
-  $('#btnPreview').classList.toggle('on', st.preview);
   $('#stSel').textContent = st.sel.size ? `выделено: ${st.sel.size}` : '';
 }
 
@@ -551,20 +584,36 @@ function updateChrome() {
 // Вписываем лист в свободное место между плавающими панелями.
 function fitView(animate = true) {
   const W = canvas.clientWidth, H = canvas.clientHeight;
-  const ins = $('#inspector'), V = viewRect();
-  // в превью инспектор и док спрятаны — экран игры занимает всё место
-  const right = !st.preview && ins.offsetWidth && W > 900 ? ins.offsetWidth + 28 : 0;
-  // отступ сверху — от нижнего края плавающих панелей (на узком экране их два ряда)
-  const top = Math.max(...$$('.bar').map(el => el.getBoundingClientRect().bottom)) + (st.preview ? 34 : 42), bottom = st.preview ? 66 : 90, side = st.preview ? 28 : 40;
-  const aw = W - right - side * 2, ah = H - top - bottom;
+  const V = viewRect();
+  // в превью панели и док спрятаны — экран игры занимает всё место
+  const inset = el => !st.preview && el.offsetWidth && W > 700 ? el.offsetWidth + 28 : 0;
+  // без панели категорий слева стоит столбик «отмена / масштаб» — лист не должен под него заезжать
+  const left = inset($('#layers')) || (!st.preview && W <= 1180 ? 48 : 0), right = inset($('#inspector'));
+  // отступ сверху — от нижнего края верхних панелей (на узком экране их два ряда)
+  const top = Math.max(...['#brandPill', '#viewSwitch', '.top-actions'].map(q => $(q).getBoundingClientRect().bottom)) + (st.preview ? 30 : 40);
+  const bottom = st.preview ? 36 : 96, side = st.preview ? 28 : 40;
+  const aw = W - left - right - side * 2, ah = H - top - bottom;
   const z = clamp(Math.min(aw / V.w, ah / V.h), 0.05, 20);
-  animateView(z, side + (aw - V.w * z) / 2 - V.x * z, top + (ah - V.h * z) / 2 - V.y * z, animate);
+  animateView(z, left + side + (aw - V.w * z) / 2 - V.x * z, top + (ah - V.h * z) / 2 - V.y * z, animate);
 }
 function setPreview(on) {
+  if (st.preview === on) return;
   st.preview = on;
   document.body.classList.toggle('previewing', on);
+  // при возврате панели въезжают обратно, а не просто появляются
+  document.body.classList.toggle('was-previewing', !on);
+  clearTimeout(setPreview.t); if (!on) setPreview.t = setTimeout(() => document.body.classList.remove('was-previewing'), 600);
+  for (const b of $$('#viewSwitch [data-view]')) b.classList.toggle('on', (b.dataset.view === 'game') === on);
+  moveSegInd();
   canvas.style.cursor = on ? 'grab' : '';
   fitView();
+}
+// «таблетка» переключателя переезжает под активную вкладку
+function moveSegInd() {
+  const b = $('#viewSwitch .on'), ind = $('#segInd');
+  if (!b || !ind) return;
+  ind.style.width = b.offsetWidth + 'px';
+  ind.style.transform = `translateX(${b.offsetLeft}px)`;
 }
 // Плавный переход вида: зум интерполируется логарифмически, чтобы скорость ощущалась ровной.
 let viewAnim = 0;
@@ -976,15 +1025,14 @@ function updateCursor(w) {
 function moveDockInd() {
   const ind = $('#dockInd'), b = $(`#rail [data-tool="${st.tool}"]`);
   if (!ind || !b) return;
-  ind.style.transform = `translateX(${b.offsetLeft}px)`;
+  Object.assign(ind.style, { width: b.offsetWidth + 'px', height: b.offsetHeight + 'px', top: b.offsetTop + 'px', transform: `translateX(${b.offsetLeft}px)` });
 }
 
 // ---------- тема ----------
-const THEME_ICONS = { light: 'M20 14.5A8 8 0 019.5 4a8 8 0 1010.5 10.5z', dark: 'M12 7.5a4.5 4.5 0 100 9 4.5 4.5 0 000-9zM12 2.5v2M12 19.5v2M4.6 4.6l1.4 1.4M18 18l1.4 1.4M2.5 12h2M19.5 12h2M4.6 19.4L6 18M18 6l1.4-1.4' };
+const themeName = () => document.documentElement.dataset.theme === 'dark' ? 'Светлая тема' : 'Тёмная тема';
 function applyThemeIcon() {
-  const th = document.documentElement.dataset.theme;
-  $('#btnTheme').innerHTML = `<svg class="i" viewBox="0 0 24 24"><path d="${THEME_ICONS[th]}"/></svg>`;
-  $('#btnTheme').dataset.tip = (th === 'dark' ? 'Светлая тема' : 'Тёмная тема') + ' · Shift+T';
+  const b = $('#menuTheme'), dark = document.documentElement.dataset.theme === 'dark';
+  b.innerHTML = `${icon(dark ? 'sun' : 'moon')}${themeName()} <kbd>Shift T</kbd>`;
 }
 function toggleTheme() {
   const root = document.documentElement, next = root.dataset.theme === 'dark' ? 'light' : 'dark';
@@ -1102,6 +1150,7 @@ function renderInspector() {
     <div class="hint">Точного лимита категорий у Доты нет в документации. Несколько тысяч обычно работают, но чем больше — тем дольше грузится экран выбора героя.</div>`);
 
   hadSel = list.length > 0;
+  renderLayers();
   const scroll = ins.scrollTop;
   ins.innerHTML = html;
   ins.scrollTop = scroll;
@@ -1171,11 +1220,62 @@ function bindInspector(list) {
   on('bgDim', 'input', ev => { st.bg.dim = ev.target.value / 100; syncRange(ev.target); requestRender(); });
 }
 
+
+// ---------- «Категории»: объекты холста слева ----------
+// Группа (картинка, фигура, штрих карандаша) — одна строка; одиночные символы собраны в «Символы»,
+// категории героев и тексты — по строке на каждую. Клик выделяет объект, Shift — добавляет к выделению.
+const LAYER_MAX = 120;
+let layerRows = [], layerKeys = new Set();
+function buildLayers() {
+  const groups = new Map(), loose = [], rows = [];
+  for (const e of st.els) {
+    if (e.g) { let g = groups.get(e.g); if (!g) groups.set(e.g, g = { key: 'g' + e.g, ids: [], kinds: new Set() }); g.ids.push(e.id); g.kinds.add(e.t); }
+    else if (e.t === 'glyph') loose.push(e.id);
+    else rows.push({ key: 'e' + e.id, ids: [e.id], kind: e.t, name: e.t === 'hero' ? (e.name || 'Без названия') : `«${e.name}»`, n: e.t === 'hero' ? e.heroes.length : 1 });
+  }
+  const num = { glyph: 0, hero: 0, mixed: 0 };
+  for (const g of groups.values()) {
+    const k = g.kinds.size > 1 ? 'mixed' : g.kinds.has('hero') ? 'hero' : 'glyph';
+    const title = k === 'hero' ? 'Мозаика' : k === 'mixed' ? 'Группа' : 'Рисунок';
+    rows.push({ key: g.key, ids: g.ids, kind: k === 'hero' ? 'mosaic' : k, name: `${title} ${++num[k]}`, n: g.ids.length });
+  }
+  if (loose.length) rows.push({ key: 'loose', ids: loose, kind: 'glyph', name: 'Символы', n: loose.length });
+  return rows;
+}
+const LAYER_ICON = { hero: 'heroes', mosaic: 'heroes', text: 'text', glyph: 'pencil', mixed: 'layers' };
+function renderLayers() {
+  const box = $('#layersList');
+  if (!box) return;
+  layerRows = buildLayers();
+  const shown = layerRows.slice(0, LAYER_MAX), fresh = new Set(shown.map(r => r.key));
+  box.innerHTML = shown.map((r, k) => {
+    const on = r.ids.every(id => st.sel.has(id));
+    // новые строки въезжают, старые стоят на месте — чтобы список не «мигал» при каждой правке
+    const anim = layerKeys.has(r.key) ? ' style="animation:none"' : '';
+    return `<button class="lrow${on ? ' on' : ''}" data-k="${k}"${anim}>${icon(LAYER_ICON[r.kind])}<span>${esc(r.name)}</span><b>${r.n.toLocaleString('ru')}</b></button>`;
+  }).join('') + (layerRows.length > LAYER_MAX ? `<div class="lmore">и ещё ${layerRows.length - LAYER_MAX}…</div>` : '');
+  layerKeys = fresh;
+}
+{
+  const box = $('#layersList');
+  const rowOf = ev => { const b = ev.target.closest('.lrow'); return b ? layerRows[+b.dataset.k] : null; };
+  box.addEventListener('click', ev => {
+    const r = rowOf(ev); if (!r) return;
+    if (st.tool !== 'select') setTool('select');
+    if (ev.shiftKey) { const all = r.ids.every(id => st.sel.has(id)); for (const id of r.ids) all ? st.sel.delete(id) : st.sel.add(id); }
+    else st.sel = new Set(r.ids);
+    requestRender(); renderInspector();
+  });
+  const hover = r => { const key = r ? r.key : null; if (key === hover.key) return; hover.key = key; st.hoverIds = r ? new Set(r.ids) : null; requestRender(); };
+  box.addEventListener('mouseover', ev => hover(rowOf(ev)));
+  box.addEventListener('mouseleave', () => hover(null));
+}
+
 // ---------- модальные окна ----------
-function openModal(html, { wide = false, onClose } = {}) {
+function openModal(html, { wide = false, cls = '', onClose } = {}) {
   const root = $('#modalRoot'), token = {};
   root._token = token; root.classList.remove('closing');
-  root.innerHTML = `<div class="modal ${wide ? 'wide' : ''}">${html}</div>`;
+  root.innerHTML = `<div class="modal ${wide ? 'wide' : ''} ${cls}">${html}</div>`;
   applyIcons(root);
   $$('input[type=range]', root).forEach(syncRange);
   let closed = false;
@@ -1663,13 +1763,84 @@ async function openCatalogGrid(id) {
 }
 
 function openHelp() {
-  const K = [['Выделение / рука', 'V / H, пробел'], ['Карандаш, линия, гор./верт.', 'P, L, I'], ['Прямоуг., эллипс, ромб, треуг.', 'R, O, D, Y'], ['Ластик, текст, герои', 'E, T, G'],
+  const K = [['Все команды', 'Ctrl+K'], ['Выделение / рука', 'V / H, пробел'], ['Карандаш, линия, гор./верт.', 'B, L, X'], ['Прямоуг., эллипс, ромб, треуг.', 'R, O, D, Y'], ['Ластик, текст, герои', 'E, T, G'],
     ['Ровно / квадрат', 'Shift при рисовании'], ['Стереть карандашом', 'ПКМ'], ['Выделить один элемент группы', 'Alt + клик'], ['Добавить к выделению', 'Shift + клик'],
     ['Группировать / разгруппировать', 'Ctrl+G / Ctrl+Shift+G'], ['Дублировать', 'Ctrl+D'], ['Копировать / вставить', 'Ctrl+C / Ctrl+V'], ['Удалить', 'Delete'],
-    ['Сдвиг', 'Стрелки (Shift ×10)'], ['Отменить / повторить', 'Ctrl+Z / Ctrl+Shift+Z'], ['Зум', 'колесо, + / −'], ['Вписать холст', 'Shift+1'], ['Как в игре / назад', 'Tab, Esc'], ['Вставить картинку', 'Ctrl+V']];
+    ['Сдвиг', 'Стрелки (Shift ×10)'], ['Отменить / повторить', 'Ctrl+Z / Ctrl+Shift+Z'], ['Зум', 'колесо, + / −'], ['Вписать холст', 'Shift+1'], ['Как в игре / назад', 'Tab, Esc'], ['Вставить картинку', 'Ctrl+V'], ['Тема', 'Shift+T']];
   openModal(`${modalHead('Горячие клавиши')}<div class="modal-body"><div class="keys">${K.map(([a, b]) => `<span>${a}</span><span><kbd>${b}</kbd></span>`).join('')}</div></div>
     <div class="modal-foot"><span class="info">Автор · Discord <b style="color:var(--ink)">@ahttps</b> — связь, заказы, предложения</span><button class="btn sm" id="copyDiscord">Скопировать ник</button></div>`);
   $('#copyDiscord').onclick = () => copyText('ahttps', 'Ник Discord скопирован');
+}
+
+
+// ---------- палитра команд (Ctrl K) ----------
+// Всё, что умеет редактор, — в одном списке с поиском. Стрелки выбирают, Enter выполняет.
+function commandList() {
+  const tools = Object.entries(TOOL_NAMES).map(([id, name]) => {
+    const key = $(`#rail [data-tool="${id}"] kbd`)?.textContent || '';
+    return { g: 'Инструменты', icon: $(`#rail [data-tool="${id}"]`)?.dataset.icon, label: name, key, run: () => { setPreview(false); setTool(id); } };
+  });
+  const sel = st.sel.size > 0;
+  return [
+    { g: 'Файл', icon: 'folder', label: 'Открыть hero_grid_config.json', words: 'json импорт', run: openJson },
+    { g: 'Файл', icon: 'download', label: 'Экспорт', key: 'Ctrl S', words: 'скачать сохранить json', run: openExportModal },
+    { g: 'Файл', icon: 'upload', label: 'Выложить в каталог', words: 'опубликовать публикация', run: openPublishModal },
+    { g: 'Добавить', icon: 'image', label: 'Картинку — мозаика, ASCII, line-art', key: 'Ctrl V', run: () => doAdd('image') },
+    { g: 'Добавить', icon: 'ascii', label: 'ASCII из буфера', words: 'текст арт', run: () => doAdd('ascii') },
+    { g: 'Добавить', icon: 'lines', label: 'Генератор линий', run: () => doAdd('lines') },
+    { g: 'Добавить', icon: 'font', label: 'Арт для профиля Steam', words: 'брайль витрина', run: () => doAdd('steam') },
+    { g: 'Добавить', icon: 'heroes', label: 'Категорию героев', run: () => doAdd('hero') },
+    { g: 'Добавить', icon: 'text', label: 'Текст', run: () => doAdd('text') },
+    ...tools,
+    { g: 'Вид', icon: st.preview ? 'pencil' : 'eye', label: st.preview ? 'Вернуться в редактор' : 'Как в игре', key: 'Tab', words: 'превью игра дота', run: () => setPreview(!st.preview) },
+    { g: 'Вид', icon: 'fit', label: 'Вписать холст', key: 'Shift 1', words: 'зум масштаб', run: () => fitView() },
+    { g: 'Вид', icon: 'plus', label: 'Приблизить', key: '+', words: 'зум', run: () => zoomBy(1.25) },
+    { g: 'Вид', icon: 'minus', label: 'Отдалить', key: '−', words: 'зум', run: () => zoomBy(0.8) },
+    { g: 'Вид', icon: 'grid', label: S.showGrid ? 'Скрыть сетку плотности' : 'Показать сетку плотности', run: () => { S.showGrid = !S.showGrid; persist(); renderInspector(); requestRender(); } },
+    { g: 'Вид', icon: document.documentElement.dataset.theme === 'dark' ? 'sun' : 'moon', label: themeName(), key: 'Shift T', words: 'тема светлая тёмная', run: toggleTheme },
+    { g: 'Правка', icon: 'undo', label: 'Отменить', key: 'Ctrl Z', run: undo, off: !st.undo.length },
+    { g: 'Правка', icon: 'redo', label: 'Повторить', key: 'Ctrl Shift Z', run: redo, off: !st.redo.length },
+    { g: 'Правка', icon: 'cursor', label: 'Выделить всё', key: 'Ctrl A', run: selectAll, off: !st.els.length },
+    { g: 'Правка', icon: 'copy', label: 'Копировать выделение как ASCII', run: () => copyText(selAsAscii(), 'ASCII скопирован'), off: !sel },
+    { g: 'Правка', icon: 'dup', label: 'Дублировать', key: 'Ctrl D', run: duplicateSel, off: !sel },
+    { g: 'Правка', icon: 'trash', label: 'Удалить выделенное', key: 'Del', run: deleteSel, off: !sel },
+    { g: 'Правка', icon: 'trashAll', label: 'Очистить холст', words: 'удалить всё', run: () => { if (!st.els.length) return; snapshot(); st.els = []; st.sel.clear(); changed(true); toast('Холст очищен. Ctrl+Z — вернуть.'); }, off: !st.els.length },
+    { g: 'Холст', icon: 'image', label: 'Загрузить фон-подложку', words: 'фон картинка обвести', run: () => $('#fileBg').click() },
+    { g: 'Холст', icon: 'font', label: 'Загрузить шрифт Radiance', words: 'ttf шрифт', run: () => $('#fileFont').click() },
+    { g: 'Прочее', icon: 'help', label: 'Горячие клавиши', key: '?', run: openHelp },
+    { g: 'Прочее', icon: 'grid', label: 'Каталог сеток', words: 'шаблоны готовые', run: () => { location.href = 'catalog.html'; } },
+    { g: 'Прочее', icon: 'home', label: 'На главную', run: () => { location.href = 'index.html'; } },
+  ].filter(c => !c.off);
+}
+function openCommands() {
+  const all = commandList();
+  const m = openModal(`<div class="cmdk-in">${icon('search')}<input id="cmdQ" placeholder="Команда или инструмент…" autocomplete="off" spellcheck="false"><kbd>Esc</kbd></div>
+    <div class="cmdk-list" id="cmdList"></div>
+    <div class="cmdk-foot"><span>↑↓ выбрать</span><span>Enter выполнить</span></div>`, { cls: 'cmdk' });
+  const q = $('#cmdQ'), box = $('#cmdList');
+  let list = all, cur = 0;
+  const draw = () => {
+    let html = '', g = '';
+    list.forEach((c, k) => {
+      if (c.g !== g) { g = c.g; html += `<div class="cmdk-group">${g}</div>`; }
+      html += `<button class="cmdk-item${k === cur ? ' on' : ''}" data-k="${k}">${icon(c.icon)}<span>${esc(c.label)}</span>${c.key ? `<kbd>${c.key}</kbd>` : ''}</button>`;
+    });
+    box.innerHTML = html || '<div class="cmdk-empty">Ничего не нашлось</div>';
+  };
+  const mark = () => { $$('.cmdk-item', box).forEach(b => b.classList.toggle('on', +b.dataset.k === cur)); box.querySelector('.cmdk-item.on')?.scrollIntoView({ block: 'nearest' }); };
+  const run = k => { const c = list[k]; if (!c) return; m.close(); c.run(); };
+  q.oninput = () => {
+    const words = q.value.toLowerCase().trim().split(/\s+/).filter(Boolean);
+    list = all.filter(c => { const hay = (c.label + ' ' + c.g + ' ' + (c.words || '')).toLowerCase(); return words.every(w => hay.includes(w)); });
+    cur = 0; draw();
+  };
+  q.onkeydown = e => {
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); if (list.length) { cur = (cur + (e.key === 'ArrowDown' ? 1 : -1) + list.length) % list.length; mark(); } }
+    else if (e.key === 'Enter') { e.preventDefault(); run(cur); }
+  };
+  box.onmousemove = e => { const b = e.target.closest('.cmdk-item'); if (b && +b.dataset.k !== cur) { cur = +b.dataset.k; mark(); } };
+  box.onclick = e => { const b = e.target.closest('.cmdk-item'); if (b) run(+b.dataset.k); };
+  draw(); q.focus();
 }
 
 // ---------- утилиты ----------
@@ -1702,22 +1873,31 @@ async function loadFont(buf, silent) {
 // ---------- верхняя панель и файлы ----------
 $('#configName').value = S.configName;
 $('#configName').oninput = e => { S.configName = e.target.value; persist(); };
-$('#btnOpen').onclick = $('#esOpen').onclick = async () => importJsonFiles(await pickJsonFiles());
+const openJson = async () => importJsonFiles(await pickJsonFiles());
+$('#esOpen').onclick = openJson;
 $('#btnExport').onclick = openExportModal;
 $('#btnPublish').onclick = openPublishModal;
 $('#btnUndo').onclick = undo; $('#btnRedo').onclick = redo;
-$('#zoomIn').onclick = () => zoomAt(1.25, canvas.clientWidth / 2, canvas.clientHeight / 2, true);
-$('#zoomOut').onclick = () => zoomAt(0.8, canvas.clientWidth / 2, canvas.clientHeight / 2, true);
+const zoomBy = k => zoomAt(k, canvas.clientWidth / 2, canvas.clientHeight / 2, true);
+$('#zoomIn').onclick = () => zoomBy(1.25);
+$('#zoomOut').onclick = () => zoomBy(0.8);
 $('#zoomVal').onclick = () => fitView();
-$('#btnPreview').onclick = () => setPreview(!st.preview);
-$('#btnBack').onclick = () => setPreview(false);
+for (const b of $$('#viewSwitch [data-view]')) b.onclick = () => setPreview(b.dataset.view === 'game');
 $('#btnHelp').onclick = openHelp;
-$('#btnTheme').onclick = toggleTheme;
-const addMenu = $('#addMenu');
-$('#btnAdd').onclick = e => { e.stopPropagation(); addMenu.classList.toggle('open'); };
-document.addEventListener('click', () => addMenu.classList.remove('open'));
+$('#btnCmd').onclick = openCommands;
+
+// выпадающие меню: «+» у категорий и стрелка у названия
+const addMenu = $('#addMenu'), mainMenu = $('#mainMenu');
+const menusOpen = () => addMenu.classList.contains('open') || mainMenu.classList.contains('open');
+function closeMenus() { addMenu.classList.remove('open'); mainMenu.classList.remove('open'); $('#btnMenu').classList.remove('open'); }
+function toggleMenu(m, btn) { const o = !m.classList.contains('open'); closeMenus(); m.classList.toggle('open', o); btn.classList.toggle('open', o); }
+$('#btnAdd').onclick = e => { e.stopPropagation(); toggleMenu(addMenu, e.currentTarget); };
+$('#btnMenu').onclick = e => { e.stopPropagation(); toggleMenu(mainMenu, e.currentTarget); };
+document.addEventListener('click', closeMenus);
+const CMD = { open: openJson, export: openExportModal, publish: openPublishModal, theme: toggleTheme, help: openHelp };
+for (const b of $$('[data-cmd]')) b.addEventListener('click', () => CMD[b.dataset.cmd]());
 function doAdd(kind) {
-  addMenu.classList.remove('open');
+  closeMenus();
   if (kind === 'image') openImageModal();
   else if (kind === 'ascii') openAsciiModal();
   else if (kind === 'lines') openLinesModal();
@@ -1748,9 +1928,11 @@ $('#fileFont').onchange = async e => {
 
 // перетаскивание файлов на холст
 const stage = $('#stage');
-stage.addEventListener('dragover', e => e.preventDefault());
+stage.addEventListener('dragover', e => { e.preventDefault(); $('#emptyState').classList.add('drag-over'); });
+stage.addEventListener('dragleave', e => { if (!stage.contains(e.relatedTarget)) $('#emptyState').classList.remove('drag-over'); });
 stage.addEventListener('drop', e => {
   e.preventDefault();
+  $('#emptyState').classList.remove('drag-over');
   const files = [...e.dataTransfer.files];
   const json = files.filter(f => /\.json$/i.test(f.name) || f.type === 'application/json');
   if (json.length) importJsonFiles(json.map(file => ({ file, handle: null })));
@@ -1790,13 +1972,16 @@ function pasteEls() {
 }
 
 // ---------- клавиатура ----------
-const TOOL_KEYS = { v: 'select', h: 'pan', p: 'pencil', l: 'line', i: 'hv', r: 'rect', o: 'ellipse', d: 'rhombus', y: 'triangle', e: 'eraser', t: 'text', g: 'hero' };
+// B и X — как подписано в доке; P и I оставлены для тех, кто привык к старым клавишам
+const TOOL_KEYS = { v: 'select', h: 'pan', b: 'pencil', p: 'pencil', l: 'line', x: 'hv', i: 'hv', r: 'rect', o: 'ellipse', d: 'rhombus', y: 'triangle', e: 'eraser', t: 'text', g: 'hero' };
 document.addEventListener('keydown', e => {
   const t = e.target;
   if (t.tagName === 'INPUT' && t.type !== 'range' && t.type !== 'checkbox' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT') return;
   if ($('#modalRoot').children.length) return;
   const k = e.key.toLowerCase(), ctrl = e.ctrlKey || e.metaKey;
   const code = e.code;
+  if (ctrl && code === 'KeyK') { e.preventDefault(); closeMenus(); openCommands(); return; }
+  if (e.key === 'Escape' && menusOpen()) { closeMenus(); return; }
   // в превью работают только вид, тема и выход — правки вслепую не нужны
   if (st.preview && !['Tab', 'Escape', '+', '=', '-', '?'].includes(e.key) && code !== 'Space'
     && !(e.shiftKey && (code === 'Digit1' || code === 'KeyT')) && !(ctrl && code === 'KeyS')) return;
@@ -1826,7 +2011,7 @@ document.addEventListener('keydown', e => {
     for (const x of selEls()) { x.x += dx; x.y += dy; }
     changed(); return;
   }
-  const code2tool = { KeyV: 'v', KeyH: 'h', KeyP: 'p', KeyL: 'l', KeyI: 'i', KeyR: 'r', KeyO: 'o', KeyD: 'd', KeyY: 'y', KeyE: 'e', KeyT: 't', KeyG: 'g' }[code];
+  const code2tool = { KeyV: 'v', KeyH: 'h', KeyB: 'b', KeyP: 'p', KeyL: 'l', KeyX: 'x', KeyI: 'i', KeyR: 'r', KeyO: 'o', KeyD: 'd', KeyY: 'y', KeyE: 'e', KeyT: 't', KeyG: 'g' }[code];
   if (code2tool && TOOL_KEYS[code2tool]) setTool(TOOL_KEYS[code2tool]);
 });
 document.addEventListener('keyup', e => { if (e.code === 'Space') { spaceDown = false; canvas.style.cursor = ''; } });
@@ -1861,7 +2046,9 @@ document.addEventListener('input', e => { if (e.target.type === 'range') syncRan
   applyThemeIcon();
   setTool('select');
   // шрифты меняют ширину кнопок дока — переставим «таблетку», когда они загрузятся
-  document.fonts.ready.then(moveDockInd);
+  document.fonts.ready.then(() => { moveDockInd(); moveSegInd(); });
+  moveSegInd();
+  addEventListener('resize', () => { moveDockInd(); moveSegInd(); });
   // ссылки из каталога: ?grid=<id> — открыть сетку, ?publish — сразу окно публикации
   const qs = new URLSearchParams(location.search);
   if (qs.has('grid') || qs.has('publish')) {
