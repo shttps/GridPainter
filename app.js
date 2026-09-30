@@ -1280,7 +1280,7 @@ function openImageModal(file) {
         <option value="lines">Линии  - \\ | /</option><option value="dots">Только точки  .</option><option value="mid">Средние точки  ·</option><option value="custom">Свой…</option></select></label>
       <input class="input mono" id="custom" value="${esc(IP.custom)}" title="4 символа: горизонталь, диагональ \\, вертикаль, диагональ /. Один символ — везде он." ${IP.charset !== 'custom' ? 'hidden' : ''}>
       ${sw('orient', 'Автоориентация по углу линии', IP.orient)}
-      <div class="hint">Canny edge detection, как в Photoshop: размытие убирает шум, пороги решают, какие границы считать линиями. Лимит 0 — без ограничения.</div>`,
+      <div class="hint">Границы ищутся Canny (как в Photoshop), сшиваются в линии, и символы ставятся вдоль них с шагом «Плотность», повёрнутые по линии. Короткие обрывки и двойные контуры отбрасываются. Лимит 0 — без ограничения.</div>`,
   };
 
   function buildControls() {
@@ -1361,7 +1361,7 @@ function openImageModal(file) {
         if (c) { c.textContent = `${n.toLocaleString('ru')} / 8 000`; c.classList.toggle('bad', n > STEAM_LIMIT); }
       }
     } else {
-      result = Convert.lineart(img, { ...IP, step: IP.lstep }, area, measure, LBL.size);
+      result = Convert.lineart(img, { ...IP, step: IP.lstep }, area, measure, LBL.size, labelFont());
       toCategories(result.els);
       info = `${result.els.length} категорий` + (result.step > IP.lstep + 0.01 ? ` · шаг увеличен до ${result.step.toFixed(1)} из-за лимита` : '');
     }

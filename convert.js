@@ -241,19 +241,28 @@ window.Convert = (() => {
     return out;
   }
 
-  function canny(gray, w, h, sigma, lowPct, highPct) {
-    const g = gaussian(gray, w, h, sigma);
+  // channels — массивы яркости/цвета; в каждой точке берём канал с самым сильным перепадом,
+  // чтобы видеть и границы между цветами одинаковой яркости.
+  function canny(channels, w, h, sigma, lowPct, highPct) {
     const mag = new Float32Array(w * h), gx = new Float32Array(w * h), gy = new Float32Array(w * h);
-    let max = 0;
-    for (let y = 1; y < h - 1; y++) for (let x = 1; x < w - 1; x++) {
-      const i = y * w + x;
-      const a = g[i - w - 1], b = g[i - w], c = g[i - w + 1], d = g[i - 1], f = g[i + 1], G = g[i + w - 1], H = g[i + w], I = g[i + w + 1];
-      const sx = (c + 2 * f + I) - (a + 2 * d + G);
-      const sy = (G + 2 * H + I) - (a + 2 * b + c);
-      gx[i] = sx; gy[i] = sy;
-      const m = Math.hypot(sx, sy);
-      mag[i] = m; if (m > max) max = m;
+    for (const ch of channels) {
+      const g = gaussian(ch, w, h, sigma);
+      for (let y = 1; y < h - 1; y++) for (let x = 1; x < w - 1; x++) {
+        const i = y * w + x;
+        const a = g[i - w - 1], b = g[i - w], c = g[i - w + 1], d = g[i - 1], f = g[i + 1], G = g[i + w - 1], H = g[i + w], I = g[i + w + 1];
+        const sx = (c + 2 * f + I) - (a + 2 * d + G);
+        const sy = (G + 2 * H + I) - (a + 2 * b + c);
+        const m = Math.hypot(sx, sy);
+        if (m > mag[i]) { mag[i] = m; gx[i] = sx; gy[i] = sy; }
+      }
     }
+    // «максимум» по 99-му перцентилю: пара ярких пикселей не должна задирать пороги для всей картинки
+    const hist = new Uint32Array(1024);
+    let top = 0, n = 0;
+    for (let i = 0; i < w * h; i++) if (mag[i] > top) top = mag[i];
+    for (let i = 0; i < w * h; i++) if (mag[i] > 0) { hist[Math.min(1023, (mag[i] / top * 1023) | 0)]++; n++; }
+    let max = top;
+    for (let k = 1023, acc = 0; k >= 0; k--) { acc += hist[k]; if (acc >= n * 0.01) { max = (k + 1) / 1024 * top; break; } }
     // подавление немаксимумов
     const nms = new Float32Array(w * h);
     for (let y = 1; y < h - 1; y++) for (let x = 1; x < w - 1; x++) {
@@ -280,57 +289,198 @@ window.Convert = (() => {
         if (!edge[j] && nms[j] >= lo) { edge[j] = 1; stack.push(j); }
       }
     }
-    return { edge, mag, gx, gy };
+    return { edge, nms, max };
   }
 
   // Порядок символов в наборе: горизонталь, диагональ «\», вертикаль, диагональ «/».
   const CHARSETS = { lines: '-\\|/', dots: '.', mid: '·', mixed: '-\\|/' };
+  const NOMINAL = [0, 45, 90, 135];
 
-  function lineart(img, p, area, measure, fontSize) {
-    const fit = fitRect(img.naturalWidth, img.naturalHeight, area.w, area.h);
-    const K = 3; // пикселей обработки на шаг плотности
-    const workW = Math.round(clamp(fit.w / p.step * K, 60, 1400));
-    const workH = Math.max(20, Math.round(workW * fit.h / fit.w));
-    const px = preprocess(sample(img, workW, workH), p);
-    const gray = new Float32Array(workW * workH);
-    for (let i = 0; i < gray.length; i++) gray[i] = px[i] ? px[i].lum : 0;
-    const { edge, mag, gx, gy } = canny(gray, workW, workH, p.blur, p.low, p.high);
-    const pts = [];
-    for (let i = 0; i < edge.length; i++) if (edge[i]) pts.push(i);
-
-    const set = p.charset === 'custom' ? [...(p.custom || '.')] : [...CHARSETS[p.charset] || '.'];
-    const binCells = c => {
-      const m = new Map();
-      for (const i of pts) {
-        const x = i % workW, y = (i / workW) | 0;
-        const key = ((y / c) | 0) * 100000 + ((x / c) | 0);
-        let e = m.get(key);
-        if (!e) m.set(key, e = { best: i, bm: -1, C: 0, S: 0 });
-        const mg = mag[i];
-        if (mg > e.bm) { e.bm = mg; e.best = i; }
-        // усреднение ориентации удвоенным углом (0° и 180° — одно направление)
-        const a = Math.atan2(gy[i], gx[i]) * 2;
-        e.C += Math.cos(a) * mg; e.S += Math.sin(a) * mg;
+  // Форма символа в игровом шрифте: центр «чернил» относительно точки вывода (textBaseline top),
+  // угол штриха (0–180°, y вниз). В «/» наклон обычно ~65°, а не 45°, а «-» висит не по
+  // середине строки — без этого соседние штрихи не складываются в ровную линию.
+  const shapeCache = new Map();
+  function glyphShape(ch, k, font, fontSize, measure) {
+    const key = font + '|' + fontSize + '|' + ch + '|' + k;
+    let s = shapeCache.get(key);
+    if (s) return s;
+    s = { cx: measure(ch) / 2, cy: fontSize * 0.55, ang: NOMINAL[k % 4] };
+    if (font && typeof document !== 'undefined') {
+      const S = Math.ceil(fontSize * 3), o = fontSize;
+      const cv = document.createElement('canvas'); cv.width = cv.height = S;
+      const cx = cv.getContext('2d', { willReadFrequently: true });
+      cx.font = font; cx.textBaseline = 'top'; cx.fillStyle = '#fff';
+      cx.fillText(ch.toUpperCase(), o, o);
+      const d = cx.getImageData(0, 0, S, S).data;
+      let W = 0, X = 0, Y = 0, xx = 0, yy = 0, xy = 0;
+      for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) { const a = d[(y * S + x) * 4 + 3]; if (a) { W += a; X += a * x; Y += a * y; } }
+      if (W > 0) {
+        X /= W; Y /= W;
+        for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) {
+          const a = d[(y * S + x) * 4 + 3];
+          if (a) { xx += a * (x - X) ** 2; yy += a * (y - Y) ** 2; xy += a * (x - X) * (y - Y); }
+        }
+        xx /= W; yy /= W; xy /= W;
+        const r = Math.sqrt(((xx - yy) / 2) ** 2 + xy * xy), l1 = (xx + yy) / 2 + r, l2 = (xx + yy) / 2 - r;
+        const ang = ((Math.atan2(2 * xy, xx - yy) / 2 * 180 / Math.PI) % 180 + 180) % 180;
+        // у круглых символов (точка, «о») направления нет — оставляем номинальный угол по позиции в наборе
+        s = { cx: X + 0.5 - o, cy: Y + 0.5 - o, ang: l1 > 3 * l2 ? ang : s.ang };
       }
-      return m;
-    };
-    let c = K, cells = binCells(c);
-    if (p.limit > 0) while (cells.size > p.limit && c < 200) cells = binCells(++c);
-
-    const ws = fit.w / workW, els = [];
-    for (const e of cells.values()) {
-      const bx = e.best % workW, by = (e.best / workW) | 0;
-      let ch = set[0];
-      if (p.orient && set.length >= 4) {
-        // направление линии = градиент + 90°, в экранных координатах (y вниз)
-        let dir = (Math.atan2(e.S, e.C) / 2) * 180 / Math.PI + 90;
-        dir = ((dir % 180) + 180) % 180;
-        ch = set[Math.round(dir / 45) % 4];
-      } else if (set.length > 1 && !p.orient) ch = set[(bx + by) % set.length];
-      const wx = fit.x + (bx + 0.5) * ws, wy = fit.y + (by + 0.5) * ws;
-      els.push({ t: 'glyph', name: ch, x: wx - measure(ch) / 2, y: wy - fontSize * 0.55 });
     }
-    return { els, step: c * ws, edges: pts.length };
+    shapeCache.set(key, s);
+    return s;
+  }
+
+  // Пиксели границ → цепочки (полилинии) по 8-связности. Сначала идём от концов линий,
+  // потом добираем замкнутые контуры; на развилке ветка дотягивается до уже пройденной точки.
+  function traceChains(edge, w) {
+    const OFF = [1, w + 1, w, w - 1, -1, -w - 1, -w, -w + 1];
+    const used = new Uint8Array(edge.length), ends = [], rest = [], chains = [];
+    for (let i = 0; i < edge.length; i++) if (edge[i]) {
+      let n = 0; for (const o of OFF) if (edge[i + o]) n++;
+      (n <= 1 ? ends : rest).push(i);
+    }
+    const walk = start => {
+      const out = [];
+      let cur = start, dir = -1;
+      for (;;) {
+        let best = -1, bd = 99;
+        for (let k = 0; k < 8; k++) {
+          const j = cur + OFF[k];
+          if (!edge[j] || used[j]) continue;
+          // меньше поворот — лучше; при равенстве прямые соседи раньше диагональных
+          const turn = dir < 0 ? 0 : Math.min((k - dir + 8) % 8, (dir - k + 8) % 8);
+          const d = turn * 2 + (k & 1);
+          if (d < bd) { bd = d; best = k; }
+        }
+        if (best < 0) break;
+        cur += OFF[best]; dir = best; used[cur] = 1; out.push(cur);
+      }
+      if (out.length) {
+        const last = out[out.length - 1], prev = out.length > 1 ? out[out.length - 2] : start;
+        for (const o of OFF) { const j = last + o; if (j !== prev && j !== start && edge[j] && used[j]) { out.push(j); break; } }
+      }
+      return out;
+    };
+    const run = i => {
+      if (used[i]) return;
+      used[i] = 1;
+      const a = walk(i), b = walk(i);
+      chains.push(b.reverse().concat([i], a));
+    };
+    ends.forEach(run); rest.forEach(run);
+    return chains;
+  }
+
+  // Line-art: границы Canny → цепочки → символы, расставленные вдоль линий с шагом p.step
+  // и повёрнутые по касательной. Раньше символ ставился в каждую клетку сетки, где была граница,
+  // и при шаге меньше длины штриха линии превращались в «щетину» из сдвинутых штрихов.
+  function lineart(img, p, area, measure, fontSize, font) {
+    const fit = fitRect(img.naturalWidth, img.naturalHeight, area.w, area.h);
+    const set = p.charset === 'custom' ? [...(p.custom || '.')] : [...CHARSETS[p.charset] || '.'];
+    const shapes = set.map((ch, k) => glyphShape(ch, k, font, fontSize, measure));
+    const directional = p.orient && set.length >= 2;
+    let cache = null;
+
+    // Границы ищем на сетке, привязанной к шагу: чем реже символы, тем крупнее детали,
+    // которые имеет смысл рисовать, — мелкая текстура уходит в размытие.
+    const detect = step => {
+      const workW = Math.round(clamp(fit.w / step * 3, 60, 1400));
+      if (cache && cache.workW === workW) return cache;
+      const workH = Math.max(20, Math.round(workW * fit.h / fit.w));
+      const px = preprocess(sample(img, workW, workH), p);
+      const L = new Float32Array(workW * workH), A = new Float32Array(L.length), B = new Float32Array(L.length);
+      let chroma = 0;
+      for (let i = 0; i < L.length; i++) if (px[i]) {
+        L[i] = px[i].lab[0] * 2.55; A[i] = px[i].lab[1] * 1.5; B[i] = px[i].lab[2] * 1.5;
+        chroma = Math.max(chroma, Math.abs(A[i]), Math.abs(B[i]));
+      }
+      // у ч/б картинки цветовые каналы пустые — не тратим на них время
+      const { edge, nms, max } = canny(chroma > 8 ? [L, A, B] : [L], workW, workH, p.blur, p.low, p.high);
+      const ws = fit.w / workW;
+      let edges = 0;
+      const chains = traceChains(edge, workW).map(ch => {
+        // в координаты холста + сглаживание по 5 точкам, чтобы убрать пиксельную лесенку
+        const n = ch.length, xs = new Float32Array(n), ys = new Float32Array(n), len = new Float32Array(n);
+        let m = 0;
+        for (let k = 0; k < n; k++) {
+          let sx = 0, sy = 0, c = 0;
+          for (let q = Math.max(0, k - 2); q <= Math.min(n - 1, k + 2); q++) { sx += ch[q] % workW; sy += (ch[q] / workW) | 0; c++; }
+          xs[k] = fit.x + (sx / c + 0.5) * ws; ys[k] = fit.y + (sy / c + 0.5) * ws;
+          if (k) len[k] = len[k - 1] + Math.hypot(xs[k] - xs[k - 1], ys[k] - ys[k - 1]);
+          m += Math.min(1, nms[ch[k]] / max);
+        }
+        edges += n;
+        return { xs, ys, len, L: len[n - 1], w: len[n - 1] * m / n };
+      });
+      // длинные контрастные линии ставятся первыми и забирают место у дублей и мусора
+      chains.sort((a, b) => b.w - a.w);
+      return cache = { workW, chains, edges };
+    };
+
+    const at = (c, t) => {
+      t = clamp(t, 0, c.L);
+      let lo = 0, hi = c.len.length - 1;
+      if (hi === 0) return [c.xs[0], c.ys[0]];
+      while (hi - lo > 1) { const mid = (lo + hi) >> 1; c.len[mid] <= t ? lo = mid : hi = mid; }
+      const seg = c.len[hi] - c.len[lo], f = seg > 0 ? (t - c.len[lo]) / seg : 0;
+      return [c.xs[lo] + (c.xs[hi] - c.xs[lo]) * f, c.ys[lo] + (c.ys[hi] - c.ys[lo]) * f];
+    };
+
+    const place = (chains, step) => {
+      const els = [];
+      // Два штриха ближе R читаются как один толстый — второй не ставим.
+      // Так схлопываются двойные контуры по обе стороны тонкой линии.
+      const R = Math.max(step * 0.7, fontSize * 0.3), R2 = R * R, G = Math.max(R, step);
+      const grid = new Map();
+      // короткие и бледные обрывки (искры, зерно, текстура) — шум, а не линии рисунка
+      const minLen = Math.max(step * 0.8, fontSize * 0.8), minW = fontSize * 0.5, half = fontSize * 0.35;
+      for (const c of chains) {
+        if (c.L < minLen || c.w < minW) continue;
+        const n = Math.floor(c.L / step) + 1, t0 = (c.L - (n - 1) * step) / 2;
+        for (let k = 0; k < n; k++) {
+          const t = t0 + k * step, [x, y] = at(c, t);
+          const [ax, ay] = at(c, t - half), [bx, by] = at(c, t + half);
+          const tl = Math.hypot(bx - ax, by - ay) || 1, ux = (bx - ax) / tl, uy = (by - ay) / tl;
+          let j = 0;
+          if (directional) {
+            const ang = ((Math.atan2(uy, ux) * 180 / Math.PI) % 180 + 180) % 180;
+            let bd = 1e9;
+            for (let q = 0; q < shapes.length; q++) {
+              const d = Math.abs(ang - shapes[q].ang), dd = Math.min(d, 180 - d);
+              if (dd < bd) { bd = dd; j = q; }
+            }
+          } else if (set.length > 1) j = els.length % set.length;
+          const gx = Math.floor(x / G), gy = Math.floor(y / G);
+          let busy = false;
+          for (let dy = -1; dy <= 1 && !busy; dy++) for (let dx = -1; dx <= 1 && !busy; dx++) {
+            const list = grid.get((gx + dx) * 65536 + gy + dy);
+            if (list) for (const o of list) {
+              const ex = x - o.x, ey = y - o.y;
+              if (ex * ex + ey * ey < R2 * 0.25) { busy = true; break; }
+              if (o.j !== j) continue;
+              // тот же символ: мешает только сосед сбоку от линии, а не следующий вдоль неё
+              const along = Math.abs(ex * o.ux + ey * o.uy), perp = Math.abs(ex * o.uy - ey * o.ux);
+              if (perp < R && along < step * 0.9) { busy = true; break; }
+            }
+          }
+          if (busy) continue;
+          const key = gx * 65536 + gy;
+          (grid.get(key) || grid.set(key, []).get(key)).push({ x, y, j, ux, uy });
+          els.push({ t: 'glyph', name: set[j], x: x - shapes[j].cx, y: y - shapes[j].cy });
+        }
+      }
+      return els;
+    };
+
+    let step = p.step, d, els;
+    for (let it = 0; it < 12; it++) {
+      d = detect(step);
+      els = place(d.chains, step);
+      if (!(p.limit > 0) || els.length <= p.limit || step > 200) break;
+      step *= Math.max(1.03, Math.sqrt(els.length / p.limit));
+    }
+    return { els, step, edges: d.edges };
   }
 
   return { CARD_W, CARD_H, PAD, rgbToLab, fitRect, mosaic, ascii, lineart };
