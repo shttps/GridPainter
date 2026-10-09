@@ -1030,9 +1030,10 @@ function moveDockInd() {
 
 // ---------- тема ----------
 const themeName = () => document.documentElement.dataset.theme === 'dark' ? 'Светлая тема' : 'Тёмная тема';
+// переключатель темы в меню показывает текущую
 function applyThemeIcon() {
-  const b = $('#menuTheme'), dark = document.documentElement.dataset.theme === 'dark';
-  b.innerHTML = `${icon(dark ? 'sun' : 'moon')}${themeName()} <kbd>Shift T</kbd>`;
+  const cur = document.documentElement.dataset.theme;
+  for (const b of $$('#themeSeg [data-theme-v]')) b.classList.toggle('on', b.dataset.themeV === cur);
 }
 function toggleTheme() {
   const root = document.documentElement, next = root.dataset.theme === 'dark' ? 'light' : 'dark';
@@ -1299,36 +1300,63 @@ const modalHead = (title, extra = '') => `<div class="modal-head"><h2>${title}</
 
 // ----- импорт картинки -----
 const IP = Object.assign({
-  mode: 'mosaic',
-  brightness: 0, contrast: 0, saturation: 0,
+  mode: 'lineart',
+  brightness: 0, contrast: 0, saturation: 0, levels: true, sharpen: 0, frame: 'fit',
   cols: 36, fit: true, dither: false, bgRemove: false, tolerance: 18,
   amode: 'chars', step: 12, ramp: ' .:-=+*#%@', rampPreset: 'classic', invert: false, threshold: 128, autoThreshold: true, lineH: 14, bcols: 60,
   blur: 1.4, low: 8, high: 22, lstep: 7, limit: 3000, charset: 'lines', custom: '-\\|/', orient: true,
+  budget: 8000, shade: 0, shadeCh: '·',
 }, load('gp2.import', {}));
 const RAMPS = { classic: ' .:-=+*#%@', blocks: ' ░▒▓█', dots: ' .·•●', simple: ' .:*#' };
+// Детализация: сколько категорий можно потратить. Плотность подбирается сама — максимум деталей в этом бюджете.
+const BUDGETS = [[2000, '2k'], [5000, '5k'], [8000, '8k'], [12000, '12k'], [0, 'Вручную']];
+const SHADE_CHS = ['·', '.', '•', ':'];
 let disabledHeroes = new Set(load('gp.disabled', []));
 
 function openImageModal(file) {
   let img = null, result = null, split = 0.5, timer = 0, steam = '';
+  let src = null, rect = null, place = null, srcKey = 0, lastStep = 0;
+  const fr = { zoom: 1, x: 0, y: 0 };        // кадр: масштаб и сдвиг картинки на холсте (доли холста)
+  const view = { z: 1, x: 0, y: 0 };         // зум и сдвиг самого превью — рассмотреть детали
+  let tab = 'compare', ro = null;
+  const edgeCache = new Map();
   const m = openModal(`
-    ${modalHead('Импорт картинки', `<div class="seg" id="ipMode" style="width:360px;margin-left:16px">
-      <button data-m="mosaic">Мозаика из героев</button><button data-m="ascii">ASCII</button><button data-m="lineart">Line-art</button></div>`)}
+    ${modalHead('Импорт картинки', `<div class="seg ip-modes" id="ipMode">
+      <button data-m="lineart" data-icon="pencil">Line-art</button><button data-m="ascii" data-icon="ascii">ASCII</button><button data-m="mosaic" data-icon="heroes">Мозаика из героев</button></div>`)}
     <div class="split">
       <div class="split-controls">
-        <div class="drop" id="ipDrop">Перетащи картинку, кликни или Ctrl+V</div>
-        <div id="ipCtl" style="display:flex;flex-direction:column;gap:12px"></div>
+        <div class="drop" id="ipDrop">${icon('image')}<b>Перетащи картинку</b><span>или кликни, или Ctrl+V</span></div>
+        <div class="ip-group" id="ipFrame">
+          <div class="ip-h">Кадр</div>
+          <div class="seg" id="ipFit"><button data-v="fit">Вписать</button><button data-v="fill">Заполнить холст</button></div>
+          ${slider('frZoom', 'Масштаб', 100, 400, 5, 100, '%')}
+          <div class="hint">Во вкладке «Кадр» на превью картинку можно двигать мышью, колесо — масштаб. <button class="link" id="frReset">Сбросить кадр</button></div>
+        </div>
+        <div id="ipCtl" class="ip-ctl"></div>
       </div>
-      <div class="split-preview"><canvas id="ipCanvas"></canvas><span class="tag" style="left:12px">Оригинал</span><span class="tag" style="right:12px">Результат</span></div>
+      <div class="split-preview" id="ipPreview">
+        <canvas id="ipCanvas"></canvas>
+        <div class="pv-tabs seg" id="pvTabs"><button data-v="compare">Сравнение</button><button data-v="result">Результат</button><button data-v="frame">Кадр</button></div>
+        <span class="tag pv-l" id="tagL">Оригинал</span><span class="tag pv-r" id="tagR">Результат</span>
+        <div class="pv-zoom"><button class="icon-btn sm" id="pvOut" data-icon="minus"></button><button class="zoom-val" id="pvZoom" title="Вписать">100%</button><button class="icon-btn sm" id="pvIn" data-icon="plus"></button></div>
+        <div class="pv-busy" id="pvBusy"><i></i>Считаю…</div>
+      </div>
     </div>
-    <div class="modal-foot"><span class="info" id="ipInfo"></span><button class="btn" data-close>Отмена</button><button class="btn primary" id="ipAdd" data-icon="plus" disabled>Добавить на холст</button></div>`, { wide: true, onClose: () => { pasteTarget = null; } });
+    <div class="modal-foot"><span class="ip-count" id="ipCount"></span><span class="info" id="ipInfo"></span><button class="btn" data-close>Отмена</button>
+      ${st.els.length ? '<button class="btn" id="ipReplace" data-icon="layers" disabled>Заменить холст</button>' : ''}
+      <button class="btn primary" id="ipAdd" data-icon="plus" disabled>Добавить на холст</button></div>`, { wide: true, onClose: () => { pasteTarget = null; clearTimeout(timer); ro && ro.disconnect(); } });
 
   const setImg = f => {
     if (!f || !f.type.startsWith('image/')) return;
     const url = URL.createObjectURL(f), im = new Image();
     im.onload = () => {
       img = im;
-      $('#ipDrop').innerHTML = `<img src="${url}"><span>${esc(f.name || 'из буфера')} · ${im.naturalWidth}×${im.naturalHeight}</span>`;
-      $('#ipAdd').disabled = false; compute();
+      Object.assign(fr, { zoom: 1, x: 0, y: 0 }); Object.assign(view, { z: 1, x: 0, y: 0 });
+      lastStep = 0; edgeCache.clear(); syncFrame();
+      $('#ipDrop').classList.add('has');
+      $('#ipDrop').innerHTML = `<img src="${url}"><span><b>${esc(f.name || 'Из буфера')}</b>${im.naturalWidth} × ${im.naturalHeight} · клик — другая</span>`;
+      $('#ipAdd').disabled = false; const rp = $('#ipReplace'); if (rp) rp.disabled = false;
+      schedule(true);
     };
     im.src = url;
   };
@@ -1339,28 +1367,34 @@ function openImageModal(file) {
   drop.ondragleave = () => drop.classList.remove('over');
   drop.ondrop = e => { e.preventDefault(); drop.classList.remove('over'); setImg(e.dataTransfer.files[0]); };
 
-  const common = () => `${slider('brightness', 'Яркость', -100, 100, 1, IP.brightness)}${slider('contrast', 'Контраст', -100, 100, 1, IP.contrast)}`;
-  const bgCtl = () => `${sw('bgRemove', 'Убрать фон (цвет угла)', IP.bgRemove)}${slider('tolerance', 'Допуск фона', 1, 100, 1, IP.tolerance)}`;
+  // ---- элементы управления ----
+  const group = (title, body, extra = '') => `<div class="ip-group"${extra}><div class="ip-h">${title}</div>${body}</div>`;
+  const budgetCtl = manual => `<div class="chips-row" id="ipBudget">${BUDGETS.map(([v, l]) => `<button data-v="${v}" class="${IP.budget === v ? 'on' : ''}">${l}</button>`).join('')}</div>
+    <div class="hint" id="budgetHint">${IP.budget ? `Плотность подбирается сама: максимум деталей, но не больше ${IP.budget.toLocaleString('ru')} категорий.` : 'Плотность и лимит — вручную.'}</div>
+    <div id="ipManual" style="display:${IP.budget ? 'none' : 'flex'}" class="ip-col">${manual}</div>`;
+  const imageCtl = (extra = '') => group('Картинка', `${sw('levels', 'Авто-уровни', IP.levels)}${slider('sharpen', 'Резкость', 0, 100, 1, IP.sharpen)}
+    ${slider('brightness', 'Яркость', -100, 100, 1, IP.brightness)}${slider('contrast', 'Контраст', -100, 100, 1, IP.contrast)}${extra}`);
+  const bgCtl = () => group('Фон', `${sw('bgRemove', 'Убрать фон (цвет по краю)', IP.bgRemove)}${slider('tolerance', 'Допуск фона', 1, 100, 1, IP.tolerance)}`);
   const controls = {
     mosaic: () => `
-      ${slider('cols', 'Ширина, героев', 6, 120, 1, IP.cols)}
-      ${common()}${slider('saturation', 'Насыщенность', -100, 100, 1, IP.saturation)}
-      ${sw('fit', 'Подогнать яркость под палитру', IP.fit)}${sw('dither', 'Дизеринг', IP.dither)}${bgCtl()}
-      <div class="lbl">Палитра — клик исключает героя</div><div class="picker" id="ipPal" style="grid-template-columns:repeat(8,1fr)"></div>
-      <div class="row2"><button class="btn sm" id="palAll">Все</button><button class="btn sm" id="palNone">Никого</button></div>`,
+      ${group('Размер', slider('cols', 'Ширина, героев', 6, 120, 1, IP.cols))}
+      ${imageCtl(`${slider('saturation', 'Насыщенность', -100, 100, 1, IP.saturation)}${sw('fit', 'Подогнать яркость под палитру', IP.fit)}${sw('dither', 'Дизеринг', IP.dither)}`)}
+      ${bgCtl()}
+      ${group('Палитра', `<div class="hint">Клик исключает героя</div><div class="picker" id="ipPal" style="grid-template-columns:repeat(8,1fr)"></div>
+        <div class="row2"><button class="btn sm" id="palAll">Все</button><button class="btn sm" id="palNone">Никого</button></div>`)}`,
     ascii: () => `
       <div class="seg" id="amode"><button data-v="chars">Символы по яркости</button><button data-v="braille">Брайль строками</button></div>
-      <div id="aChars" ${IP.amode !== 'chars' ? 'hidden' : ''} style="display:flex;flex-direction:column;gap:12px">
-        ${slider('step', 'Плотность (шаг)', 3, 40, 1, IP.step)}
-        <label class="field"><span>Набор символов</span><select class="input" id="rampPreset">
+      <div id="aChars" class="ip-col" ${IP.amode !== 'chars' ? 'hidden' : ''}>
+        ${group('Детализация', budgetCtl(slider('step', 'Плотность (шаг)', 3, 40, 0.5, IP.step)))}
+        ${group('Символы', `<label class="field"><select class="input" id="rampPreset">
           <option value="classic">Классика  .:-=+*#%@</option><option value="blocks">Блоки ░▒▓█</option><option value="dots">Точки .·•●</option><option value="simple">Простой .:*#</option><option value="custom">Свой…</option></select></label>
-        <input class="input mono" id="ramp" value="${esc(IP.ramp)}" title="От тёмного к светлому; пробел = пусто" ${IP.rampPreset !== 'custom' ? 'hidden' : ''}>
+          <input class="input mono" id="ramp" value="${esc(IP.ramp)}" title="От тёмного к светлому; пробел = пусто" ${IP.rampPreset !== 'custom' ? 'hidden' : ''}>`)}
       </div>
-      <div id="aBraille" ${IP.amode !== 'braille' ? 'hidden' : ''} style="display:flex;flex-direction:column;gap:12px">
-        ${slider('bcols', 'Символов в строке', 10, 200, 1, IP.bcols)}
-        ${sw('autoThreshold', 'Авто-порог', IP.autoThreshold)}${slider('threshold', 'Порог', 1, 254, 1, IP.threshold)}
-        ${slider('lineH', 'Высота строки', 4, 40, 1, IP.lineH)}
-        <div class="hint">Каждая строка — одна категория: очень экономно по количеству категорий.</div>
+      <div id="aBraille" class="ip-col" ${IP.amode !== 'braille' ? 'hidden' : ''}>
+        ${group('Брайль', `${slider('bcols', 'Символов в строке', 10, 300, 1, IP.bcols)}
+          ${sw('autoThreshold', 'Авто-порог', IP.autoThreshold)}${slider('threshold', 'Порог', 1, 254, 1, IP.threshold)}
+          ${slider('lineH', 'Высота строки', 4, 40, 1, IP.lineH)}
+          <div class="hint">Каждая строка — одна категория: очень экономно по количеству категорий.</div>`)}
         <div class="steam-box">
           <div class="steam-head"><b>Steam · Custom Info Box</b><span class="badge" id="steamCount">—</span></div>
           <div class="row2"><button class="btn sm" id="steamW" title="Рекомендуемая ширина Брайль-арта для информационного поля">Ширина 60</button><button class="btn sm" id="steamFit" title="Уменьшить ширину, пока текст не влезет в лимит Steam">Влезть в 8000</button></div>
@@ -1368,25 +1402,28 @@ function openImageModal(file) {
           <div class="hint">Профиль → Редактировать → Витрины → «Своё информационное поле», вставь в поле текста. Если строки переносятся — уменьши ширину на 1–2 символа.</div>
         </div>
       </div>
-      ${common()}${sw('invert', 'Инвертировать', IP.invert)}${sw('dither', 'Дизеринг', IP.dither)}${bgCtl()}`,
+      ${imageCtl(`${sw('invert', 'Инвертировать', IP.invert)}${sw('dither', 'Дизеринг', IP.dither)}`)}${bgCtl()}`,
     lineart: () => `
-      ${slider('lstep', 'Плотность (шаг)', 3, 30, 0.5, IP.lstep)}
-      ${slider('limit', 'Лимит категорий', 0, 10000, 100, IP.limit)}
-      ${slider('blur', 'Blur (размытие)', 0, 6, 0.1, IP.blur)}
-      ${slider('low', 'Нижний порог Canny', 1, 60, 1, IP.low, '%')}
-      ${slider('high', 'Верхний порог Canny', 1, 80, 1, IP.high, '%')}
-      ${common()}
-      <label class="field"><span>Набор символов</span><select class="input" id="charset">
+      ${group('Детализация', budgetCtl(`${slider('lstep', 'Плотность (шаг)', 3, 30, 0.5, IP.lstep)}${slider('limit', 'Лимит категорий', 0, 20000, 100, IP.limit)}`))}
+      ${group('Контуры', `${slider('blur', 'Сглаживание', 0, 6, 0.1, IP.blur)}
+        ${slider('low', 'Нижний порог', 1, 60, 1, IP.low, '%')}${slider('high', 'Верхний порог', 1, 80, 1, IP.high, '%')}
+        <div class="hint">Ниже пороги — больше линий и мелких деталей. Сглаживание убирает шум и текстуру.</div>`)}
+      ${group('Тени точками', `${slider('shade', 'Сила теней', 0, 100, 1, IP.shade, '%')}
+        <div class="pens shade-chs" id="shadeChs">${SHADE_CHS.map(c => `<button data-ch="${esc(c)}" class="${IP.shadeCh === c ? 'on' : ''}">${esc(c)}</button>`).join('')}</div>
+        ${sw('invert', 'Точки в тёмных местах', IP.invert)}
+        <div class="hint">Точки рисуют тон картинки между контурами — объём, волосы, свет. 0 — только контуры.</div>`)}
+      ${group('Символы', `<label class="field"><select class="input" id="charset">
         <option value="lines">Линии  - \\ | /</option><option value="dots">Только точки  .</option><option value="mid">Средние точки  ·</option><option value="custom">Свой…</option></select></label>
-      <input class="input mono" id="custom" value="${esc(IP.custom)}" title="4 символа: горизонталь, диагональ \\, вертикаль, диагональ /. Один символ — везде он." ${IP.charset !== 'custom' ? 'hidden' : ''}>
-      ${sw('orient', 'Автоориентация по углу линии', IP.orient)}
-      <div class="hint">Границы ищутся Canny (как в Photoshop), сшиваются в линии, и символы ставятся вдоль них с шагом «Плотность», повёрнутые по линии. Короткие обрывки и двойные контуры отбрасываются. Лимит 0 — без ограничения.</div>`,
+        <input class="input mono" id="custom" value="${esc(IP.custom)}" title="4 символа: горизонталь, диагональ \\, вертикаль, диагональ /. Один символ — везде он." ${IP.charset !== 'custom' ? 'hidden' : ''}>
+        ${sw('orient', 'Автоориентация по углу линии', IP.orient)}`)}
+      ${imageCtl()}${bgCtl()}`,
   };
 
   function buildControls() {
     $$('#ipMode button').forEach(b => b.classList.toggle('on', b.dataset.m === IP.mode));
     const box = $('#ipCtl');
     box.innerHTML = controls[IP.mode]();
+    applyIcons(box);
     $$('input[type=range]', box).forEach(el => {
       syncRange(el);
       el.addEventListener('input', () => { IP[el.id] = +el.value; if (el.id === 'threshold') { IP.autoThreshold = false; const a = $('#autoThreshold'); if (a) a.checked = false; } syncRange(el); schedule(); });
@@ -1396,9 +1433,20 @@ function openImageModal(file) {
     sel('rampPreset', () => { const r = $('#ramp'); r.hidden = IP.rampPreset !== 'custom'; if (IP.rampPreset !== 'custom') IP.ramp = r.value = RAMPS[IP.rampPreset]; });
     sel('charset', () => { $('#custom').hidden = IP.charset !== 'custom'; });
     for (const id of ['ramp', 'custom']) { const el = document.getElementById(id); if (el) el.oninput = () => { IP[id] = el.value; schedule(); }; }
+    const bud = $('#ipBudget');
+    if (bud) bud.onclick = e => {
+      const b = e.target.closest('button'); if (!b) return;
+      IP.budget = +b.dataset.v; lastStep = 0;
+      $$('button', bud).forEach(x => x.classList.toggle('on', x === b));
+      $('#ipManual').style.display = IP.budget ? 'none' : 'flex';
+      $('#budgetHint').textContent = IP.budget ? `Плотность подбирается сама: максимум деталей, но не больше ${IP.budget.toLocaleString('ru')} категорий.` : 'Плотность и лимит — вручную.';
+      schedule();
+    };
+    const sch = $('#shadeChs');
+    if (sch) sch.onclick = e => { const b = e.target.closest('button'); if (!b) return; IP.shadeCh = b.dataset.ch; $$('button', sch).forEach(x => x.classList.toggle('on', x === b)); if (!IP.shade) { IP.shade = 40; const s = $('#shade'); s.value = 40; syncRange(s); } schedule(); };
     const am = $('#amode');
     if (am) {
-      const upd = () => { $$('button', am).forEach(b => b.classList.toggle('on', b.dataset.v === IP.amode)); $('#aChars').hidden = IP.amode !== 'chars'; $('#aBraille').hidden = IP.amode !== 'braille'; $('#aChars').style.display = IP.amode === 'chars' ? 'flex' : 'none'; $('#aBraille').style.display = IP.amode === 'braille' ? 'flex' : 'none'; };
+      const upd = () => { $$('button', am).forEach(b => b.classList.toggle('on', b.dataset.v === IP.amode)); $('#aChars').hidden = IP.amode !== 'chars'; $('#aBraille').hidden = IP.amode !== 'braille'; };
       upd();
       am.onclick = e => { const b = e.target.closest('button'); if (!b) return; IP.amode = b.dataset.v; upd(); schedule(); };
     }
@@ -1421,8 +1469,8 @@ function openImageModal(file) {
     const id = e.target.closest('button')?.id;
     if (id === 'steamW') setBcols(60);
     else if (id === 'steamFit') {
-      if (!img) return;
-      const len = cols => [...steamText(Convert.ascii(img, { ...IP, mode: 'braille', cols }, { w: S.areaW, h: S.areaH }, measure, LBL.size).lines)].length;
+      if (!src) return;
+      const len = cols => [...steamText(Convert.ascii(src, { ...IP, rect, mode: 'braille', cols }, { w: S.areaW, h: S.areaH }, measure, LBL.size).lines)].length;
       if (len(IP.bcols) <= STEAM_LIMIT) { toast('Уже влезает в лимит Steam', 'ok'); return; }
       let lo = 10, hi = IP.bcols;
       while (hi - lo > 1) { const mid = (lo + hi) >> 1; len(mid) <= STEAM_LIMIT ? lo = mid : hi = mid; }
@@ -1436,81 +1484,228 @@ function openImageModal(file) {
   function setBcols(v) { IP.bcols = v; const el = $('#bcols'); if (el) { el.value = v; syncRange(el); } schedule(); }
   $('#ipMode').onclick = e => { const b = e.target.closest('button'); if (!b) return; IP.mode = b.dataset.m; buildControls(); schedule(); };
 
-  function schedule() { store('gp2.import', IP); clearTimeout(timer); timer = setTimeout(compute, 70); }
+  // ---- кадр: вписать / заполнить, масштаб, сдвиг ----
+  function syncFrame() {
+    $$('#ipFit button').forEach(b => b.classList.toggle('on', b.dataset.v === IP.frame));
+    const z = $('#frZoom'); z.value = Math.round(fr.zoom * 100); syncRange(z);
+  }
+  $('#ipFit').onclick = e => { const b = e.target.closest('button'); if (!b) return; IP.frame = b.dataset.v; fr.x = fr.y = 0; syncFrame(); schedule(true); };
+  $('#frZoom').oninput = e => { fr.zoom = e.target.value / 100; syncRange(e.target); schedule(true); };
+  $('#frReset').onclick = () => { Object.assign(fr, { zoom: 1, x: 0, y: 0 }); syncFrame(); schedule(true); };
+  // Где картинка стоит на холсте и какая её часть видна. Видимая часть вырезается в отдельный холст —
+  // все режимы работают с ней, как с обычной картинкой, и ставят результат ровно в видимый прямоугольник.
+  function computePlace() {
+    const A = { w: S.areaW, h: S.areaH }, iw = img.naturalWidth, ih = img.naturalHeight;
+    const s0 = IP.frame === 'fill' ? Math.max(A.w / iw, A.h / ih) : Math.min(A.w / iw, A.h / ih);
+    const s = s0 * fr.zoom, w = iw * s, h = ih * s;
+    place = { x: (A.w - w) / 2 + fr.x * A.w, y: (A.h - h) / 2 + fr.y * A.h, w, h };
+    frameDirty = true;
+    return s;
+  }
+  function buildSource() {
+    const A = { w: S.areaW, h: S.areaH }, iw = img.naturalWidth, ih = img.naturalHeight, s = computePlace();
+    const x0 = Math.max(0, place.x), y0 = Math.max(0, place.y), x1 = Math.min(A.w, place.x + place.w), y1 = Math.min(A.h, place.y + place.h);
+    srcKey++;
+    if (x1 - x0 < 4 || y1 - y0 < 4) { src = rect = null; return; }
+    rect = { x: x0, y: y0, w: x1 - x0, h: y1 - y0 };
+    const cx = (x0 - place.x) / s, cy = (y0 - place.y) / s, cw = rect.w / s, ch = rect.h / s;
+    if (cx < 0.5 && cy < 0.5 && cw > iw - 1 && ch > ih - 1) { src = img; return; }
+    const k = Math.min(1, 2048 / Math.max(cw, ch)), c = document.createElement('canvas');
+    c.width = Math.max(1, Math.round(cw * k)); c.height = Math.max(1, Math.round(ch * k));
+    const g = c.getContext('2d'); g.imageSmoothingQuality = 'high';
+    g.drawImage(img, cx, cy, cw, ch, 0, 0, c.width, c.height);
+    src = c;
+  }
+
+  // ---- расчёт ----
+  let frameDirty = true;
+  function schedule(frame = false) {
+    store('gp2.import', IP);
+    if (frame) frameDirty = true;
+    clearTimeout(timer);
+    if (img) $('#pvBusy').classList.add('on');
+    timer = setTimeout(compute, 70);
+  }
+  // ASCII по яркости с бюджетом: бинпоиск самого плотного шага, при котором символов не больше бюджета
+  function asciiBudget(p, area) {
+    const at = step => Convert.ascii(src, { ...p, mode: 'chars', step }, area, measure, LBL.size);
+    let best = at(3);
+    if (best.els.length <= IP.budget) return Object.assign(best, { step: 3 });
+    let lo = 3, hi = 40;
+    best = null;
+    for (let it = 0; it < 10; it++) {
+      const mid = (lo + hi) / 2, r = at(mid);
+      if (r.els.length <= IP.budget) { hi = mid; best = Object.assign(r, { step: mid }); } else lo = mid;
+    }
+    return best || Object.assign(at(40), { step: 40 });
+  }
   function compute() {
+    if (!pv.isConnected) return;
+    $('#pvBusy').classList.remove('on');
     if (!img) { draw(); return; }
+    if (frameDirty) { buildSource(); frameDirty = false; }
     const area = { w: S.areaW, h: S.areaH };
     const t0 = performance.now();
     const toCategories = els => { for (const e of els) { e.x -= LBL.dx; e.y -= LBL.dy; } };
+    if (!src) { result = null; setCount(0); $('#ipInfo').textContent = 'Картинка ушла за холст — верни её во вкладке «Кадр»'; draw(); return; }
+    const p = { ...IP, rect, srcKey, cache: edgeCache };
     let info = '';
     if (IP.mode === 'mosaic') {
       const pool = HEROES.map((h, i) => i).filter(i => !disabledHeroes.has(HEROES[i].id));
       // над каждой полосой мозаики есть строка названия 20px — оставляем под неё место сверху
-      result = Convert.mosaic(img, IP, { w: area.w - 3, h: area.h - HEAD - 3 }, HEROES, pool); // −3: запас на SLACK, чтобы не появилась прокрутка
+      result = Convert.mosaic(src, p, { w: area.w - 3, h: area.h - HEAD - 3 }, HEROES, pool); // −3: запас на SLACK, чтобы не появилась прокрутка
       const n = result.els.reduce((a, e) => a + e.heroes.length, 0);
-      info = `${result.cols}×${result.rows} · ${n} героев (${result.uniq} разных) · ${result.els.length} категорий`;
+      info = `${result.cols}×${result.rows} · ${n} героев (${result.uniq} разных)`;
       if (!pool.length) info = 'В палитре нет ни одного героя';
     } else if (IP.mode === 'ascii') {
-      result = Convert.ascii(img, { ...IP, mode: IP.amode, cols: IP.bcols }, area, measure, LBL.size);
+      result = IP.amode === 'chars' && IP.budget > 0 ? asciiBudget(p, area) : Convert.ascii(src, { ...p, mode: IP.amode, cols: IP.bcols }, area, measure, LBL.size);
       toCategories(result.els);
       if (result.th !== undefined && IP.autoThreshold) { const t = $('#threshold'); if (t) { t.value = IP.threshold = result.th; syncRange(t); } }
-      info = `${result.els.length} категорий`;
+      if (result.step && IP.budget > 0) info = `шаг ${result.step.toFixed(1)}`;
       if (result.lines) {
         steam = steamText(result.lines);
         const n = [...steam].length, c = $('#steamCount');
         if (c) { c.textContent = `${n.toLocaleString('ru')} / 8 000`; c.classList.toggle('bad', n > STEAM_LIMIT); }
       }
     } else {
-      result = Convert.lineart(img, { ...IP, step: IP.lstep }, area, measure, LBL.size, labelFont());
+      result = Convert.lineart(src, { ...p, step: IP.lstep, startStep: lastStep ? lastStep / 1.15 : 0 }, area, measure, LBL.size, labelFont());
       toCategories(result.els);
-      info = `${result.els.length} категорий` + (result.step > IP.lstep + 0.01 ? ` · шаг увеличен до ${result.step.toFixed(1)} из-за лимита` : '');
+      lastStep = result.step;
+      info = IP.budget > 0 ? `шаг ${result.step.toFixed(1)}` : result.step > IP.lstep + 0.01 ? `шаг увеличен до ${result.step.toFixed(1)} из-за лимита` : '';
+      // бюджет не набран даже на самом плотном шаге — подсказываем, откуда взять ещё деталей
+      if (IP.budget > 0 && result.step <= 3.01 && result.els.length < IP.budget * 0.7)
+        info += IP.shade < 30 ? ' · это все контуры — добавь «Тени точками»' : IP.frame === 'fit' ? ' · больше деталей: «Заполнить холст» или ниже пороги' : ' · больше деталей: ниже пороги';
     }
-    $('#ipInfo').textContent = info + ` · ${Math.round(performance.now() - t0)} мс`;
+    setCount(result.els.length);
+    $('#ipInfo').textContent = (info ? info + ' · ' : '') + `${Math.round(performance.now() - t0)} мс`;
     draw();
   }
+  // число категорий — главное, что надо видеть: с ним растёт время загрузки экрана героев в игре
+  function setCount(n) {
+    const c = $('#ipCount');
+    c.innerHTML = img ? `<b>${n.toLocaleString('ru')}</b> ${plural(n, 'категория', 'категории', 'категорий')}` : '';
+    c.className = 'ip-count' + (n > 12000 ? ' bad' : n > 6000 ? ' warn' : '');
+  }
+
+  // ---- превью ----
   const pv = $('#ipCanvas');
+  // базовый масштаб: холст вписан в превью; в «Кадре» — с запасом, чтобы видеть обрезанные края картинки
+  const xf = () => {
+    const W = pv.clientWidth, H = pv.clientHeight, pad = tab === 'frame' ? 0.72 : 1;
+    const z0 = Math.min((W - 40) / S.areaW, (H - 100) / S.areaH) * pad, z = tab === 'frame' ? z0 : z0 * view.z;
+    const ox = (W - S.areaW * z) / 2 + (tab === 'frame' ? 0 : view.x), oy = (H - S.areaH * z) / 2 + 12 + (tab === 'frame' ? 0 : view.y);
+    return { W, H, z, ox, oy };
+  };
+  let drawQueued = false;
+  const redraw = () => { if (!drawQueued) { drawQueued = true; requestAnimationFrame(() => { drawQueued = false; draw(); }); } };
   function draw() {
-    const dpr = window.devicePixelRatio || 1, W = pv.clientWidth, H = pv.clientHeight;
+    if (!pv.isConnected) return; // окно уже закрыто, а кадр был запрошен раньше
+    const dpr = window.devicePixelRatio || 1, { W, H, z, ox, oy } = xf();
     pv.width = W * dpr; pv.height = H * dpr;
     const c = pv.getContext('2d');
-    const z = Math.min((W - 40) / S.areaW, (H - 40) / S.areaH), ox = (W - S.areaW * z) / 2, oy = (H - S.areaH * z) / 2;
+    $('#pvZoom').textContent = Math.round(view.z * 100) + '%';
+    $('#tagL').hidden = $('#tagR').hidden = tab !== 'compare' || !img;
     c.setTransform(dpr * z, 0, 0, dpr * z, dpr * ox, dpr * oy);
+    if (tab === 'frame' && img && place) {
+      // картинка целиком, за краем холста — приглушённая
+      c.globalAlpha = 0.28; c.drawImage(img, place.x, place.y, place.w, place.h); c.globalAlpha = 1;
+      c.save(); c.beginPath(); c.rect(0, 0, S.areaW, S.areaH); c.clip();
+      c.fillStyle = GAME.bg; c.fillRect(0, 0, S.areaW, S.areaH);
+      c.drawImage(img, place.x, place.y, place.w, place.h);
+      c.restore();
+      c.setTransform(dpr, 0, 0, dpr, 0, 0);
+      c.strokeStyle = T.accent; c.lineWidth = 2; c.setLineDash([6, 4]);
+      c.strokeRect(ox, oy, S.areaW * z, S.areaH * z); c.setLineDash([]);
+      c.fillStyle = T.accent; c.font = '600 11px Onest, sans-serif'; c.textBaseline = 'bottom';
+      c.fillText(`Холст ${S.areaW} × ${S.areaH} — в игру попадёт то, что внутри рамки`, ox, oy - 8);
+      return;
+    }
     c.fillStyle = GAME.bg; c.fillRect(0, 0, S.areaW, S.areaH);
     if (!img) return;
-    const sx = S.areaW * split;
+    const sx = tab === 'compare' ? S.areaW * split : 0;
     c.save(); c.beginPath(); c.rect(sx, 0, S.areaW - sx, S.areaH); c.clip();
     if (result) renderEls(c, result.els, { editor: false, zoom: z });
     c.restore();
+    if (tab !== 'compare') return;
     c.save(); c.beginPath(); c.rect(0, 0, sx, S.areaH); c.clip();
-    const f = Convert.fitRect(img.naturalWidth, img.naturalHeight, S.areaW, S.areaH);
-    c.drawImage(img, f.x, f.y, f.w, f.h);
+    if (place) c.drawImage(img, place.x, place.y, place.w, place.h);
     c.restore();
     c.setTransform(dpr, 0, 0, dpr, 0, 0);
-    const lx = ox + sx * z;
-    c.fillStyle = '#fff'; c.fillRect(lx - 1, oy, 2, S.areaH * z);
-    c.beginPath(); c.arc(lx, oy + S.areaH * z / 2, 11, 0, Math.PI * 2); c.fill();
-    c.fillStyle = '#111'; c.font = '600 11px Inter'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText('⇆', lx, oy + S.areaH * z / 2 + 1);
+    const lx = ox + sx * z, ly = clamp(oy + S.areaH * z / 2, 30, H - 30);
+    c.fillStyle = '#fff'; c.fillRect(lx - 1, Math.max(0, oy), 2, Math.min(H, S.areaH * z));
+    c.beginPath(); c.arc(lx, ly, 13, 0, Math.PI * 2); c.fill();
+    c.fillStyle = '#111'; c.font = '600 12px Onest, sans-serif'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText('⇆', lx, ly + 1);
   }
-  let dragging = false;
-  const setSplit = e => {
-    const r = pv.getBoundingClientRect(), W = r.width, H = r.height;
-    const z = Math.min((W - 40) / S.areaW, (H - 40) / S.areaH), ox = (W - S.areaW * z) / 2;
-    split = clamp((e.clientX - r.left - ox) / (S.areaW * z), 0, 1); draw();
-  };
-  pv.onpointerdown = e => { dragging = true; pv.setPointerCapture(e.pointerId); setSplit(e); };
-  pv.onpointermove = e => { if (dragging) setSplit(e); };
-  pv.onpointerup = () => { dragging = false; };
-  new ResizeObserver(draw).observe(pv);
 
-  $('#ipAdd').onclick = () => {
+  // мышь: в «Кадре» двигает картинку, иначе — ручка сравнения или сдвиг превью; колесо — зум
+  let drag = null;
+  pv.onpointerdown = e => {
+    if (!img) { drop.click(); return; }
+    pv.setPointerCapture(e.pointerId);
+    const r = pv.getBoundingClientRect(), { z, ox } = xf(), mx = e.clientX - r.left;
+    if (tab === 'frame') drag = { kind: 'frame', sx: e.clientX, sy: e.clientY, fx: fr.x, fy: fr.y };
+    else if (tab === 'compare' && Math.abs(mx - (ox + S.areaW * split * z)) < 18) drag = { kind: 'split' };
+    else drag = { kind: 'pan', sx: e.clientX, sy: e.clientY, vx: view.x, vy: view.y };
+    pv.classList.add('dragging');
+    move(e);
+  };
+  const move = e => {
+    if (!drag) return;
+    const r = pv.getBoundingClientRect(), { z, ox } = xf();
+    if (drag.kind === 'split') { split = clamp((e.clientX - r.left - ox) / (S.areaW * z), 0, 1); redraw(); }
+    else if (drag.kind === 'pan') { view.x = drag.vx + e.clientX - drag.sx; view.y = drag.vy + e.clientY - drag.sy; redraw(); }
+    else {
+      fr.x = drag.fx + (e.clientX - drag.sx) / (z * S.areaW); fr.y = drag.fy + (e.clientY - drag.sy) / (z * S.areaH);
+      computePlace(); redraw();
+    }
+  };
+  pv.onpointermove = e => {
+    move(e);
+    if (drag || !img) { pv.style.cursor = img ? '' : 'pointer'; return; }
+    const r = pv.getBoundingClientRect(), { z, ox } = xf();
+    pv.style.cursor = tab === 'frame' ? 'move' : tab === 'compare' && Math.abs(e.clientX - r.left - (ox + S.areaW * split * z)) < 18 ? 'ew-resize' : 'grab';
+  };
+  pv.onpointerup = pv.onpointercancel = () => {
+    if (drag?.kind === 'frame') schedule(true);
+    drag = null; pv.classList.remove('dragging');
+  };
+  const zoomView = (k, mx, my) => {
+    const { W, H } = xf(), nz = clamp(view.z * k, 1, 12), f = nz / view.z;
+    // точка под курсором остаётся на месте
+    const cx = mx - W / 2, cy = my - H / 2 - 12;
+    view.x = cx - (cx - view.x) * f; view.y = cy - (cy - view.y) * f; view.z = nz;
+    if (nz === 1) view.x = view.y = 0;
+    redraw();
+  };
+  pv.addEventListener('wheel', e => {
+    e.preventDefault();
+    if (!img) return;
+    const k = Math.exp(-e.deltaY * (e.ctrlKey ? 0.01 : 0.0018));
+    if (tab === 'frame') { fr.zoom = clamp(fr.zoom * k, 1, 4); syncFrame(); computePlace(); redraw(); schedule(true); return; }
+    const r = pv.getBoundingClientRect();
+    zoomView(k, e.clientX - r.left, e.clientY - r.top);
+  }, { passive: false });
+  pv.ondblclick = () => { Object.assign(view, { z: 1, x: 0, y: 0 }); redraw(); };
+  $('#pvIn').onclick = () => zoomView(1.5, pv.clientWidth / 2, pv.clientHeight / 2 + 12);
+  $('#pvOut').onclick = () => zoomView(1 / 1.5, pv.clientWidth / 2, pv.clientHeight / 2 + 12);
+  $('#pvZoom').onclick = () => { Object.assign(view, { z: 1, x: 0, y: 0 }); redraw(); };
+  const setTab = v => { tab = v; $$('#pvTabs button').forEach(b => b.classList.toggle('on', b.dataset.v === v)); $('#ipPreview').dataset.tab = v; redraw(); };
+  $('#pvTabs').onclick = e => { const b = e.target.closest('button'); if (b) setTab(b.dataset.v); };
+  ro = new ResizeObserver(redraw); ro.observe(pv);
+
+  const commit = replace => {
     if (!result || !result.els.length) { toast('Результат пустой — подкрути настройки', 'err'); return; }
     snapshot();
+    if (replace) { st.els = []; st.sel.clear(); }
     addEls(result.els);
     changed(true); m.close();
     setTool('select');
-    toast(`Добавлено ${result.els.length} элементов одной группой — можно двигать, масштабировать, поворачивать`, 'ok');
+    toast(`${replace ? 'Холст заменён' : 'Добавлено'}: ${result.els.length.toLocaleString('ru')} элементов одной группой — можно двигать, масштабировать, поворачивать`, 'ok');
   };
-  buildControls();
+  $('#ipAdd').onclick = () => commit(false);
+  const rp = $('#ipReplace'); if (rp) rp.onclick = () => commit(true);
+  applyIcons(m.root);
+  buildControls(); syncFrame(); setTab('compare');
   if (file) setImg(file); else draw();
 }
 
@@ -1844,6 +2039,7 @@ function openCommands() {
 }
 
 // ---------- утилиты ----------
+const plural = (n, one, few, many) => { const m10 = n % 10, m100 = n % 100; return m10 === 1 && m100 !== 11 ? one : m10 >= 2 && m10 <= 4 && (m100 < 12 || m100 > 14) ? few : many; };
 function toast(msg, kind = '') {
   const t = document.createElement('div'); t.className = 'toast ' + kind; t.textContent = msg;
   $('#toasts').appendChild(t);
@@ -1892,10 +2088,18 @@ const menusOpen = () => addMenu.classList.contains('open') || mainMenu.classList
 function closeMenus() { addMenu.classList.remove('open'); mainMenu.classList.remove('open'); $('#btnMenu').classList.remove('open'); }
 function toggleMenu(m, btn) { const o = !m.classList.contains('open'); closeMenus(); m.classList.toggle('open', o); btn.classList.toggle('open', o); }
 $('#btnAdd').onclick = e => { e.stopPropagation(); toggleMenu(addMenu, e.currentTarget); };
-$('#btnMenu').onclick = e => { e.stopPropagation(); toggleMenu(mainMenu, e.currentTarget); };
-document.addEventListener('click', closeMenus);
+$('#btnMenu').onclick = e => {
+  e.stopPropagation();
+  // в шапке меню — название сетки и сколько в ней категорий
+  const n = st.els.length;
+  $('#menuName').textContent = S.configName || 'Моя сетка';
+  $('#menuStats').textContent = n ? `${n.toLocaleString('ru')} ${plural(n, 'категория', 'категории', 'категорий')} · ${$('#saveState').textContent}` : 'пустой холст';
+  toggleMenu(mainMenu, e.currentTarget);
+};
+document.addEventListener('click', e => { if (!e.target.closest('.menu')) closeMenus(); });
+for (const b of $$('#themeSeg [data-theme-v]')) b.addEventListener('click', () => { if (b.dataset.themeV !== document.documentElement.dataset.theme) toggleTheme(); });
 const CMD = { open: openJson, export: openExportModal, publish: openPublishModal, theme: toggleTheme, help: openHelp };
-for (const b of $$('[data-cmd]')) b.addEventListener('click', () => CMD[b.dataset.cmd]());
+for (const b of $$('[data-cmd]')) b.addEventListener('click', () => { closeMenus(); CMD[b.dataset.cmd](); });
 function doAdd(kind) {
   closeMenus();
   if (kind === 'image') openImageModal();

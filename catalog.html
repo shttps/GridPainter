@@ -11,21 +11,27 @@
 <meta property="og:image" content="https://shttps.github.io/GridPainter/docs/ingame.webp">
 <link rel="icon" href="logo.svg" type="image/svg+xml">
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap">
-<link rel="stylesheet" href="site.css?v=4">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="site.css?v=6">
 </head>
 <body data-page="catalog">
 
-<div class="wrap">
-  <header class="top">
-    <a class="logo" href="index.html" aria-label="Grid Studio — на главную"><svg viewBox="0 0 48 48" aria-hidden="true"><rect width="48" height="48" rx="12" class="mk-bg"/><path d="M13 35L35 13" class="mk-stroke"/></svg>Grid Studio<em>DOTA 2</em></a>
-    <nav class="nav">
-      <a href="catalog.html" aria-current="page">Каталог</a>
-      <a href="editor.html">Редактор</a>
-      <a class="hide-sm" href="https://github.com/shttps/GridPainter" target="_blank" rel="noopener">GitHub</a>
-    </nav>
-  </header>
+<header class="navbar" id="navbar">
+  <nav class="nav-pill" aria-label="Главное меню">
+    <a class="logo" href="index.html" aria-label="Grid Studio — на главную"><svg viewBox="0 0 48 48" aria-hidden="true"><rect width="48" height="48" rx="12" class="mk-bg"/><path d="M13 35L35 13" class="mk-stroke"/></svg><span>Grid Studio</span></a>
+    <div class="nav-links" id="navLinks">
+      <span class="nav-hl" aria-hidden="true"></span>
+      <a href="index.html"><span data-icon="home"></span>Главная</a>
+      <a href="catalog.html" aria-current="page"><span data-icon="grid"></span>Каталог<b class="nav-badge" data-cat-count hidden></b></a>
+      <a href="editor.html"><span data-icon="brush"></span>Редактор</a>
+      <a href="https://github.com/shttps/GridPainter" target="_blank" rel="noopener"><span data-icon="github"></span>GitHub</a>
+    </div>
+    <a class="btn primary sm nav-cta" href="editor.html">Создать сетку<span data-icon="arrow"></span></a>
+    <button class="nav-burger" id="navBurger" aria-label="Открыть меню" aria-expanded="false" aria-controls="navLinks"><i></i><i></i></button>
+  </nav>
+</header>
 
+<div class="wrap">
   <div class="cat-head">
     <div class="row">
       <div>
@@ -73,6 +79,6 @@
 <script src="config.js?v=6"></script>
 <script src="gridrender.js?v=6"></script>
 <script src="catalog-api.js?v=6"></script>
-<script src="site.js?v=4"></script>
+<script src="site.js?v=5"></script>
 </body>
 </html>

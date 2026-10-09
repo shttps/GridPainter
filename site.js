@@ -36,6 +36,8 @@ const ICONS = {
   text: 'M5 6.5V4.5h14v2M12 4.5v15M9 19.5h6',
   eraser: 'M8.5 19.5L4 15l9.5-9.5 5.5 5.5-9 8.5zM9 10.5l5 5M8.5 19.5H20',
   heroes: '<rect x="4" y="4" width="6.5" height="6.5" rx="1.2"/><rect x="13.5" y="4" width="6.5" height="6.5" rx="1.2"/><rect x="4" y="13.5" width="6.5" height="6.5" rx="1.2"/><rect x="13.5" y="13.5" width="6.5" height="6.5" rx="1.2" fill="currentColor"/>',
+  home: 'M4 11l8-7 8 7M6.5 9v11h11V9',
+  github: 'M9 19c-4 1.5-4-2-6-2.5M15 21v-3.5c0-1 .1-1.4-.5-2 2.8-.3 5.5-1.4 5.5-6a4.6 4.6 0 00-1.3-3.2 4.3 4.3 0 00-.1-3.2s-1.1-.3-3.5 1.3a12 12 0 00-6.2 0C6.5 2.8 5.4 3.1 5.4 3.1a4.3 4.3 0 00-.1 3.2A4.6 4.6 0 004 9.5c0 4.6 2.7 5.7 5.5 6-.6.6-.6 1.2-.5 2V21',
 };
 const icon = n => { const v = ICONS[n] || ''; return `<svg class="i" viewBox="0 0 24 24" aria-hidden="true">${v.startsWith('<') ? v : `<path d="${v}"/>`}</svg>`; };
 function applyIcons(root = document) {
@@ -195,25 +197,61 @@ function shuffled(list, seed = 7) {
   return a;
 }
 
+// ---------- меню ----------
+// Подсветка переезжает под ссылку под курсором и возвращается к текущей странице;
+// при прокрутке таблетка становится плотнее; на узком экране ссылки прячутся в «бургер».
+function initNav() {
+  const bar = $('#navbar'); if (!bar) return;
+  const links = $('#navLinks'), hl = $('.nav-hl', links), cur = $('a[aria-current]', links);
+  const moveTo = a => {
+    if (!a) { hl.style.opacity = 0; return; }
+    hl.style.width = a.offsetWidth + 'px'; hl.style.transform = `translateX(${a.offsetLeft}px)`; hl.style.opacity = 1;
+  };
+  const home = () => moveTo(cur);
+  links.addEventListener('mouseover', e => { const a = e.target.closest('a'); if (a) moveTo(a); });
+  links.addEventListener('mouseleave', home);
+  // без перехода при первой расстановке — иначе подсветка «приезжает» из угла
+  hl.style.transition = 'none'; home(); requestAnimationFrame(() => { hl.style.transition = ''; });
+  document.fonts?.ready.then(home); addEventListener('resize', home);
+
+  const onScroll = () => bar.classList.toggle('scrolled', scrollY > 12);
+  onScroll(); addEventListener('scroll', onScroll, { passive: true });
+
+  const burger = $('#navBurger');
+  const setOpen = on => { bar.classList.toggle('open', on); burger.setAttribute('aria-expanded', on); burger.setAttribute('aria-label', on ? 'Закрыть меню' : 'Открыть меню'); };
+  burger.onclick = e => { e.stopPropagation(); setOpen(!bar.classList.contains('open')); };
+  document.addEventListener('click', e => { if (!bar.contains(e.target)) setOpen(false); });
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') setOpen(false); });
+}
+// число сеток в каталоге — в меню и в блоках главной
+function setCatCount(total) {
+  for (const el of $$('[data-cat-count]')) { el.textContent = num(total); el.hidden = !total && el.classList.contains('nav-badge'); }
+}
+
 // ---------- главная ----------
 function initHome() {
   $('#authorChip').onclick = () => copyText('ahttps', 'Ник в Discord скопирован: ahttps');
   const heroes = window.HEROES || [], still = matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-  // лёгкий наклон монитора за курсором
-  const hero = $('#hero'), device = $('#device');
-  if (!still && matchMedia('(pointer: fine)').matches) {
-    hero.addEventListener('pointermove', e => {
-      const r = hero.getBoundingClientRect(), x = (e.clientX - r.left) / r.width - .5, y = (e.clientY - r.top) / r.height - .5;
-      device.style.setProperty('--ry', (x * 8).toFixed(2) + 'deg'); device.style.setProperty('--rx', (-y * 5).toFixed(2) + 'deg');
-    });
-    hero.addEventListener('pointerleave', () => { device.style.setProperty('--ry', '0deg'); device.style.setProperty('--rx', '0deg'); });
-  }
+  // витрина наклонена назад и выпрямляется, пока доезжает до середины экрана
+  const scene = $('#scene');
+  if (!still) {
+    let queued = false;
+    const tilt = () => {
+      queued = false;
+      const r = scene.getBoundingClientRect(), t = Math.min(1, Math.max(0, (r.top - innerHeight * 0.18) / (innerHeight * 0.55)));
+      scene.style.setProperty('--tilt', t.toFixed(3));
+    };
+    tilt();
+    addEventListener('scroll', () => { if (!queued) { queued = true; requestAnimationFrame(tilt); } }, { passive: true });
+    addEventListener('resize', tilt);
+  } else scene.style.setProperty('--tilt', 0);
 
   // плашка «127 героев»: три портрета
   const pick = shuffled(heroes, 11);
   $('#fcFaces').innerHTML = pick.slice(0, 3).map(h => heroImgTag(h, false)).join('');
   $('.fc-heroes b').textContent = `${heroes.length} ${plural(heroes.length, 'герой', 'героя', 'героев')}`;
+  $('#heroCount').textContent = heroes.length;
 
   // лента портретов: каждый ряд продублирован, чтобы прокрутка была бесконечной
   const half = Math.ceil(pick.length / 2), rowA = pick.slice(0, half), rowB = pick.slice(half);
@@ -257,10 +295,12 @@ function initHome() {
   box.innerHTML = skeletons(3);
   API.list({ limit: 6 }).then(({ items, total }) => {
     // пустой каталог — не «0», а приглашение стать первым
+    setCatCount(total);
     $('#catNum').textContent = total ? num(total) : '#1';
     $('.big-num span').textContent = total ? plural(total, 'сетка', 'сетки', 'сеток') + ' в каталоге' : 'стань первым автором';
+    if (total) $('#eyebrowText').textContent = `${num(total)} ${plural(total, 'сетка', 'сетки', 'сеток')} от игроков в каталоге`;
     box.innerHTML = items.length ? items.map(cardHTML).join('') : `<div class="cards-empty">${MARK}<b>Здесь пока пусто</b><span>Стань первым: нарисуй сетку в редакторе и нажми «В каталог».</span><a class="btn primary sm" href="editor.html">Открыть редактор</a></div>`;
-  }).catch(() => { box.closest('.section').hidden = true; $('#catNum').textContent = '∞'; });
+  }).catch(() => { box.closest('.section').hidden = true; $('#catNum').textContent = '∞'; setCatCount(0); });
   box.onclick = e => { const c = e.target.closest('.gcard[data-id]'); if (c) location.href = 'catalog.html?id=' + encodeURIComponent(c.dataset.id); };
 }
 
@@ -280,6 +320,7 @@ function initCatalog() {
       const r = await API.list({ q: f.q, kind: f.kind === 'mine' ? 'all' : f.kind, onlyMine: f.kind === 'mine', sort: f.sort, offset, limit: PAGE });
       if (my !== seq) return;
       total = r.total;
+      if (f.kind === 'all' && !f.q) setCatCount(total);
       const html = r.items.map((g, k) => cardHTML(g, k)).join('');
       if (reset) cards.innerHTML = html || emptyHTML();
       else cards.insertAdjacentHTML('beforeend', html);
@@ -323,6 +364,7 @@ function initCatalog() {
 }
 
 applyIcons();
+initNav();
 // блоки с data-reveal проявляются, когда доезжают до экрана
 {
   const els = $$('[data-reveal]');

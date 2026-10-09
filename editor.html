@@ -14,7 +14,7 @@
 <link rel="icon" href="logo.svg" type="image/svg+xml">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap">
-<link rel="stylesheet" href="style.css?v=8">
+<link rel="stylesheet" href="style.css?v=11">
 <script>
   // тема до первой отрисовки — чтобы не мигало; по умолчанию тёмная, как в макете
   try { document.documentElement.dataset.theme = localStorage.getItem('gp2.theme') || 'dark'; } catch { document.documentElement.dataset.theme = 'dark'; }
@@ -25,12 +25,15 @@
   <canvas id="canvas"></canvas>
 
   <div class="empty-state" id="emptyState" hidden>
-    <div class="es-title">Брось картинку сюда</div>
+    <button class="es-drop" data-add="image">
+      <span class="es-ico" data-icon="image"></span>
+      <span class="es-title">Брось картинку сюда</span>
+      <span class="es-sub">или нажми <kbd>Ctrl V</kbd> — line-art, ASCII или мозаика из героев</span>
+    </button>
     <div class="es-actions">
-      <button class="pill" data-add="image" data-icon="image">Картинка</button>
-      <button class="pill" id="esOpen" data-icon="folder">JSON</button>
+      <button class="pill" id="esOpen" data-icon="folder">Открыть JSON</button>
       <button class="pill" data-add="ascii" data-icon="ascii">ASCII</button>
-      <a class="pill" href="catalog.html" data-icon="layers">Шаблоны</a>
+      <a class="pill" href="catalog.html" data-icon="layers">Сетки игроков</a>
     </div>
     <div class="es-hint">или <kbd>Ctrl K</kbd> — все команды</div>
   </div>
@@ -46,16 +49,22 @@
     </div>
     <div class="menu-wrap">
       <button class="icon-btn sm" id="btnMenu" data-icon="chev" aria-label="Меню"></button>
-      <div class="menu" id="mainMenu">
-        <button data-cmd="open" data-icon="folder">Открыть JSON…</button>
-        <button data-cmd="export" data-icon="download">Экспорт <kbd>Ctrl S</kbd></button>
-        <button data-cmd="publish" data-icon="upload">Выложить в каталог</button>
+      <div class="menu menu-rich" id="mainMenu">
+        <div class="menu-head">
+          <svg class="mh-mark" viewBox="0 0 48 48" aria-hidden="true"><rect width="48" height="48" rx="12" class="lg-bg"/><path d="M13 35L35 13" class="lg-stroke"/></svg>
+          <span><b id="menuName">Моя сетка</b><small id="menuStats">пусто</small></span>
+        </div>
+        <div class="menu-sec">Файл</div>
+        <button data-cmd="open" data-icon="folder"><span>Открыть JSON…<small>hero_grid_config.json из папки Доты</small></span></button>
+        <button data-cmd="export" data-icon="download"><span>Экспорт<small>скачать или записать в файл игры</small></span><kbd>Ctrl S</kbd></button>
+        <button data-cmd="publish" data-icon="upload"><span>Выложить в каталог<small>поделиться сеткой с игроками</small></span></button>
         <hr>
-        <button data-cmd="theme" data-icon="sun" id="menuTheme">Светлая тема <kbd>Shift T</kbd></button>
-        <button data-cmd="help" data-icon="help">Горячие клавиши <kbd>?</kbd></button>
-        <hr>
-        <a href="catalog.html" data-icon="grid">Каталог сеток</a>
-        <a href="index.html" data-icon="home">На главную</a>
+        <div class="menu-theme"><span>Тема</span><div class="seg" id="themeSeg"><button data-theme-v="dark" data-icon="moon">Тёмная</button><button data-theme-v="light" data-icon="sun">Светлая</button></div></div>
+        <div class="menu-tiles">
+          <a href="catalog.html" data-icon="grid">Каталог</a>
+          <a href="index.html" data-icon="home">Главная</a>
+          <button data-cmd="help" data-icon="help">Клавиши</button>
+        </div>
       </div>
     </div>
   </header>
@@ -81,14 +90,18 @@
       <span class="badge" id="catCount" data-tip="Категорий в сетке">0</span>
       <div class="menu-wrap">
         <button class="icon-btn xs" id="btnAdd" data-icon="plus" aria-label="Добавить"></button>
-        <div class="menu" id="addMenu">
-          <button data-add="image" data-icon="image">Картинку… <kbd>Ctrl V</kbd></button>
-          <button data-add="ascii" data-icon="ascii">ASCII из буфера</button>
-          <button data-add="lines" data-icon="lines">Генератор линий</button>
-          <button data-add="steam" data-icon="font">Арт для профиля Steam…</button>
+        <div class="menu menu-rich" id="addMenu">
+          <div class="menu-sec">Из картинки</div>
+          <button data-add="image" data-icon="image" class="menu-hero"><span>Картинку…<small>line-art, ASCII или мозаика из героев</small></span><kbd>Ctrl V</kbd></button>
+          <button data-add="steam" data-icon="font"><span>Арт для профиля Steam…<small>Брайль для «Своего информационного поля»</small></span></button>
+          <div class="menu-sec">Готовое</div>
+          <button data-add="ascii" data-icon="ascii"><span>ASCII из буфера<small>вставить готовый текстовый арт</small></span></button>
+          <button data-add="lines" data-icon="lines"><span>Генератор линий<small>пунктиры, рамки, разделители</small></span></button>
           <hr>
-          <button data-add="hero" data-icon="heroes">Категорию героев</button>
-          <button data-add="text" data-icon="text">Текст</button>
+          <div class="menu-tiles two">
+            <button data-add="hero" data-icon="heroes">Категория героев</button>
+            <button data-add="text" data-icon="text">Текст</button>
+          </div>
         </div>
       </div>
     </div>
@@ -141,10 +154,10 @@
 <input type="file" id="fileFont" accept=".ttf,.otf,.woff,.woff2" hidden>
 
 <script src="heroes.js?v=6"></script>
-<script src="convert.js?v=7"></script>
+<script src="convert.js?v=9"></script>
 <script src="config.js?v=6"></script>
 <script src="gridrender.js?v=6"></script>
 <script src="catalog-api.js?v=6"></script>
-<script src="app.js?v=9"></script>
+<script src="app.js?v=12"></script>
 </body>
 </html>

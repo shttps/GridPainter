@@ -204,6 +204,34 @@ svg.i { width: 16px; height: 16px; flex: none; stroke: currentColor; fill: none;
 .menu svg.i { color: var(--muted); transition: color .15s; }
 .menu kbd { margin-left: auto; }
 .menu hr { border: 0; height: 1px; background: var(--line); margin: 5px 6px; }
+/* «богатые» меню: иконка в плитке, название и строка пояснения, разделы, тема и быстрые плитки */
+.menu-rich { min-width: 340px; padding: 6px; }
+.menu-rich kbd { white-space: nowrap; flex: none; }
+.brand-pill .menu-wrap { position: static; }
+#mainMenu { left: -1px; right: auto; top: calc(100% + 8px); transform-origin: top left; }
+.menu-rich > button { padding: 7px 10px 7px 7px; gap: 11px; }
+.menu-rich > button:hover { padding-left: 7px; }
+.menu-rich > button > svg.i { box-sizing: border-box; width: 34px; height: 34px; padding: 8px; border-radius: 10px; background: var(--field); color: var(--ink-2); transition: background .15s, color .15s, transform .25s var(--spring); }
+.menu-rich > button:hover > svg.i { background: var(--accent-soft); color: var(--accent); transform: rotate(-6deg); }
+.menu-rich > button.menu-hero > svg.i { background: var(--accent); color: var(--accent-ink); box-shadow: 0 6px 16px -6px oklch(0.68 0.19 38 / .8); }
+.menu-rich > button > span { display: flex; flex-direction: column; gap: 1px; min-width: 0; color: var(--ink); font-weight: 500; }
+.menu-rich > button small { font-size: 11.5px; font-weight: 400; color: var(--muted); }
+.menu-sec { padding: 8px 10px 4px; font: 600 10.5px var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--faint); }
+.menu-head { display: flex; align-items: center; gap: 11px; margin: -6px -6px 4px; padding: 12px 14px; border-bottom: 1px solid var(--line); border-radius: 12px 12px 0 0; background: linear-gradient(120deg, var(--accent-soft), transparent 70%); }
+.mh-mark { width: 36px; height: 36px; flex: none; }
+.menu-head b { display: block; max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; font-size: 14px; }
+.menu-head small { display: block; font: 11px var(--mono); color: var(--muted); }
+.menu-theme { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 4px 4px 4px 10px; color: var(--ink-2); font-size: 13px; }
+.menu-theme .seg { width: 200px; }
+.menu-theme .seg button { display: flex; align-items: center; justify-content: center; gap: 6px; }
+.menu-theme .seg svg.i { width: 14px; height: 14px; }
+.menu-tiles { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; padding-top: 6px; }
+.menu-tiles.two { grid-template-columns: 1fr 1fr; padding-top: 0; }
+.menu-tiles > a, .menu-tiles > button { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 10px 6px 9px; border: 0; border-radius: 10px; background: var(--field); color: var(--ink-2); font-size: 12px; text-decoration: none; cursor: pointer; transition: background .15s, color .15s, transform .15s var(--spring); }
+.menu-tiles > a:hover, .menu-tiles > button:hover { background: var(--field-hover); color: var(--ink); }
+.menu-tiles > a:active, .menu-tiles > button:active { transform: scale(.95); }
+.menu-tiles svg.i { width: 18px; height: 18px; color: var(--muted); transition: color .15s; }
+.menu-tiles > a:hover svg.i, .menu-tiles > button:hover svg.i { color: var(--accent); }
 
 /* ---------- док инструментов ---------- */
 .dock { left: 50%; bottom: 18px; transform: translateX(-50%); display: flex; align-items: center; gap: 2px; padding: 5px; border-radius: 14px; background: var(--panel); box-shadow: var(--shadow); z-index: 20; }
@@ -232,6 +260,14 @@ svg.i { width: 16px; height: 16px; flex: none; stroke: currentColor; fill: none;
 
 /* ---------- пустое состояние (поверх листа) ---------- */
 .empty-state { position: absolute; z-index: 4; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px; pointer-events: none; text-align: center; }
+/* главный путь — картинка: большая зона, куда её бросить */
+.es-drop { pointer-events: auto; display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 30px 46px 26px; border: 1.5px dashed var(--line); border-radius: 22px; background: color-mix(in oklab, var(--panel-solid) 55%, transparent); color: var(--ink); cursor: pointer; transition: border-color .2s, background .2s, transform .3s var(--spring); animation: fadeUp .5s var(--ease) .3s both; }
+.es-drop:hover, .empty-state.drag-over .es-drop { border-color: var(--accent); background: var(--accent-soft); transform: translateY(-2px); }
+.es-ico { display: grid; place-items: center; width: 56px; height: 56px; margin-bottom: 8px; border-radius: 16px; background: var(--accent); color: var(--accent-ink); box-shadow: 0 10px 30px -8px oklch(0.68 0.19 38 / .7); transition: transform .35s var(--spring); }
+.es-drop:hover .es-ico, .empty-state.drag-over .es-ico { transform: rotate(-8deg) scale(1.06); }
+.es-ico svg.i { width: 26px; height: 26px; }
+.es-sub { color: var(--muted); font-size: 13px; }
+.es-sub kbd { background: var(--field); }
 .es-title { font-size: 22px; font-weight: 600; letter-spacing: -.01em; }
 .es-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; pointer-events: auto; }
 .pill { display: inline-flex; align-items: center; gap: 7px; height: 36px; padding: 0 15px 0 12px; border: 1px solid transparent; border-radius: 999px; background: var(--field); color: var(--ink); font-size: 13px; text-decoration: none; cursor: pointer; transition: background .15s, border-color .15s, transform .25s var(--spring); }
@@ -343,14 +379,56 @@ input[type=range]::-moz-range-thumb { width: 14px; height: 14px; border-radius: 
 .modal-foot { display: flex; gap: 8px; align-items: center; justify-content: flex-end; padding: 12px 16px 12px 20px; border-top: 1px solid var(--line); }
 .modal-foot .info { margin-right: auto; color: var(--muted); font: 11.5px var(--mono); }
 .modal-foot .btn.primary { background: var(--accent); color: var(--accent-ink); }
-.split { flex: 1; display: grid; grid-template-columns: 320px 1fr; min-height: 0; }
-.split-controls { overflow: auto; padding: 16px 18px; display: flex; flex-direction: column; gap: 14px; border-right: 1px solid var(--line); }
-.split-preview { position: relative; min-width: 0; background: var(--bg) radial-gradient(var(--bg-dot) 1px, transparent 1.2px) 0 0 / 20px 20px; }
-.split-preview canvas { position: absolute; inset: 0; width: 100%; height: 100%; cursor: ew-resize; }
-.split-preview .tag { position: absolute; top: 14px; padding: 4px 10px; border-radius: 7px; background: var(--panel); border: 1px solid var(--line); font: 500 11px var(--mono); color: var(--ink-2); pointer-events: none; }
-.drop { border: 1.5px dashed var(--line); border-radius: 14px; padding: 18px; text-align: center; color: var(--muted); cursor: pointer; transition: .2s var(--ease); }
+.split { flex: 1; display: grid; grid-template-columns: 340px 1fr; min-height: 0; }
+.split-controls { overflow: auto; padding: 16px 16px 20px; display: flex; flex-direction: column; gap: 12px; border-right: 1px solid var(--line); }
+.split-preview { position: relative; min-width: 0; background: var(--bg) radial-gradient(var(--bg-dot) 1px, transparent 1.2px) 0 0 / 20px 20px; overflow: hidden; }
+.split-preview canvas { position: absolute; inset: 0; width: 100%; height: 100%; cursor: grab; touch-action: none; }
+.split-preview canvas.dragging { cursor: grabbing !important; }
+.split-preview .tag { position: absolute; top: 62px; padding: 4px 10px; border-radius: 7px; background: var(--panel); border: 1px solid var(--line); font: 500 11px var(--mono); color: var(--ink-2); pointer-events: none; }
+.split-preview .pv-l { left: 14px; }
+.split-preview .pv-r { right: 14px; }
+/* вкладки превью, зум и «считаю…» — плавают поверх холста */
+.pv-tabs { position: absolute; top: 14px; left: 50%; transform: translateX(-50%); background: var(--panel); border: 1px solid var(--line); box-shadow: var(--shadow); -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); }
+.pv-tabs button { flex: none; padding: 0 14px; }
+.pv-zoom { position: absolute; right: 14px; bottom: 14px; display: flex; align-items: center; padding: 3px; border-radius: 10px; background: var(--panel); border: 1px solid var(--line); -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); }
+.pv-zoom .zoom-val { min-width: 50px; height: 28px; }
+.pv-busy { position: absolute; left: 14px; bottom: 14px; display: flex; align-items: center; gap: 8px; padding: 6px 12px 6px 10px; border-radius: 10px; background: var(--panel); border: 1px solid var(--line); font: 500 11.5px var(--mono); color: var(--ink-2); opacity: 0; transform: translateY(6px); transition: opacity .2s, transform .2s var(--ease); pointer-events: none; }
+.pv-busy.on { opacity: 1; transform: none; transition-delay: .15s; }
+.pv-busy i { width: 12px; height: 12px; border-radius: 50%; border: 2px solid var(--accent-soft); border-top-color: var(--accent); animation: spin .7s linear infinite; }
+.split-preview[data-tab="frame"] .pv-zoom { display: none; }
+/* загрузка картинки */
+.drop { display: flex; flex-direction: column; align-items: center; gap: 4px; border: 1.5px dashed var(--line); border-radius: 14px; padding: 18px 14px; text-align: center; color: var(--muted); cursor: pointer; transition: .2s var(--ease); }
+.drop svg.i { width: 26px; height: 26px; margin-bottom: 4px; color: var(--accent); stroke-width: 1.5; }
+.drop > b { color: var(--ink); font-weight: 600; }
+.drop > span { font-size: 12px; }
 .drop:hover, .drop.over { border-color: var(--accent); color: var(--ink); background: var(--accent-soft); }
-.drop img { max-width: 100%; max-height: 90px; border-radius: 8px; display: block; margin: 0 auto 8px; }
+.drop.has { flex-direction: row; gap: 12px; padding: 8px; text-align: left; border-style: solid; background: var(--field); }
+.drop.has img { width: 64px; height: 64px; object-fit: cover; border-radius: 9px; flex: none; }
+.drop.has span { display: flex; flex-direction: column; gap: 2px; min-width: 0; font: 11.5px var(--mono); }
+.drop.has span b { font: 600 13px var(--font); color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* группы настроек */
+.ip-ctl, .ip-col { display: flex; flex-direction: column; gap: 12px; }
+.ip-group { display: flex; flex-direction: column; gap: 12px; padding: 14px; border-radius: 14px; background: color-mix(in oklab, var(--field) 55%, transparent); border: 1px solid var(--line-soft); }
+.ip-h { display: flex; align-items: center; gap: 8px; margin-bottom: -2px; font: 600 11px var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+.ip-h::before { content: ""; width: 10px; height: 2px; border-radius: 2px; background: var(--accent); transform: rotate(-45deg); }
+.ip-modes { margin-left: 16px; }
+.ip-modes button { display: flex; align-items: center; gap: 7px; padding: 0 14px; }
+.ip-modes button svg.i { width: 15px; height: 15px; }
+.chips-row { display: grid; grid-template-columns: repeat(4, 1fr) 1.6fr; gap: 4px; padding: 3px; border-radius: 10px; background: var(--field); }
+.chips-row button { height: 30px; border: 0; border-radius: 8px; background: none; color: var(--muted); font: 600 12px var(--mono); cursor: pointer; transition: background .2s, color .2s, box-shadow .2s; }
+.chips-row button:last-child { font: 500 12px var(--font); }
+.chips-row button:hover { color: var(--ink); }
+.chips-row button.on { background: var(--accent); color: var(--accent-ink); box-shadow: 0 4px 14px -4px oklch(0.68 0.19 38 / .7); }
+.shade-chs { grid-template-columns: repeat(4, 1fr); }
+.shade-chs button { aspect-ratio: auto; height: 32px; font-size: 18px; }
+/* число категорий в подвале окна импорта */
+.ip-count { font: 12px var(--mono); color: var(--muted); }
+.ip-count b { font: 600 15px var(--mono); color: var(--ink); margin-right: 2px; transition: color .2s; }
+.ip-count.warn b { color: var(--warn); }
+.ip-count.bad b { color: var(--danger); }
+.modal-foot .ip-count + .info { margin-left: 4px; }
+.modal-foot .ip-count:not(:empty) + .info::before { content: "· "; }
+@keyframes spin { to { transform: rotate(360deg); } }
 .cfg-list { display: flex; flex-direction: column; gap: 6px; }
 .cfg-item { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 10px; background: var(--field); cursor: pointer; transition: background .15s; }
 .cfg-item:hover { background: var(--field-hover); }
