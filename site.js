@@ -220,26 +220,31 @@ function openInfo(kind) {
 // 18+ — карточка размыта, пока не нажмёшь (или не ответишь «мне есть 18, не спрашивать»).
 const tagsHTML = (tags, n = 3) => tags?.length ? `<span class="gtags">${tags.slice(0, n).map(t => `<i>${esc(t)}</i>`).join('')}${tags.length > n ? `<i>+${tags.length - n}</i>` : ''}</span>` : '';
 const nsfwCover = () => `<span class="nsfw-cover"><b>18+</b><span>Нажми, чтобы показать</span></span>`;
+// что внутри сетки — строкой под карточкой: «ASCII · 11 909 категорий» или «Мозаика · 1 903 кат. · 82 героя»
+function gridFacts(g) {
+  const kind = API.KINDS[g.kind] || 'Сетка';
+  return g.heroes ? `${kind} · ${num(g.cats)} кат. · ${num(g.heroes)} ${plural(g.heroes, 'герой', 'героя', 'героев')}`
+    : `${kind} · ${num(g.cats)} ${plural(g.cats, 'категория', 'категории', 'категорий')}`;
+}
 function cardHTML(g, k = 0) {
   const hide = g.nsfw && !API.adult();
-  return `<button class="gcard${hide ? ' hide18' : ''}" data-id="${esc(g.id)}" style="animation-delay:${Math.min(k, 12) * 40}ms">
+  return `<article class="gcard${hide ? ' hide18' : ''}" data-id="${esc(g.id)}" tabindex="0" style="animation-delay:${Math.min(k, 12) * 40}ms">
     <span class="gthumb" data-live="${esc(g.id)}"><canvas aria-hidden="true"></canvas><span class="g-load">Загружаем сетку…</span>
-      <span class="gkind">${esc(API.KINDS[g.kind] || 'Сетка')} · ${num(g.cats)} кат.</span>
-      ${API.isMine(g.id, g.user_id) ? '<span class="gkind gmine">моя</span>' : ''}
+      ${API.isMine(g.id, g.user_id) ? '<span class="gmine">моя</span>' : ''}
       ${g.nsfw ? '<span class="g18">18+</span>' : ''}${hide ? nsfwCover() : ''}</span>
-    <span class="gbody">
-      <span class="gtitle">${esc(g.title)}</span>
-      <span class="gmeta"><span class="by">${esc(g.author)} · ${ago(g.created_at)}</span>
-        <span class="st ${API.isLiked(g.id) ? 'liked' : ''}" data-likes>${icon('heart')}${num(g.likes)}</span>
-        <span class="st">${icon('download')}${num(g.downloads)}</span></span>
-      ${tagsHTML(g.tags)}
-    </span>
-  </button>`;
+    <div class="ginfo">
+      <div class="gmain"><b class="gtitle" title="${esc(g.title)}">${esc(g.title)}</b>
+        <span class="gby">${avatarHTML('', g.author, 'ava gava')}${esc(g.author)}<i>· ${ago(g.created_at)}</i></span></div>
+      <div class="gacts"><span class="gdl" title="Скачали: ${num(g.downloads)}">${icon('download')}${num(g.downloads)}</span>
+        <button class="glike${API.isLiked(g.id) ? ' liked' : ''}" data-grid-like="${esc(g.id)}" data-likes aria-label="Лайк">${icon('heart')}${num(g.likes)}</button></div>
+    </div>
+    <div class="gfoot"><span>${gridFacts(g)}</span>${g.tags?.length ? `<span class="gtagline">${g.tags.map(esc).join(', ')}</span>` : ''}</div>
+  </article>`;
 }
-const skeletons = n => Array.from({ length: n }, () => '<div class="gcard sk"><div class="skeleton"></div><div class="gbody"><span></span><span></span></div></div>').join('');
+const skeletons = n => Array.from({ length: n }, () => '<div class="gcard sk"><div class="skeleton"></div><div class="ginfo"><span></span><span></span></div></div>').join('');
 
-// подложка превью сеток: «как в Доте», тёмная или градиент — выбор запоминается
-const PREVIEW_BG = [['dota', 'Как в Dota'], ['dark', 'Тёмный'], ['grad', 'Градиент']];
+// подложка превью сеток: «как в Доте», «классика» (старый коричневый клиент), тёмная или градиент — выбор запоминается
+const PREVIEW_BG = [['dota', 'Как в Dota'], ['classic', 'Классика'], ['dark', 'Тёмный'], ['grad', 'Градиент']];
 const previewBg = () => { try { const v = localStorage.getItem('gs.previewBg'); return PREVIEW_BG.some(b => b[0] === v) ? v : 'dota'; } catch { return 'dota'; } };
 function setPreviewBg(v) {
   try { localStorage.setItem('gs.previewBg', v); } catch {}
@@ -274,6 +279,22 @@ document.addEventListener('click', e => {
   e.preventDefault(); e.stopPropagation();
   askAdult(() => card.classList.remove('hide18'));
 }, true);
+// лайк прямо с карточки сетки: перехватываем раньше, чем клик откроет окно
+document.addEventListener('click', async e => {
+  const b = e.target.closest('[data-grid-like]');
+  if (!b || b.closest('.hide18')) return;
+  e.preventDefault(); e.stopPropagation();
+  b.disabled = true;
+  try {
+    const r = await API.like(b.dataset.gridLike);
+    b.classList.toggle('liked', r.liked); b.lastChild.textContent = num(r.likes);
+  } catch (er) { toast(er.message, 'err'); }
+  b.disabled = false;
+}, true);
+// карточка — <article>, поэтому Enter открывает её вручную
+document.addEventListener('keydown', e => {
+  if (e.key === 'Enter' && e.target.matches?.('.gcard[data-id], .bcard[data-bg]')) e.target.click();
+});
 function askAdult(onShow) {
   const m = openSheet(`<div class="sh-body"><div class="sh-ico sh-18">18+</div><h2>Работа для взрослых</h2>
     <p>Автор пометил её как 18+. Показать?</p>
@@ -437,24 +458,40 @@ function initHome() {
     card.style.setProperty('--x', (e.clientX - r.left) + 'px'); card.style.setProperty('--y', (e.clientY - r.top) + 'px');
   }, { passive: true });
 
-  // экран ноутбука: арт прорисовывается слева направо, счётчик категорий бежит вместе с ним
-  const mock = $('#mock');
-  if (mock) {
-    const N = 11821, counters = [$('#mkCount'), $('#mkCount2')];
-    const run = () => {
-      mock.classList.remove('drawn'); void mock.offsetWidth; mock.classList.add('drawing');
-      const t0 = performance.now(), D = 2600;
-      const tick = now => {
-        const t = Math.min(1, (now - t0) / D), v = Math.round(N * (1 - (1 - t) ** 2));
-        counters.forEach(c => { c.textContent = num(v); });
-        if (t < 1) requestAnimationFrame(tick); else { mock.classList.remove('drawing'); mock.classList.add('drawn'); }
-      };
-      requestAnimationFrame(tick);
-      // вкладка в фоне и кадры не идут — всё равно приходим к итоговому числу
-      setTimeout(() => { counters.forEach(c => { c.textContent = num(N); }); mock.classList.remove('drawing'); mock.classList.add('drawn'); }, D + 400);
+  // экран ноутбука: в редакторе открыта случайная сетка из Мастерской (живой холст на подложке «как в Доте»);
+  // она прорисовывается слева направо, счётчик категорий бежит вместе с ней. Мастерская молчит — показываем готовый арт.
+  const mock = $('#mock'), counters = [$('#mkCount'), $('#mkCount2')];
+  let shown = false;
+  const setN = n => counters.forEach(c => { c.textContent = num(n); });
+  const run = N => {
+    mock.classList.remove('drawn'); void mock.offsetWidth; mock.classList.add('drawing');
+    const t0 = performance.now(), D = 2600;
+    const tick = now => {
+      const t = Math.min(1, (now - t0) / D);
+      setN(Math.round(N * (1 - (1 - t) ** 2)));
+      if (t < 1) requestAnimationFrame(tick); else { mock.classList.remove('drawing'); mock.classList.add('drawn'); }
     };
-    if (still) { counters.forEach(c => { c.textContent = num(N); }); mock.classList.add('drawn'); }
-    else { const img = $('.mk-sheet img', mock); const go = () => setTimeout(run, 900); img.complete ? go() : img.addEventListener('load', go, { once: true }); }
+    requestAnimationFrame(tick);
+    // вкладка в фоне и кадры не идут — всё равно приходим к итоговому числу
+    setTimeout(() => { setN(N); mock.classList.remove('drawing'); mock.classList.add('drawn'); }, D + 400);
+  };
+  const start = N => { if (shown) return; shown = true; if (still) { setN(N); mock.classList.add('drawn'); } else setTimeout(() => run(N), 300); };
+  const fallback = setTimeout(() => { const img = $('.mk-sheet img', mock); img.complete ? start(11821) : img.addEventListener('load', () => start(11821), { once: true }); }, 2500);
+  async function laptopGrid(g) {
+    try {
+      const cfg = await API.config(g.id);
+      if (shown || !cfg?.categories?.length) return;
+      clearTimeout(fallback);
+      const sheet = $('.mk-sheet', mock);
+      sheet.insertAdjacentHTML('afterbegin', '<canvas class="mk-grid" aria-hidden="true"></canvas>');
+      $('img', sheet).hidden = true;
+      GridRender.mount($('canvas', sheet), cfg.categories, { bg: 'dota' });
+      $('.mk-brand b', mock).textContent = g.title;
+      $('.mk-row:not(.on)', mock).lastElementChild.textContent = '1';
+      $('.mk-row:not(.on)', mock).childNodes[1].textContent = `«${g.title}»`;
+      mock.setAttribute('aria-label', `Редактор Grid Studio: сетка «${g.title}» из Мастерской, ${num(g.cats)} категорий`);
+      start(g.cats);
+    } catch { /* останется готовый арт */ }
   }
 
   // примеры артов в блоке сравнения: картинка ↔ сетка
@@ -514,14 +551,24 @@ function initHome() {
     $('#catNum').textContent = total ? num(total) : '#1';
     $('.big-num span').textContent = total ? plural(total, 'сетка', 'сетки', 'сеток') + ' в Мастерской' : 'стань первым автором';
     box.innerHTML = items.length ? items.slice(0, 6).map(cardHTML).join('') : `<div class="cards-empty">${MARK}<b>Здесь пока пусто</b><span>Стань первым: нарисуй сетку в редакторе и нажми «В Мастерскую».</span><a class="btn primary sm" href="editor.html">Открыть редактор</a></div>`;
-    // плашка «случайная сетка из Мастерской» поверх ноутбука
-    if (items.length) {
-      const g = items[Math.floor(Math.random() * items.length)], rg = $('#randomGrid');
+    // случайная сетка из Мастерской — на экран ноутбука и в подпись под ним; 18+ на главную не берём
+    const pool = items.filter(g => !g.nsfw), big = pool.filter(g => g.cats >= 300);
+    if (pool.length) {
+      const list = big.length ? big : pool, g = list[Math.floor(Math.random() * list.length)], rg = $('#randomGrid');
+      laptopGrid(g);
       rg.href = 'workshop.html?id=' + encodeURIComponent(g.id);
       rg.innerHTML = `<span class="rg-likes">${icon('heart')}${num(g.likes)}</span><b>«${esc(g.title)}» — ${esc(g.author)}</b><span class="rg-note">случайная сетка из Мастерской</span>`;
       rg.hidden = false;
     }
   }).catch(() => { box.closest('.section').hidden = true; $('#catNum').textContent = '∞'; setCatCount(0); });
+
+  // панель «Фоны меню»: постер одного из популярных фонов вместо заглушки
+  API.bg.list({ limit: 8 }).then(({ items }) => {
+    const pool = items.filter(b => !b.nsfw); if (!pool.length) return;
+    const b = pool[Math.floor(Math.random() * pool.length)], art = $('.wc-bg');
+    art.insertAdjacentHTML('beforeend', `<img src="${esc(b.poster)}" alt="" loading="lazy">`);
+    $('img', art).onload = () => art.classList.add('has-img');
+  }).catch(() => {});
   box.onclick = e => { const c = e.target.closest('.gcard[data-id]'); if (c) location.href = 'workshop.html?id=' + encodeURIComponent(c.dataset.id); };
 }
 

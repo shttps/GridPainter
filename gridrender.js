@@ -4,11 +4,11 @@
    список героев на 20px ниже y_position, карточки 51×83 + 8 отступа, масштаб — максимальный, при котором все влезают.
    Портреты Valve CDN не отдаёт с CORS, поэтому сохранённую картинку-превью рисуем средними цветами героев,
    а карточки Мастерской и окно сетки — живым холстом с настоящими портретами (mount): показывать такой холст можно,
-   нельзя только сохранить его в файл. Подложка на выбор: «как в Доте», тёмная или градиент. */
+   нельзя только сохранить его в файл. Подложка на выбор: «как в Доте», «классика», тёмная или градиент. */
 window.GridRender = (() => {
   const CARD_W = 51, CARD_H = 83, PAD = 8, IMG_W = CARD_W - PAD, IMG_H = CARD_H - PAD, INSET = PAD / 2;
   const LBL = { size: 16, ls: 2, dx: 4, dy: 3 }, HEAD = 20;
-  const GRID = { w: 1204, h: 612 }, BG = '#1d140e', LABEL = '#808fa6', LABEL_SMALL = '#a4b2c6', SAT = 0.7;
+  const GRID = { w: 1204, h: 612 }, BG = '#1d140e', LABEL = '#808fa6', SAT = 0.7;
   const CDN = 'https://cdn.cloudflare.steamstatic.com/apps/dota2/images/';
   const HAS_LS = typeof CanvasRenderingContext2D !== 'undefined' && 'letterSpacing' in CanvasRenderingContext2D.prototype;
   const HEROES = new Map((window.HEROES || []).map(h => [h.id, h]));
@@ -60,9 +60,22 @@ window.GridRender = (() => {
     return best;
   }
 
-  // подложки превью: «как в Доте» (экран «Герои»), тёмная и градиент «Огня»
+  // подложки превью: «как в Доте» — тёмная бирюза нынешнего экрана «Герои» (светлее к центру, синее книзу, темнее по краям),
+  // «классика» — коричневый фон старого клиента, тёмная и градиент «Огня»
   const BGS = {
     dota: c => {
+      c.fillStyle = '#0f1819'; c.fillRect(0, 0, GRID.w, GRID.h);
+      const glow = c.createRadialGradient(GRID.w * .58, GRID.h * .42, 0, GRID.w * .58, GRID.h * .42, GRID.w * .62);
+      glow.addColorStop(0, 'rgba(34,52,54,.75)'); glow.addColorStop(.55, 'rgba(26,40,42,.35)'); glow.addColorStop(1, 'rgba(26,40,42,0)');
+      c.fillStyle = glow; c.fillRect(0, 0, GRID.w, GRID.h);
+      const low = c.createLinearGradient(0, GRID.h * .6, 0, GRID.h);
+      low.addColorStop(0, 'rgba(10,11,22,0)'); low.addColorStop(1, 'rgba(10,11,22,.55)');
+      c.fillStyle = low; c.fillRect(0, 0, GRID.w, GRID.h);
+      const edge = c.createRadialGradient(GRID.w / 2, GRID.h / 2, GRID.h * .45, GRID.w / 2, GRID.h / 2, GRID.w * .72);
+      edge.addColorStop(0, 'rgba(0,0,0,0)'); edge.addColorStop(1, 'rgba(0,0,0,.45)');
+      c.fillStyle = edge; c.fillRect(0, 0, GRID.w, GRID.h);
+    },
+    classic: c => {
       c.fillStyle = BG; c.fillRect(0, 0, GRID.w, GRID.h);
       const g = c.createRadialGradient(GRID.w / 2, -60, 0, GRID.w / 2, -60, GRID.w * .95);
       g.addColorStop(0, 'rgba(64,46,28,.32)'); g.addColorStop(1, 'rgba(64,46,28,0)');
@@ -85,7 +98,7 @@ window.GridRender = (() => {
   };
 
   // Рисует сетку в координатах игры (0…1204 × 0…612). Трансформацию ставит вызывающий.
-  // label — цвет подписей: в маленьком превью тонкие символы темнеют от сглаживания, поэтому там его делают светлее.
+  // label — цвет подписей; по умолчанию игровой серо-голубой.
   function draw(c, cats, { portraits = false, onLoad, font = FONT, bg = 'dota', label = LABEL } = {}) {
     c.save();
     c.beginPath(); c.rect(0, 0, GRID.w, GRID.h); c.clip();
@@ -139,8 +152,7 @@ window.GridRender = (() => {
       const W = Math.round(w * dpr), H = Math.round(GRID.h * k);
       if (cv.width !== W || cv.height !== H) { cv.width = W; cv.height = H; }
       ctx.setTransform(k, 0, 0, k, 0, 0);
-      // в маленьком превью подписи светлее — иначе тонкие точки и штрихи line-art сливаются с фоном
-      draw(ctx, cats, { portraits: true, onLoad: later, label: w < 700 ? LABEL_SMALL : LABEL, ...o });
+      draw(ctx, cats, { portraits: true, onLoad: later, ...o });
     };
     const redraw = () => { if (!queued) { queued = true; requestAnimationFrame(paint); } };
     // портреты приходят пачкой — перерисовываемся раз в ~120 мс, а не на каждый
