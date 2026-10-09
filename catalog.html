@@ -12,24 +12,10 @@
 <link rel="icon" href="logo.svg" type="image/svg+xml">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap">
-<link rel="stylesheet" href="site.css?v=6">
+<link rel="stylesheet" href="site.css?v=7">
 </head>
 <body data-page="catalog">
 
-<header class="navbar" id="navbar">
-  <nav class="nav-pill" aria-label="Главное меню">
-    <a class="logo" href="index.html" aria-label="Grid Studio — на главную"><svg viewBox="0 0 48 48" aria-hidden="true"><rect width="48" height="48" rx="12" class="mk-bg"/><path d="M13 35L35 13" class="mk-stroke"/></svg><span>Grid Studio</span></a>
-    <div class="nav-links" id="navLinks">
-      <span class="nav-hl" aria-hidden="true"></span>
-      <a href="index.html"><span data-icon="home"></span>Главная</a>
-      <a href="catalog.html" aria-current="page"><span data-icon="grid"></span>Каталог<b class="nav-badge" data-cat-count hidden></b></a>
-      <a href="editor.html"><span data-icon="brush"></span>Редактор</a>
-      <a href="https://github.com/shttps/GridPainter" target="_blank" rel="noopener"><span data-icon="github"></span>GitHub</a>
-    </div>
-    <a class="btn primary sm nav-cta" href="editor.html">Создать сетку<span data-icon="arrow"></span></a>
-    <button class="nav-burger" id="navBurger" aria-label="Открыть меню" aria-expanded="false" aria-controls="navLinks"><i></i><i></i></button>
-  </nav>
-</header>
 
 <div class="wrap">
   <div class="cat-head">
@@ -68,17 +54,18 @@
   <div class="more"><button class="btn" id="more" hidden>Показать ещё</button></div>
 
   <footer class="site-foot">
-    <span>© 2026 shttps · Dota 2 — товарный знак Valve Corporation, проект с Valve не связан.</span>
-    <a href="index.html">На главную</a>
+    <div class="bottom-bar" data-bottom-bar></div>
+    <span class="foot-note">© 2026 shttps · Dota 2 — товарный знак Valve Corporation, проект с Valve не связан.</span>
   </footer>
 </div>
 
 <div class="modal-root" id="modalRoot"></div>
 <div class="toasts" id="toasts"></div>
 <script src="heroes.js?v=6"></script>
-<script src="config.js?v=6"></script>
+<script src="config.js?v=7"></script>
+<script src="auth.js?v=1"></script>
 <script src="gridrender.js?v=6"></script>
-<script src="catalog-api.js?v=6"></script>
-<script src="site.js?v=5"></script>
+<script src="catalog-api.js?v=7"></script>
+<script src="site.js?v=7"></script>
 </body>
 </html>

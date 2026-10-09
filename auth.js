@@ -1,0 +1,156 @@
+'use strict';
+/* Аккаунты: вход через Supabase Auth (без SDK), профиль и «Мои работы».
+   Сессия (access/refresh token) лежит в localStorage и обновляется сама, когда токен истекает.
+   Вход по ссылке из письма и через Discord/GitHub возвращает на сайт с токенами в #хеше —
+   их подхватывает этот файл при загрузке любой страницы.
+   Выключено, пока в config.js не стоит accounts: true (нужна настройка Supabase, см. README). */
+window.Accounts = (() => {
+  const cfg = window.GRID_CATALOG || {};
+  const enabled = !!(cfg.url && cfg.key && cfg.accounts);
+  const base = enabled ? cfg.url.replace(/\/+$/, '') : '';
+  const providers = Object.entries(cfg.providers || {}).filter(([, on]) => on).map(([p]) => p);
+
+  const load = (k, d) => { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : d; } catch { return d; } };
+  const save = (k, v) => { try { v == null ? localStorage.removeItem(k) : localStorage.setItem(k, JSON.stringify(v)); } catch {} };
+  let session = enabled ? load('gs.session', null) : null;  // { access_token, refresh_token, expires_at, user: { id, email } }
+  let profile = enabled ? load('gs.profile', null) : null;  // { id, nick, avatar }
+  let lastError = '';
+  const listeners = new Set();
+  const emit = () => { for (const f of listeners) try { f(); } catch (e) { console.error(e); } };
+  const setSession = s => { session = s; save('gs.session', s); if (!s) { profile = null; save('gs.profile', null); } emit(); };
+
+  const ERRORS = {
+    over_email_send_rate_limit: 'Слишком много писем подряд. Подожди минуту и попробуй снова.',
+    email_address_invalid: 'Похоже, в адресе почты опечатка.',
+    otp_expired: 'Ссылка или код устарели. Запроси новое письмо.',
+    validation_failed: 'Проверь адрес почты.',
+    provider_disabled: 'Этот способ входа ещё не включён.',
+    too_many_projects: 'В профиле уже 200 работ — удали старые, чтобы сохранить новую.',
+    projects_size: 'Работа слишком большая для сохранения в профиль.',
+    profiles_nick: 'Ник — до 32 символов.',
+    JWT: 'Сессия истекла — войди ещё раз.',
+  };
+  const nice = (msg, code) => {
+    for (const k in ERRORS) if (String(code).includes(k) || String(msg).includes(k)) return ERRORS[k];
+    return msg || 'Что-то пошло не так. Попробуй ещё раз.';
+  };
+
+  async function call(path, { method = 'GET', body, token, headers = {} } = {}) {
+    const h = { apikey: cfg.key, ...headers };
+    if (token) h.Authorization = 'Bearer ' + token;
+    if (body !== undefined) h['Content-Type'] = 'application/json';
+    let res;
+    try { res = await fetch(base + path, { method, headers: h, body: body === undefined ? undefined : JSON.stringify(body) }); }
+    catch { throw new Error('Нет связи с сервером. Проверь интернет.'); }
+    const text = await res.text();
+    let data = null; try { data = text ? JSON.parse(text) : null; } catch { data = text; }
+    if (!res.ok) {
+      if (res.status === 401 && token) { setSession(null); throw new Error(ERRORS.JWT); }
+      const e = new Error(nice(data?.msg || data?.message || data?.error_description || data?.error || res.statusText, data?.error_code || data?.code));
+      e.status = res.status; throw e;
+    }
+    return data;
+  }
+
+  // ---------- возврат со ссылки из письма или от Discord/GitHub ----------
+  {
+    const h = enabled && location.hash.length > 1 ? new URLSearchParams(location.hash.slice(1)) : null;
+    if (h && (h.has('access_token') || h.has('error_description'))) {
+      if (h.get('access_token')) {
+        const now = Math.floor(Date.now() / 1000);
+        session = { access_token: h.get('access_token'), refresh_token: h.get('refresh_token'), expires_at: +h.get('expires_at') || now + (+h.get('expires_in') || 3600), user: null };
+        save('gs.session', session);
+      } else lastError = nice(h.get('error_description'), h.get('error_code'));
+      history.replaceState(null, '', location.pathname + location.search);
+    }
+  }
+
+  // свежий access token (обновляется за минуту до конца), null — если не вошли
+  let refreshing = null;
+  async function token() {
+    if (!session) return null;
+    if (session.expires_at - 60 > Date.now() / 1000) return session.access_token;
+    refreshing ||= call('/auth/v1/token?grant_type=refresh_token', { method: 'POST', body: { refresh_token: session.refresh_token } })
+      .then(r => { setSession({ access_token: r.access_token, refresh_token: r.refresh_token, expires_at: r.expires_at || Math.floor(Date.now() / 1000) + r.expires_in, user: pickUser(r.user) || session?.user }); })
+      .catch(() => setSession(null))
+      .finally(() => { refreshing = null; });
+    await refreshing;
+    return session?.access_token || null;
+  }
+  const pickUser = u => u && { id: u.id, email: u.email || '', meta: { name: u.user_metadata?.custom_claims?.global_name || u.user_metadata?.full_name || u.user_metadata?.user_name || '', avatar: u.user_metadata?.avatar_url || '' } };
+  const rest = async (path, opts = {}) => call('/rest/v1' + path, { ...opts, token: await token() });
+
+  // ---------- вход и выход ----------
+  // redirect — куда вернуться после входа (адрес должен быть разрешён в Supabase → Auth → URL Configuration)
+  const sendLink = (email, redirect) => call('/auth/v1/otp?redirect_to=' + encodeURIComponent(redirect), { method: 'POST', body: { email: String(email).trim(), create_user: true } });
+  async function verifyCode(email, code) {
+    const r = await call('/auth/v1/verify', { method: 'POST', body: { type: 'email', email: String(email).trim(), token: String(code).replace(/\D/g, '') } });
+    setSession({ access_token: r.access_token, refresh_token: r.refresh_token, expires_at: r.expires_at || Math.floor(Date.now() / 1000) + r.expires_in, user: pickUser(r.user) });
+    await ready();
+  }
+  const oauth = (provider, redirect) => { location.href = `${base}/auth/v1/authorize?provider=${provider}&redirect_to=${encodeURIComponent(redirect)}`; };
+  async function signOut() {
+    const t = session?.access_token;
+    setSession(null);
+    if (t) call('/auth/v1/logout', { method: 'POST', token: t }).catch(() => {});
+  }
+
+  // ---------- профиль ----------
+  const PROFILE_COLS = 'id,nick,avatar,created_at';
+  async function loadProfile() {
+    const u = session?.user; if (!u) return null;
+    let p = (await rest(`/profiles?select=${PROFILE_COLS}&id=eq.${u.id}`))[0];
+    // профиль создаёт триггер при регистрации; если его нет (аккаунт старше таблицы) — создаём сами
+    if (!p) p = (await rest('/profiles?select=' + PROFILE_COLS, { method: 'POST', headers: { Prefer: 'return=representation' },
+      body: { id: u.id, nick: (u.meta.name || 'Игрок ' + u.id.replace(/-/g, '').slice(0, 4).toUpperCase()).slice(0, 32), avatar: /^https:\/\//.test(u.meta.avatar) ? u.meta.avatar.slice(0, 500) : '' } }))[0];
+    profile = p; save('gs.profile', p); emit();
+    return p;
+  }
+  async function updateProfile(fields) {
+    const p = (await rest(`/profiles?id=eq.${session.user.id}&select=${PROFILE_COLS}`, { method: 'PATCH', headers: { Prefer: 'return=representation' }, body: fields }))[0];
+    profile = p; save('gs.profile', p); emit();
+    return p;
+  }
+  const getProfile = async id => (await rest(`/profiles?select=${PROFILE_COLS}&id=eq.${encodeURIComponent(id)}`))[0] || null;
+
+  // ---------- мои работы (приватные) ----------
+  const PROJECT_COLS = 'id,title,thumb,cats,grid_id,created_at,updated_at';
+  const projects = {
+    list: () => rest(`/projects?select=${PROJECT_COLS}&order=updated_at.desc`),
+    get: async id => { const r = (await rest(`/projects?select=${PROJECT_COLS},data&id=eq.${encodeURIComponent(id)}`))[0]; if (!r) throw new Error('Работа не найдена — возможно, её удалили.'); return r; },
+    // id есть — обновляем эту работу, нет — создаём новую
+    async save({ id, ...fields }) {
+      const opts = { headers: { Prefer: 'return=representation' }, body: fields };
+      const r = id ? await rest(`/projects?id=eq.${encodeURIComponent(id)}&select=${PROJECT_COLS}`, { ...opts, method: 'PATCH' })
+        : await rest('/projects?select=' + PROJECT_COLS, { ...opts, method: 'POST' });
+      if (!r?.[0]) throw new Error('Работа не найдена — возможно, её удалили из профиля.');
+      return r[0];
+    },
+    remove: id => rest(`/projects?id=eq.${encodeURIComponent(id)}`, { method: 'DELETE' }),
+  };
+  // опубликованные сетки автора (каталог виден всем)
+  const userGrids = uid => rest(`/grids?select=id,title,author,description,thumb,kind,cats,heroes,likes,downloads,created_at,user_id&user_id=eq.${encodeURIComponent(uid)}&order=created_at.desc`);
+
+  // при загрузке: подтянуть пользователя и профиль (после входа по ссылке user ещё пустой)
+  let readyP = null;
+  function ready() {
+    if (!enabled || !session) return Promise.resolve(null);
+    readyP ||= (async () => {
+      try {
+        if (!session.user) { const u = await call('/auth/v1/user', { token: await token() }); session = { ...session, user: pickUser(u) }; save('gs.session', session); }
+        await loadProfile();
+      } catch (e) { if (!session) lastError = e.message; }
+      finally { readyP = null; emit(); }
+      return profile;
+    })();
+    return readyP;
+  }
+
+  return {
+    enabled, providers,
+    signedIn: () => !!session?.user, user: () => session?.user || null, profile: () => profile,
+    error: () => { const e = lastError; lastError = ''; return e; },
+    onChange: f => { listeners.add(f); return () => listeners.delete(f); },
+    ready, token, sendLink, verifyCode, oauth, signOut, loadProfile, updateProfile, getProfile, projects, userGrids,
+  };
+})();

@@ -30,6 +30,9 @@ create table if not exists public.grids (
 create index if not exists grids_new_idx  on public.grids (created_at desc) where not hidden;
 create index if not exists grids_top_idx  on public.grids (likes desc, created_at desc) where not hidden;
 create index if not exists grids_dl_idx   on public.grids (downloads desc, created_at desc) where not hidden;
+-- аккаунт автора (если выкладывал, войдя в профиль); у старых и анонимных сеток — null
+alter table public.grids add column if not exists user_id uuid references auth.users(id) on delete set null;
+create index if not exists grids_user_idx on public.grids (user_id, created_at desc) where user_id is not null;
 
 create table if not exists public.grid_owners (
   grid_id    uuid primary key references public.grids(id) on delete cascade,
@@ -136,8 +139,8 @@ begin
     when v_hero > 0 and v_label > 0 then case when v_hero > 3 and v_label > 3 then 'mixed' when v_hero > v_label then 'mosaic' else 'ascii' end
     when v_hero > 0 then 'mosaic' else 'ascii' end;
 
-  insert into grids (title, author, description, kind, cats, heroes, config, thumb)
-  values (v_title, v_author, v_desc, v_kind, v_n, v_ids, jsonb_build_object('config_name', v_title, 'categories', v_cats), p_thumb)
+  insert into grids (title, author, description, kind, cats, heroes, config, thumb, user_id)
+  values (v_title, v_author, v_desc, v_kind, v_n, v_ids, jsonb_build_object('config_name', v_title, 'categories', v_cats), p_thumb, auth.uid())
   returning id into v_id;
   insert into grid_owners (grid_id, key, ip) values (v_id, p_key, v_ip);
   return v_id;
@@ -178,7 +181,9 @@ end $$;
 create or replace function public.grid_delete(p_id uuid, p_key uuid) returns boolean
 language plpgsql security definer set search_path = public as $$
 begin
-  delete from grids g using grid_owners o where g.id = p_id and o.grid_id = g.id and o.key = p_key;
+  delete from grids g where g.id = p_id and (
+    (auth.uid() is not null and g.user_id = auth.uid())
+    or exists (select 1 from grid_owners o where o.grid_id = g.id and o.key = p_key));
   return found;
 end $$;
 
@@ -186,3 +191,82 @@ revoke all on function public.publish_grid(text, text, text, jsonb, text, uuid),
   public.grid_hit(uuid), public.grid_report(uuid, uuid), public.grid_delete(uuid, uuid), public._client_ip() from public;
 grant execute on function public.publish_grid(text, text, text, jsonb, text, uuid), public.grid_like(uuid, uuid),
   public.grid_hit(uuid), public.grid_report(uuid, uuid), public.grid_delete(uuid, uuid) to anon, authenticated;
+
+-- =====================================================================
+-- Аккаунты: профили и «Мои работы».
+-- Вход — Supabase Auth (ссылка на почту, по желанию Discord/GitHub). Профиль создаётся сам
+-- при регистрации. Работы приватные: видит и меняет их только владелец (RLS).
+-- =====================================================================
+
+create table if not exists public.profiles (
+  id         uuid primary key references auth.users(id) on delete cascade,
+  nick       text not null default '',
+  avatar     text not null default '',
+  created_at timestamptz not null default now(),
+  constraint profiles_nick   check (char_length(nick) <= 32),
+  constraint profiles_avatar check (char_length(avatar) <= 500 and (avatar = '' or avatar ~ '^https://'))
+);
+
+create table if not exists public.projects (
+  id         uuid primary key default gen_random_uuid(),
+  owner      uuid not null default auth.uid() references auth.users(id) on delete cascade,
+  title      text not null default 'Моя сетка',
+  data       jsonb not null,                       -- холст редактора: { v, settings, els }
+  thumb      text not null default '',             -- превью как в каталоге
+  cats       int  not null default 0,
+  grid_id    uuid references public.grids(id) on delete set null,   -- опубликованная копия
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  constraint projects_title check (char_length(title) between 1 and 60),
+  constraint projects_thumb check (octet_length(thumb) <= 600000),
+  constraint projects_size  check (octet_length(data::text) <= 5000000)
+);
+create index if not exists projects_owner_idx on public.projects (owner, updated_at desc);
+
+alter table public.profiles enable row level security;
+alter table public.projects enable row level security;
+
+drop policy if exists "profiles are public" on public.profiles;
+create policy "profiles are public" on public.profiles for select to anon, authenticated using (true);
+drop policy if exists "own profile insert" on public.profiles;
+create policy "own profile insert" on public.profiles for insert to authenticated with check (id = auth.uid());
+drop policy if exists "own profile update" on public.profiles;
+create policy "own profile update" on public.profiles for update to authenticated using (id = auth.uid()) with check (id = auth.uid());
+grant select on public.profiles to anon, authenticated;
+grant insert on public.profiles to authenticated;
+grant update (nick, avatar) on public.profiles to authenticated;
+
+drop policy if exists "own projects" on public.projects;
+create policy "own projects" on public.projects for all to authenticated using (owner = auth.uid()) with check (owner = auth.uid());
+revoke all on public.projects from anon;
+grant select, insert, update, delete on public.projects to authenticated;
+
+-- время изменения ставит база; не больше 200 работ на аккаунт
+create or replace function public._projects_touch() returns trigger
+language plpgsql security definer set search_path = public as $$
+begin
+  if tg_op = 'INSERT' and (select count(*) from projects where owner = new.owner) >= 200 then
+    raise exception 'too_many_projects';
+  end if;
+  new.updated_at := now();
+  return new;
+end $$;
+drop trigger if exists projects_touch on public.projects;
+create trigger projects_touch before insert or update on public.projects for each row execute function public._projects_touch();
+
+-- профиль при регистрации: ник и аватар из Discord/GitHub, иначе «Игрок XXXX» (почту не светим)
+create or replace function public._new_profile() returns trigger
+language plpgsql security definer set search_path = public as $$
+declare m jsonb := coalesce(new.raw_user_meta_data, '{}'::jsonb);
+begin
+  insert into public.profiles (id, nick, avatar) values (
+    new.id,
+    left(coalesce(nullif(m -> 'custom_claims' ->> 'global_name', ''), nullif(m ->> 'full_name', ''), nullif(m ->> 'user_name', ''),
+                  nullif(m ->> 'name', ''), 'Игрок ' || upper(substr(replace(new.id::text, '-', ''), 1, 4))), 32),
+    case when coalesce(m ->> 'avatar_url', '') ~ '^https://' then left(m ->> 'avatar_url', 500) else '' end)
+  on conflict (id) do nothing;
+  return new;
+end $$;
+drop trigger if exists on_auth_user_created on auth.users;
+create trigger on_auth_user_created after insert on auth.users for each row execute function public._new_profile();
+revoke all on function public._new_profile(), public._projects_touch() from public, anon, authenticated;

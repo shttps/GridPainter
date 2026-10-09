@@ -7,7 +7,11 @@ window.CatalogAPI = (() => {
   const cfg = window.GRID_CATALOG || {};
   const remote = !!(cfg.url && cfg.key);
   const base = remote ? cfg.url.replace(/\/+$/, '') + '/rest/v1' : '';
-  const LIST_COLS = 'id,title,author,description,thumb,kind,cats,heroes,likes,downloads,created_at';
+  const BASE_COLS = 'id,title,author,description,thumb,kind,cats,heroes,likes,downloads,created_at';
+  // user_id (автор-аккаунт) есть в базе только после SQL из раздела «Аккаунты»; если колонки нет — живём без неё
+  let userCol = remote && !!cfg.accounts;
+  const cols = () => BASE_COLS + (userCol ? ',user_id' : '');
+  const noUserCol = e => { if (userCol && /user_id/.test(e.message)) { userCol = false; return true; } return false; };
 
   const load = (k, d) => { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : d; } catch { return d; } };
   const save = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); return true; } catch { return false; } };
@@ -36,7 +40,10 @@ window.CatalogAPI = (() => {
   async function rest(path, { method = 'GET', body, count = false } = {}) {
     // новые ключи sb_publishable_… — не JWT, их передают только в apikey; старый anon key — ещё и в Authorization
     const headers = { apikey: cfg.key };
-    if (!cfg.key.startsWith('sb_')) headers.Authorization = 'Bearer ' + cfg.key;
+    // вошёл в аккаунт — запрос от его имени: публикация привяжется к профилю, удалить можно с любого устройства
+    const userToken = window.Accounts?.enabled ? await window.Accounts.token() : null;
+    if (userToken) headers.Authorization = 'Bearer ' + userToken;
+    else if (!cfg.key.startsWith('sb_')) headers.Authorization = 'Bearer ' + cfg.key;
     if (body !== undefined) headers['Content-Type'] = 'application/json';
     if (count) headers.Prefer = 'count=exact';
     let res;
@@ -56,7 +63,7 @@ window.CatalogAPI = (() => {
   function localSave(list) {
     if (!save(LOCAL, list)) throw new Error('В браузере закончилось место для демо-каталога. Удали пару своих сеток.');
   }
-  const pick = g => { const o = {}; for (const k of LIST_COLS.split(',')) o[k] = g[k]; return o; };
+  const pick = g => { const o = {}; for (const k of BASE_COLS.split(',')) o[k] = g[k]; return o; };
 
   // ---------- общий интерфейс ----------
   const clean = q => String(q || '').replace(/[,()*%\\"]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 60);
@@ -72,13 +79,29 @@ window.CatalogAPI = (() => {
       all.sort((a, b) => (by ? b[by] - a[by] : 0) || b.created_at.localeCompare(a.created_at));
       return { items: all.slice(offset, offset + limit).map(pick), total: all.length };
     }
-    const p = new URLSearchParams({ select: LIST_COLS });
+    const p = new URLSearchParams({ select: cols() });
     if (kind !== 'all') p.set('kind', 'eq.' + kind);
-    if (q) p.set('or', `(title.ilike.*${q}*,author.ilike.*${q}*)`);
-    if (onlyMine) { if (!mine.size) return { items: [], total: 0 }; p.set('id', `in.(${[...mine].join(',')})`); }
+    // «Мои» — выложенные из этого браузера или из моего аккаунта
+    const conds = [];
+    if (q) conds.push(`or(title.ilike.*${q}*,author.ilike.*${q}*)`);
+    if (onlyMine) {
+      const uid = cfg.accounts && window.Accounts?.user()?.id, own = [];
+      if (mine.size) own.push(`id.in.(${[...mine].join(',')})`);
+      if (uid) own.push(`user_id.eq.${uid}`);
+      if (!own.length) return { items: [], total: 0 };
+      conds.push(`or(${own.join(',')})`);
+    }
+    if (conds.length) p.set('and', `(${conds.join(',')})`);
     p.set('order', sort === 'top' ? 'likes.desc,created_at.desc' : sort === 'downloads' ? 'downloads.desc,created_at.desc' : 'created_at.desc');
     p.set('offset', offset); p.set('limit', limit);
-    const r = await rest('/grids?' + p, { count: true });
+    let r;
+    try { r = await rest('/grids?' + p, { count: true }); }
+    catch (e) {
+      if (!noUserCol(e)) throw e;
+      p.set('select', cols());
+      if (p.get('and')?.includes('user_id')) p.set('and', p.get('and').replace(/,?user_id\.eq\.[\w-]+/, '').replace('or()', 'id.is.null'));
+      r = await rest('/grids?' + p, { count: true });
+    }
     return { items: r.data, total: r.total ?? r.data.length };
   }
 
@@ -88,7 +111,9 @@ window.CatalogAPI = (() => {
       if (!g) throw new Error('Сетка не найдена — возможно, её удалили.');
       return g;
     }
-    const r = await rest(`/grids?select=${LIST_COLS},config&id=eq.${encodeURIComponent(id)}`);
+    const q = () => rest(`/grids?select=${cols()},config&id=eq.${encodeURIComponent(id)}`);
+    let r;
+    try { r = await q(); } catch (e) { if (!noUserCol(e)) throw e; r = await q(); }
     if (!r.data?.length) throw new Error('Сетка не найдена — возможно, её удалили.');
     return r.data[0];
   }
@@ -137,13 +162,13 @@ window.CatalogAPI = (() => {
 
   async function remove(id) {
     if (!remote) localSave(localAll().filter(g => g.id !== id));
-    else if (!await rpc('grid_delete', { p_id: id, p_key: browserKey })) throw new Error('Удалить можно только свою сетку и только из того браузера, где её выложили.');
+    else if (!await rpc('grid_delete', { p_id: id, p_key: browserKey })) throw new Error('Удалить можно только свою сетку: из того браузера, где её выложили, или войдя в свой профиль.');
     mine.delete(id); remember(mine, 'gs.mine');
   }
 
   return {
     remote, list, get, publish, like, hit, report, remove,
-    isMine: id => mine.has(id), isLiked: id => liked.has(id), isReported: id => reported.has(id), mineCount: () => mine.size,
+    isMine: (id, userId) => mine.has(id) || (!!userId && userId === window.Accounts?.user()?.id), isLiked: id => liked.has(id), isReported: id => reported.has(id), mineCount: () => mine.size,
     author: () => load('gs.author', ''), setAuthor: a => save('gs.author', a),
     KINDS: { ascii: 'ASCII', mosaic: 'Мозаика', mixed: 'Смешанная' },
   };

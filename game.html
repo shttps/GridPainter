@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Угадайка · Grid Studio — угадай героя Dota 2 по арту</title>
+<meta name="description" content="Мини-игра Grid Studio: угадай героя Dota 2 по портрету из символов. Новый герой каждый день и бесконечный режим.">
+<meta name="theme-color" content="#0e0a09">
+<meta property="og:title" content="Угадайка — герой Dota 2 из символов">
+<meta property="og:description" content="Угадай героя дня по ASCII-портрету: с каждой ошибкой арт становится чётче.">
+<meta property="og:image" content="https://shttps.github.io/GridPainter/docs/ingame.webp">
+<link rel="icon" href="logo.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="site.css?v=7">
+</head>
+<body data-page="game">
+
+<main class="wrap game">
+  <header class="page-head game-head">
+    <span class="kicker">Мини-игра</span>
+    <h1>Угадайка</h1>
+    <p>Угадай героя по портрету из символов. С каждой ошибкой арт становится чётче, а после второй и четвёртой — открываются подсказки.</p>
+    <div class="chips game-modes" id="gModes">
+      <i class="chip-ind" id="gModeInd"></i>
+      <button class="chip on" data-mode="daily" data-icon="clock"> Герой дня</button>
+      <button class="chip" data-mode="endless" data-icon="dice"> Бесконечный</button>
+    </div>
+  </header>
+
+  <div class="game-grid">
+    <div class="game-art">
+      <canvas id="gArt" aria-label="Портрет героя из символов"></canvas>
+      <img id="gReveal" alt="" hidden>
+      <span class="g-stage" id="gStage"></span>
+    </div>
+
+    <div class="game-side">
+      <h2 id="gTitle"></h2>
+      <div class="g-tries" id="gTries"></div>
+      <div class="g-hints" id="gHints"></div>
+      <form class="g-guess" id="gForm" autocomplete="off">
+        <div class="g-input"><span data-icon="search"></span><input class="input" id="gInput" placeholder="Имя героя, например Juggernaut" spellcheck="false" aria-label="Имя героя"></div>
+        <div class="g-sugg" id="gSugg" hidden></div>
+        <button class="btn primary">Ответить</button>
+      </form>
+      <div class="g-result" id="gResult" hidden></div>
+      <ol class="g-log" id="gLog"></ol>
+      <div class="g-stats" id="gStats"></div>
+    </div>
+  </div>
+</main>
+
+<footer class="wrap site-foot">
+  <div class="bottom-bar" data-bottom-bar></div>
+  <span class="foot-note">© 2026 shttps · Портреты героев — Valve. Dota 2 — товарный знак Valve Corporation, проект с Valve не связан.</span>
+</footer>
+
+<div class="modal-root" id="modalRoot"></div>
+<div class="toasts" id="toasts"></div>
+<script src="heroes.js?v=6"></script>
+<script src="game-data.js?v=1"></script>
+<script src="config.js?v=7"></script>
+<script src="auth.js?v=1"></script>
+<script src="gridrender.js?v=6"></script>
+<script src="catalog-api.js?v=7"></script>
+<script src="site.js?v=7"></script>
+<script src="game.js?v=1"></script>
+</body>
+</html>

@@ -14,7 +14,7 @@
 <link rel="icon" href="logo.svg" type="image/svg+xml">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap">
-<link rel="stylesheet" href="style.css?v=11">
+<link rel="stylesheet" href="style.css?v=12">
 <script>
   // тема до первой отрисовки — чтобы не мигало; по умолчанию тёмная, как в макете
   try { document.documentElement.dataset.theme = localStorage.getItem('gp2.theme') || 'dark'; } catch { document.documentElement.dataset.theme = 'dark'; }
@@ -45,7 +45,7 @@
     </a>
     <div class="brand-text">
       <input class="title-input" id="configName" spellcheck="false" title="Название сетки в Доте" aria-label="Название сетки">
-      <span class="brand-sub">Grid Studio · <span id="saveState">сохранено</span></span>
+      <span class="brand-sub">Grid Studio · <span id="saveState">сохранено</span><span id="cloudState"></span></span>
     </div>
     <div class="menu-wrap">
       <button class="icon-btn sm" id="btnMenu" data-icon="chev" aria-label="Меню"></button>
@@ -58,11 +58,13 @@
         <button data-cmd="open" data-icon="folder"><span>Открыть JSON…<small>hero_grid_config.json из папки Доты</small></span></button>
         <button data-cmd="export" data-icon="download"><span>Экспорт<small>скачать или записать в файл игры</small></span><kbd>Ctrl S</kbd></button>
         <button data-cmd="publish" data-icon="upload"><span>Выложить в каталог<small>поделиться сеткой с игроками</small></span></button>
+        <div id="menuAccount"></div>
         <hr>
         <div class="menu-theme"><span>Тема</span><div class="seg" id="themeSeg"><button data-theme-v="dark" data-icon="moon">Тёмная</button><button data-theme-v="light" data-icon="sun">Светлая</button></div></div>
-        <div class="menu-tiles">
+        <div class="menu-tiles four">
           <a href="catalog.html" data-icon="grid">Каталог</a>
-          <a href="index.html" data-icon="home">Главная</a>
+          <a href="guides.html" data-icon="book">Гайды</a>
+          <button data-cmd="tour" data-icon="spark">Подсказки</button>
           <button data-cmd="help" data-icon="help">Клавиши</button>
         </div>
       </div>
@@ -155,9 +157,11 @@
 
 <script src="heroes.js?v=6"></script>
 <script src="convert.js?v=9"></script>
-<script src="config.js?v=6"></script>
+<script src="config.js?v=7"></script>
+<script src="auth.js?v=1"></script>
 <script src="gridrender.js?v=6"></script>
-<script src="catalog-api.js?v=6"></script>
-<script src="app.js?v=12"></script>
+<script src="catalog-api.js?v=7"></script>
+<script src="app.js?v=13"></script>
+<script src="studio.js?v=1"></script>
 </body>
 </html>

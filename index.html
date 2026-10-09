@@ -3,98 +3,82 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Grid Studio — сетка героев Dota 2</title>
-<meta name="description" content="Grid Studio — сайт, на котором можно создать свою сетку героев Dota 2: ASCII-арт, line-art и мозаика из героев. Каталог готовых сеток от игроков.">
+<title>Grid Studio — оформи Dota 2 под себя</title>
+<meta name="description" content="Grid Studio — сетки героев Dota 2, арты из картинок и Брайль для профиля Steam. Бесплатно, прямо в браузере. Каталог сеток от игроков, гайды и «Угадайка» героя дня.">
 <meta name="theme-color" content="#0e0a09">
-<meta property="og:title" content="Grid Studio — твоя сетка героев Dota 2">
-<meta property="og:description" content="Редактор кастомных сеток героев Dota 2 и каталог готовых сеток от игроков.">
+<meta property="og:title" content="Grid Studio — оформи Dota 2 под себя">
+<meta property="og:description" content="Сетки героев, line-art из картинок, каталог от игроков, гайды и «Угадайка» героя дня.">
 <meta property="og:type" content="website">
 <meta property="og:image" content="https://shttps.github.io/GridPainter/docs/ingame.webp">
 <link rel="icon" href="logo.svg" type="image/svg+xml">
 <link rel="preload" href="docs/hero.gif" as="image" fetchpriority="high">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap">
-<link rel="stylesheet" href="site.css?v=6">
+<link rel="stylesheet" href="site.css?v=7">
 </head>
 <body data-page="home">
 
-<!-- меню: плавающая «таблетка» по центру, при прокрутке плотнее -->
-<header class="navbar" id="navbar">
-  <nav class="nav-pill" aria-label="Главное меню">
-    <a class="logo" href="index.html" aria-label="Grid Studio — на главную"><svg viewBox="0 0 48 48" aria-hidden="true"><rect width="48" height="48" rx="12" class="mk-bg"/><path d="M13 35L35 13" class="mk-stroke"/></svg><span>Grid Studio</span></a>
-    <div class="nav-links" id="navLinks">
-      <span class="nav-hl" aria-hidden="true"></span>
-      <a href="index.html" aria-current="page"><span data-icon="home"></span>Главная</a>
-      <a href="catalog.html"><span data-icon="grid"></span>Каталог<b class="nav-badge" data-cat-count hidden></b></a>
-      <a href="editor.html"><span data-icon="brush"></span>Редактор</a>
-      <a href="https://github.com/shttps/GridPainter" target="_blank" rel="noopener"><span data-icon="github"></span>GitHub</a>
-    </div>
-    <a class="btn primary sm nav-cta" href="editor.html">Создать сетку<span data-icon="arrow"></span></a>
-    <button class="nav-burger" id="navBurger" aria-label="Открыть меню" aria-expanded="false" aria-controls="navLinks"><i></i><i></i></button>
-  </nav>
-</header>
-
-<section class="hero" id="hero">
+<!-- первый экран: слева заголовок и разделы сайта, справа — редактор на наклонённом ноутбуке -->
+<section class="landing" id="hero">
   <div class="hero-bg" aria-hidden="true">
     <div class="aurora au-red"></div><div class="aurora au-gold"></div><div class="aurora au-ember"></div>
     <div class="bg-grid"></div>
   </div>
 
-  <div class="wrap hero-copy">
-    <a class="eyebrow" href="catalog.html"><span class="dot"></span><span id="eyebrowText">Каталог сеток от игроков</span><span data-icon="arrow"></span></a>
-    <h1><span class="w">Твоя</span> <span class="w">сетка</span> <span class="w">героев</span><br><span class="w grad">Dota&nbsp;2</span></h1>
-    <p>Grid Studio — сайт, на котором вы можете создать свою сетку героев, используя встроенные инструменты и своё воображение.</p>
-    <div class="hero-cta">
-      <a class="btn primary lg" href="editor.html"><span class="ico-box" data-icon="brush"></span>Создать свою сетку</a>
-      <a class="btn lg glass" href="catalog.html"><span class="ico-box" data-icon="grid"></span>Каталог сеток</a>
-    </div>
-    <ul class="perks">
-      <li data-icon="check">Бесплатно</li>
-      <li data-icon="check">Прямо в браузере</li>
-      <li data-icon="check">Без установки</li>
-    </ul>
-  </div>
+  <div class="wrap landing-grid">
+    <div class="landing-copy">
+      <h1><span class="w">Оформи</span> <span class="w grad">Dota&nbsp;2</span><br><span class="w">под</span> <span class="w">себя.</span></h1>
+      <p class="lead">Сетки героев, арты из картинок и Брайль для профиля Steam — бесплатно, прямо в браузере.</p>
 
-  <div class="wrap showcase" id="scene">
-    <div class="sc-glow" aria-hidden="true"></div>
-    <div class="device" id="device">
-      <div class="win-bar"><i></i><i></i><i></i><span>shttps.github.io/GridPainter/editor</span></div>
-      <div class="screen-in">
-        <img src="docs/hero.gif" alt="Редактор Grid Studio: line-art Джаггернаута рисуется на холсте, потом тот же рисунок показан в экране героев Доты" width="1280" height="800" fetchpriority="high">
+      <div class="fcards">
+        <article class="fcard" style="--d:.35s">
+          <div class="fc-media fc-faces-grid" id="fcFacesGrid" aria-hidden="true"></div>
+          <b>Сетка героев</b>
+          <span>Герои, рисунки и ASCII-арты из символов — прямо в экран выбора.</span>
+          <a class="btn primary block" href="editor.html">Создать сетку</a>
+          <a class="fc-more" href="catalog.html">Готовые <span data-icon="arrow"></span></a>
+        </article>
+        <article class="fcard" style="--d:.42s">
+          <div class="fc-media fc-lineart" aria-hidden="true"><img src="docs/lineart-out.webp" alt="" width="810" height="918"></div>
+          <b>Арт из картинки</b>
+          <span>Line-art, ASCII или мозаика из героев: вставь картинку — и готово.</span>
+          <a class="btn block" href="editor.html?import">Загрузить картинку</a>
+          <a class="fc-more" href="guides.html#lineart">Как сделать красиво <span data-icon="arrow"></span></a>
+        </article>
+        <article class="fcard" style="--d:.49s">
+          <div class="fc-media fc-braille" aria-hidden="true"><pre id="fcBraille"></pre></div>
+          <b>Профиль Steam</b>
+          <span>Брайль-арт для «Своего информационного поля» в один клик.</span>
+          <a class="btn block" href="editor.html?steam">Сделать арт</a>
+          <a class="fc-more" href="guides.html#steam">Как вставить <span data-icon="arrow"></span></a>
+        </article>
       </div>
+
+      <a class="game-card" href="game.html" id="gameCard">
+        <span class="gc-art" aria-hidden="true"><i>.:+</i><i>=#@</i><i>-*%</i></span>
+        <span class="gc-text"><b id="gameTitle">Угадайка</b><small id="gameSub">Угадай героя дня по портрету из символов</small></span>
+        <span class="gc-go" data-icon="arrow"></span>
+      </a>
     </div>
-    <div class="float-card fc-heroes" aria-hidden="true">
-      <span class="fc-faces" id="fcFaces"></span>
-      <span><b>127 героев</b><small>мозаика по цвету</small></span>
-    </div>
-    <div class="float-card fc-file" aria-hidden="true">
-      <span class="fc-ico" data-icon="file"></span>
-      <span><b>hero_grid_config.json</b><small>экспорт готов</small></span>
-      <span class="fc-ok" data-icon="check"></span>
-    </div>
-    <div class="float-card fc-cats" aria-hidden="true">
-      <span><b>2 679</b><small>категорий в сетке</small></span>
-      <span class="fc-bars"><i></i><i></i><i></i><i></i><i></i></span>
+
+    <div class="landing-device" id="scene">
+      <div class="laptop">
+        <div class="lt-lid">
+          <div class="lt-screen"><img src="docs/hero.gif" alt="Редактор Grid Studio: line-art Джаггернаута рисуется на холсте, потом тот же рисунок показан в экране героев Доты" width="1280" height="800" fetchpriority="high"></div>
+        </div>
+        <div class="lt-base"></div>
+      </div>
+      <a class="random-grid" id="randomGrid" href="catalog.html" hidden></a>
     </div>
   </div>
 
-  <div class="wrap stats-strip" data-reveal>
-    <div><b data-cat-count>—</b><span>сеток в каталоге</span></div>
-    <div><b id="heroCount">127</b><span>героев в палитре</span></div>
-    <div><b>3</b><span>режима импорта картинки</span></div>
-    <div><b>1 клик</b><span>экспорт в игру</span></div>
-  </div>
+  <div class="wrap bottom-bar" data-bottom-bar></div>
 </section>
 
-<section class="marquee" aria-label="Герои Dota 2">
-  <div class="mq-row" id="mqA"></div>
-  <div class="mq-row rev" id="mqB"></div>
-</section>
-
-<!-- сетки игроков — сразу после первого экрана: это живой контент сайта -->
+<!-- сетки игроков — живой контент сайта -->
 <section class="section wrap" id="community">
   <div class="section-head" data-reveal>
-    <div><span class="kicker">Сообщество</span><h2>Свежие сетки игроков</h2><p>Открой любую в редакторе, доработай под себя — или выложи свою.</p></div>
+    <div><span class="kicker">Каталог</span><h2>Свежие сетки игроков</h2><p>Открой любую в редакторе, доработай под себя — или выложи свою.</p></div>
     <div class="head-actions">
       <a class="btn sm" href="editor.html?publish"><span data-icon="upload"></span>Выложить свою</a>
       <a class="btn sm" href="catalog.html">Весь каталог <span data-icon="arrow"></span></a>
@@ -104,14 +88,11 @@
 </section>
 
 <section class="section wrap">
-  <div class="section-head center" data-reveal>
-    <div><span class="kicker">Как это работает</span><h2>От идеи до сетки в игре — три шага</h2></div>
+  <div class="section-head" data-reveal>
+    <div><span class="kicker">Гайды</span><h2>Как оформить Dota 2 под себя</h2><p>От тех, кто уже разобрался: куда класть файл, как сделать арт читаемым и сколько категорий не страшно.</p></div>
+    <a class="btn sm" href="guides.html">Все гайды <span data-icon="arrow"></span></a>
   </div>
-  <ol class="steps">
-    <li class="step" data-reveal style="--d:.05s"><span class="step-n">01</span><b>Нарисуй или вставь картинку</b><span>Инструменты как в графическом редакторе, или Ctrl+V — и картинка станет line-art, ASCII или мозаикой из героев.</span></li>
-    <li class="step" data-reveal style="--d:.15s"><span class="step-n">02</span><b>Проверь «Как в игре»</b><span>Кнопка «В игре» показывает экран «Герои» Доты по её настоящим стилям: шрифт, отступы, прокрутка.</span></li>
-    <li class="step" data-reveal style="--d:.25s"><span class="step-n">03</span><b>Экспортируй и играй</b><span>Получи hero_grid_config.json и положи в папку игры. Или выложи сетку в каталог — пусть скачивают другие.</span></li>
-  </ol>
+  <div class="guide-cards" id="guideTeaser"></div>
 </section>
 
 <section class="section wrap">
@@ -147,40 +128,24 @@
     </article>
     <article class="tile t-catalog" data-reveal style="--d:.16s">
       <div class="big-num"><b id="catNum">—</b><span>сеток в каталоге</span></div>
-      <div class="tile-text"><span class="tile-ico" data-icon="upload"></span><b>Каталог от игроков</b><span>Скачивай чужие сетки и выкладывай свои в один клик.</span></div>
+      <div class="tile-text"><span class="tile-ico" data-icon="user"></span><b>Профиль и «Мои работы»</b><span>Держи работы приватно и возвращайся к ним с любого устройства — или выкладывай в каталог.</span></div>
       <a class="tile-link" href="catalog.html" aria-label="Открыть каталог"></a>
     </article>
   </div>
 </section>
 
-<section class="wrap">
-  <div class="cta" data-reveal>
-    <div class="cta-bg" aria-hidden="true"></div>
-    <svg class="cta-mark" viewBox="0 0 48 48" aria-hidden="true"><rect width="48" height="48" rx="12" class="mk-bg"/><circle cx="14" cy="14" r="1.6" class="mk-dot"/><circle cx="24" cy="14" r="1.6" class="mk-dot"/><circle cx="34" cy="14" r="1.6" class="mk-dot"/><circle cx="14" cy="24" r="1.6" class="mk-dot"/><circle cx="24" cy="24" r="1.6" class="mk-dot"/><circle cx="34" cy="24" r="1.6" class="mk-dot"/><circle cx="14" cy="34" r="1.6" class="mk-dot"/><circle cx="24" cy="34" r="1.6" class="mk-dot"/><circle cx="34" cy="34" r="1.6" class="mk-dot"/><path d="M13 35L35 13" class="mk-stroke"/></svg>
-    <h2>Собери свою сетку за пять минут</h2>
-    <p>Открой редактор, вставь картинку — и заходи в Доту с новой сеткой.</p>
-    <div class="hero-cta center">
-      <a class="btn primary lg" href="editor.html"><span class="ico-box" data-icon="brush"></span>Создать свою сетку</a>
-      <a class="btn lg glass" href="catalog.html"><span class="ico-box" data-icon="grid"></span>Смотреть каталог</a>
-    </div>
-    <div class="authors">
-      <span>Автор</span>
-      <button class="author" id="authorChip" title="Скопировать ник в Discord"><span class="ava">A</span>@ahttps</button>
-    </div>
-  </div>
-</section>
-
 <footer class="wrap site-foot">
-  <a class="logo" href="index.html"><svg viewBox="0 0 48 48" aria-hidden="true"><rect width="48" height="48" rx="12" class="mk-bg"/><path d="M13 35L35 13" class="mk-stroke"/></svg>Grid Studio</a>
-  <nav class="foot-nav"><a href="editor.html">Редактор</a><a href="catalog.html">Каталог</a><a href="https://github.com/shttps/GridPainter" target="_blank" rel="noopener">GitHub</a></nav>
-  <span class="foot-note">© 2026 shttps · Discord @ahttps · Dota 2 — товарный знак Valve Corporation, проект с Valve не связан.</span>
+  <div class="bottom-bar" data-bottom-bar></div>
+  <span class="foot-note">© 2026 shttps · Dota 2 — товарный знак Valve Corporation, проект с Valve не связан.</span>
 </footer>
 
+<div class="modal-root" id="modalRoot"></div>
 <div class="toasts" id="toasts"></div>
 <script src="heroes.js?v=6"></script>
-<script src="config.js?v=6"></script>
+<script src="config.js?v=7"></script>
+<script src="auth.js?v=1"></script>
 <script src="gridrender.js?v=6"></script>
-<script src="catalog-api.js?v=6"></script>
-<script src="site.js?v=5"></script>
+<script src="catalog-api.js?v=7"></script>
+<script src="site.js?v=7"></script>
 </body>
 </html>

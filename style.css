@@ -148,7 +148,9 @@ svg.i { width: 16px; height: 16px; flex: none; stroke: currentColor; fill: none;
 .title-input:hover { background: var(--field); }
 .title-input:focus { outline: 0; background: var(--field); box-shadow: 0 0 0 1.5px var(--accent); }
 .brand-sub { font-size: 11px; color: var(--muted); white-space: nowrap; }
-#saveState { transition: color .2s; }
+#saveState, #cloudState { transition: color .2s; }
+#cloudState.saving { color: var(--accent-hi); }
+#cloudState.err { color: var(--danger); }
 #saveState.saving { color: var(--accent-hi); }
 #saveState.saving::after { content: ""; display: inline-block; width: 5px; height: 5px; margin-left: 5px; vertical-align: 1px; border-radius: 50%; background: currentColor; animation: pulseDot .8s ease-in-out infinite; }
 #btnMenu svg.i { width: 15px; height: 15px; transition: transform .25s var(--ease); }
@@ -198,9 +200,9 @@ svg.i { width: 16px; height: 16px; flex: none; stroke: currentColor; fill: none;
 .menu { position: absolute; top: calc(100% + 10px); left: -8px; min-width: 240px; padding: 6px; background: var(--panel-solid); border: 1px solid var(--line); border-radius: 12px; box-shadow: var(--shadow-lg); display: none; z-index: 40; transform-origin: top left; }
 #mainMenu { left: auto; right: -7px; transform-origin: top right; }
 .menu.open { display: block; animation: pop .16s var(--ease); }
-.menu > button, .menu > a { width: 100%; display: flex; align-items: center; gap: 10px; padding: 8px 10px; border: 0; background: none; border-radius: 8px; cursor: pointer; text-align: left; color: var(--ink-2); font-size: 13px; text-decoration: none; transition: background .12s, color .12s, padding-left .15s var(--ease); }
-.menu > button:hover, .menu > a:hover { background: var(--field); color: var(--ink); padding-left: 13px; }
-.menu > button:hover svg.i, .menu > a:hover svg.i { color: var(--accent); }
+.menu > button, .menu > a, #menuAccount > button, #menuAccount > a { width: 100%; display: flex; align-items: center; gap: 10px; padding: 8px 10px; border: 0; background: none; border-radius: 8px; cursor: pointer; text-align: left; color: var(--ink-2); font-size: 13px; text-decoration: none; transition: background .12s, color .12s, padding-left .15s var(--ease); }
+.menu > button:hover, .menu > a:hover, #menuAccount > :is(button, a):hover { background: var(--field); color: var(--ink); padding-left: 13px; }
+.menu > button:hover svg.i, .menu > a:hover svg.i, #menuAccount > :is(button, a):hover svg.i { color: var(--accent); }
 .menu svg.i { color: var(--muted); transition: color .15s; }
 .menu kbd { margin-left: auto; }
 .menu hr { border: 0; height: 1px; background: var(--line); margin: 5px 6px; }
@@ -209,13 +211,13 @@ svg.i { width: 16px; height: 16px; flex: none; stroke: currentColor; fill: none;
 .menu-rich kbd { white-space: nowrap; flex: none; }
 .brand-pill .menu-wrap { position: static; }
 #mainMenu { left: -1px; right: auto; top: calc(100% + 8px); transform-origin: top left; }
-.menu-rich > button { padding: 7px 10px 7px 7px; gap: 11px; }
-.menu-rich > button:hover { padding-left: 7px; }
-.menu-rich > button > svg.i { box-sizing: border-box; width: 34px; height: 34px; padding: 8px; border-radius: 10px; background: var(--field); color: var(--ink-2); transition: background .15s, color .15s, transform .25s var(--spring); }
-.menu-rich > button:hover > svg.i { background: var(--accent-soft); color: var(--accent); transform: rotate(-6deg); }
+.menu-rich > button, #menuAccount > :is(button, a) { padding: 7px 10px 7px 7px; gap: 11px; }
+.menu-rich > button:hover, #menuAccount > :is(button, a):hover { padding-left: 7px; }
+.menu-rich > button > svg.i, #menuAccount > :is(button, a) > svg.i { box-sizing: border-box; width: 34px; height: 34px; padding: 8px; border-radius: 10px; background: var(--field); color: var(--ink-2); transition: background .15s, color .15s, transform .25s var(--spring); }
+.menu-rich > button:hover > svg.i, #menuAccount > :is(button, a):hover > svg.i { background: var(--accent-soft); color: var(--accent); transform: rotate(-6deg); }
 .menu-rich > button.menu-hero > svg.i { background: var(--accent); color: var(--accent-ink); box-shadow: 0 6px 16px -6px oklch(0.68 0.19 38 / .8); }
-.menu-rich > button > span { display: flex; flex-direction: column; gap: 1px; min-width: 0; color: var(--ink); font-weight: 500; }
-.menu-rich > button small { font-size: 11.5px; font-weight: 400; color: var(--muted); }
+.menu-rich > button > span, #menuAccount > :is(button, a) > span { display: flex; flex-direction: column; gap: 1px; min-width: 0; color: var(--ink); font-weight: 500; }
+.menu-rich > button small, #menuAccount small { font-size: 11.5px; font-weight: 400; color: var(--muted); }
 .menu-sec { padding: 8px 10px 4px; font: 600 10.5px var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--faint); }
 .menu-head { display: flex; align-items: center; gap: 11px; margin: -6px -6px 4px; padding: 12px 14px; border-bottom: 1px solid var(--line); border-radius: 12px 12px 0 0; background: linear-gradient(120deg, var(--accent-soft), transparent 70%); }
 .mh-mark { width: 36px; height: 36px; flex: none; }
@@ -227,6 +229,7 @@ svg.i { width: 16px; height: 16px; flex: none; stroke: currentColor; fill: none;
 .menu-theme .seg svg.i { width: 14px; height: 14px; }
 .menu-tiles { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; padding-top: 6px; }
 .menu-tiles.two { grid-template-columns: 1fr 1fr; padding-top: 0; }
+.menu-tiles.four { grid-template-columns: repeat(4, 1fr); }
 .menu-tiles > a, .menu-tiles > button { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 10px 6px 9px; border: 0; border-radius: 10px; background: var(--field); color: var(--ink-2); font-size: 12px; text-decoration: none; cursor: pointer; transition: background .15s, color .15s, transform .15s var(--spring); }
 .menu-tiles > a:hover, .menu-tiles > button:hover { background: var(--field-hover); color: var(--ink); }
 .menu-tiles > a:active, .menu-tiles > button:active { transform: scale(.95); }
@@ -574,3 +577,45 @@ textarea.input.plain { min-height: 76px; font: 13px/1.45 var(--font); white-spac
 .pub-ok { display: grid; place-items: center; width: 44px; height: 44px; border-radius: 50%; background: var(--ok-bg); color: var(--ok); font-size: 20px; font-weight: 700; margin-bottom: 4px; animation: bump .5s var(--spring); }
 .pub-link { display: flex; gap: 8px; width: 100%; margin-top: 8px; }
 .pub-link .input { font: 12px var(--mono); }
+
+/* ---------- первое знакомство: окно приветствия ---------- */
+.modal.welcome-modal { width: min(640px, calc(100vw - 32px)); }
+.welcome { gap: 16px; }
+.wl-lead { margin: 0; color: var(--ink-2); font-size: 14px; line-height: 1.55; }
+.wl-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.wl-card { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; padding: 16px; border: 1px solid var(--line); border-radius: 14px; background: var(--field); color: var(--ink); text-align: left; text-decoration: none; cursor: pointer; transition: border-color .2s, background .2s, transform .25s var(--spring); animation: fadeUp .4s var(--ease) both; }
+.wl-card:nth-child(2) { animation-delay: .05s; }
+.wl-card:nth-child(3) { animation-delay: .1s; }
+.wl-card:nth-child(4) { animation-delay: .15s; }
+.wl-card:hover { border-color: var(--accent); background: var(--accent-soft); transform: translateY(-2px); }
+.wl-card b { font-size: 14.5px; font-weight: 600; }
+.wl-card > span:last-child { color: var(--muted); font-size: 12.5px; line-height: 1.45; }
+.wl-ico { display: grid; place-items: center; width: 38px; height: 38px; margin-bottom: 8px; border-radius: 11px; background: var(--panel-solid); color: var(--accent); transition: transform .3s var(--spring); }
+.wl-ico svg.i { width: 19px; height: 19px; }
+.wl-card:hover .wl-ico { transform: rotate(-8deg) scale(1.06); }
+.wl-card.hot .wl-ico { background: var(--accent); color: var(--accent-ink); box-shadow: 0 8px 20px -8px oklch(0.68 0.19 38 / .8); }
+
+/* ---------- тур: подсветка элемента и попап с шагом ---------- */
+.tour { position: fixed; inset: 0; z-index: 150; }
+.tour-spot { position: fixed; border-radius: 16px; box-shadow: 0 0 0 9999px oklch(0.08 0.004 60 / .62), 0 0 0 2px var(--accent), 0 0 30px 4px oklch(0.68 0.19 38 / .5); pointer-events: none; transition: left .4s var(--ease), top .4s var(--ease), width .4s var(--ease), height .4s var(--ease); }
+.tour-pop { position: fixed; display: flex; flex-direction: column; gap: 6px; padding: 16px 16px 14px; border-radius: 16px; background: var(--panel-solid); border: 1px solid var(--line); box-shadow: var(--shadow-lg); transition: left .35s var(--ease), top .35s var(--ease); }
+.tour-pop.in { animation: pop .25s var(--ease); }
+.tour-pop b { font-size: 15px; }
+.tour-pop p { margin: 0; color: var(--ink-2); font-size: 13px; line-height: 1.55; }
+.tour-pop kbd { color: var(--ink-2); }
+.tp-step { color: var(--accent-hi); font: 600 11px var(--mono); }
+.tp-actions { display: flex; align-items: center; gap: 6px; margin-top: 8px; }
+.tp-actions .link { margin-right: auto; color: var(--muted); }
+.tp-actions .btn.primary { background: var(--accent); color: var(--accent-ink); }
+
+/* ---------- подсказка к месту ---------- */
+.hint-pop { position: fixed; z-index: 140; display: flex; flex-direction: column; gap: 10px; padding: 14px; border-radius: 14px; background: var(--panel-solid); border: 1px solid var(--accent-line); box-shadow: var(--shadow-lg), 0 0 0 4px var(--accent-soft); animation: pop .25s var(--ease); }
+.hint-pop::before { content: ""; position: absolute; left: calc(var(--ax, 50%) - 7px); width: 12px; height: 12px; background: var(--panel-solid); border: 1px solid var(--accent-line); transform: rotate(45deg); }
+.hint-pop.below::before { top: -7px; border-right: 0; border-bottom: 0; }
+.hint-pop.above::before { bottom: -7px; border-left: 0; border-top: 0; }
+.hint-pop p { margin: 0; color: var(--ink-2); font-size: 13px; line-height: 1.5; }
+.hint-pop a { color: var(--accent-hi); }
+.hp-actions { display: flex; justify-content: flex-end; gap: 6px; }
+.hp-actions .btn.primary { background: var(--accent); color: var(--accent-ink); }
+.hint-pop.out { animation: popOut .2s var(--ease) forwards; }
+@media (max-width: 640px) { .wl-grid { grid-template-columns: 1fr; } }

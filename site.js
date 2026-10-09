@@ -1,9 +1,13 @@
 'use strict';
-/* Лендинг (index.html) и каталог сеток (catalog.html). */
+/* Сайт: главная, каталог, гайды, профиль (и общее меню для «Угадайки»).
+   Меню сверху и полоса снизу рисуются отсюда — разметка одна на все страницы. */
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const API = window.CatalogAPI;
+const ACC = window.Accounts;
+const SITE = window.SITE || {};
+const PAGE = document.body.dataset.page;
 
 // ---------- иконки ----------
 // Та же система, что в редакторе: 24px, линия 1.75, скруглённые концы, currentColor.
@@ -38,11 +42,25 @@ const ICONS = {
   heroes: '<rect x="4" y="4" width="6.5" height="6.5" rx="1.2"/><rect x="13.5" y="4" width="6.5" height="6.5" rx="1.2"/><rect x="4" y="13.5" width="6.5" height="6.5" rx="1.2"/><rect x="13.5" y="13.5" width="6.5" height="6.5" rx="1.2" fill="currentColor"/>',
   home: 'M4 11l8-7 8 7M6.5 9v11h11V9',
   github: 'M9 19c-4 1.5-4-2-6-2.5M15 21v-3.5c0-1 .1-1.4-.5-2 2.8-.3 5.5-1.4 5.5-6a4.6 4.6 0 00-1.3-3.2 4.3 4.3 0 00-.1-3.2s-1.1-.3-3.5 1.3a12 12 0 00-6.2 0C6.5 2.8 5.4 3.1 5.4 3.1a4.3 4.3 0 00-.1 3.2A4.6 4.6 0 004 9.5c0 4.6 2.7 5.7 5.5 6-.6.6-.6 1.2-.5 2V21',
+  user: '<circle cx="12" cy="8" r="3.75"/><path d="M4.5 20a7.5 7.5 0 0115 0"/>',
+  book: 'M4 5.5A1.5 1.5 0 015.5 4H11v15.5H5.5A1.5 1.5 0 014 18zM20 5.5A1.5 1.5 0 0018.5 4H13v15.5h5.5A1.5 1.5 0 0020 18z',
+  dice: '<rect x="4" y="4" width="16" height="16" rx="3.5"/><circle cx="9" cy="9" r="1.1" fill="currentColor"/><circle cx="15" cy="15" r="1.1" fill="currentColor"/><circle cx="15" cy="9" r="1.1" fill="currentColor"/><circle cx="9" cy="15" r="1.1" fill="currentColor"/>',
+  send: 'M20.5 3.5L3.5 10.5l6.5 2.5 2.5 6.5zM10 13l5-5',
+  megaphone: 'M4 10v4h3l7 4.5v-13L7 10zM17.5 9a4 4 0 010 6M7 14l1.5 5.5h2.5L10 15.5',
+  logout: 'M14 4h4.5A1.5 1.5 0 0120 5.5v13a1.5 1.5 0 01-1.5 1.5H14M9.5 8L5.5 12l4 4M5.5 12H15',
+  lock: '<rect x="5" y="10.5" width="14" height="9.5" rx="2"/><path d="M8 10.5V8a4 4 0 018 0v2.5"/>',
+  globe: '<circle cx="12" cy="12" r="8.5"/><path d="M3.5 12h17M12 3.5c2.5 2.7 3.5 5.5 3.5 8.5s-1 5.8-3.5 8.5c-2.5-2.7-3.5-5.5-3.5-8.5s1-5.8 3.5-8.5z"/>',
+  trash: 'M4.5 7h15M9.5 7V4.5h5V7M6.5 7l1 13h9l1-13',
+  mail: '<rect x="3.5" y="5.5" width="17" height="13" rx="2"/><path d="M4 7l8 6 8-6"/>',
+  star: 'M12 3.5l2.6 5.4 5.9.8-4.3 4.1 1 5.8-5.2-2.8-5.2 2.8 1-5.8-4.3-4.1 5.9-.8z',
+  clock: '<circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/>',
+  discord: 'M8.5 16.5c-2 .5-4-.5-4.5-1 0-4 1-7.5 2.5-9.5 1.5-.8 3-1.2 4-1.3l.5 1.3a14 14 0 013.5 0l.5-1.3c1 .1 2.5.5 4 1.3 1.5 2 2.5 5.5 2.5 9.5-.5.5-2.5 1.5-4.5 1l-1-1.8M7 15.5c3.3 1.5 6.7 1.5 10 0M9.5 12.5a.5.5 0 100-1 .5.5 0 000 1zM14.5 12.5a.5.5 0 100-1 .5.5 0 000 1z',
 };
 const icon = n => { const v = ICONS[n] || ''; return `<svg class="i" viewBox="0 0 24 24" aria-hidden="true">${v.startsWith('<') ? v : `<path d="${v}"/>`}</svg>`; };
 function applyIcons(root = document) {
   for (const el of $$('[data-icon]', root)) { if (!el.querySelector(':scope > svg.i')) el.insertAdjacentHTML('afterbegin', icon(el.dataset.icon)); }
 }
+const LOGO = '<svg viewBox="0 0 48 48" aria-hidden="true"><rect width="48" height="48" rx="12" class="mk-bg"/><path d="M13 35L35 13" class="mk-stroke"/></svg>';
 // знак «штрих по сетке» для пустых состояний
 const MARK = '<svg class="empty-mark" viewBox="0 0 48 48" aria-hidden="true"><rect width="48" height="48" rx="12" class="mk-bg"/><path d="M13 35L35 13" class="mk-stroke"/></svg>';
 
@@ -70,13 +88,132 @@ function ago(iso) {
   if (s < 86400 * 30) { const d = Math.floor(s / 86400); return `${d} ${plural(d, 'день', 'дня', 'дней')} назад`; }
   return new Date(iso).toLocaleDateString('ru', { day: 'numeric', month: 'long', year: 'numeric' });
 }
+// аватар: картинка, а если её нет или не загрузилась — первая буква ника
+function avatarHTML(url, nick, cls = 'ava') {
+  const letter = esc([...String(nick || '?').trim()][0] || '?').toUpperCase();
+  return url ? `<span class="${cls}"><img src="${esc(url)}" alt="${letter}" referrerpolicy="no-referrer" onerror="this.parentNode.textContent=this.alt"></span>` : `<span class="${cls}">${letter}</span>`;
+}
+// «Угадайка»: номер дня — сколько дней прошло с запуска игры (по местному времени), с единицы
+const GAME_START = new Date(2026, 9, 9);
+const gameDay = (d = new Date()) => Math.round((new Date(d.getFullYear(), d.getMonth(), d.getDate()) - GAME_START) / 864e5) + 1;
+// куда можно вернуться после входа: только страницы этого сайта
+const safeNext = s => /^(index|catalog|editor|guides|game|profile)\.html(\?[\w=&%.-]*)?$/.test(s || '') ? s : '';
+
+// ---------- меню сверху ----------
+const NAV = [['catalog', 'catalog.html', 'grid', 'Каталог'], ['guides', 'guides.html', 'book', 'Гайды'], ['game', 'game.html', 'dice', 'Угадайка']];
+function renderNav() {
+  const bar = document.createElement('header');
+  bar.className = 'navbar'; bar.id = 'navbar';
+  bar.innerHTML = `<nav class="nav-pill" aria-label="Главное меню">
+    <a class="logo" href="index.html" aria-label="Grid Studio — на главную">${LOGO}<span>Grid<b>Studio</b></span></a>
+    <div class="nav-links" id="navLinks">
+      <span class="nav-hl" aria-hidden="true"></span>
+      ${NAV.map(([k, href, ic, label]) => `<a href="${href}"${k === PAGE ? ' aria-current="page"' : ''}>${icon(ic)}${label}${k === 'catalog' ? '<b class="nav-badge" data-cat-count hidden></b>' : ''}</a>`).join('')}
+      <a href="editor.html" class="nav-studio">${icon('brush')}Редактор${icon('arrow')}</a>
+    </div>
+    <div class="nav-acc" id="navAcc"></div>
+    <button class="nav-burger" id="navBurger" aria-label="Открыть меню" aria-expanded="false" aria-controls="navLinks"><i></i><i></i></button>
+  </nav>`;
+  document.body.prepend(bar);
+  renderAccount();
+  ACC?.onChange(renderAccount);
+}
+// справа в меню: «Войти» или аватар с ником; без аккаунтов — просто «Создать сетку»
+function renderAccount() {
+  const box = $('#navAcc'); if (!box) return;
+  if (!ACC?.enabled) { box.innerHTML = `<a class="btn primary sm" href="editor.html">Создать сетку${icon('arrow')}</a>`; return; }
+  const p = ACC.profile(), u = ACC.user();
+  box.innerHTML = u
+    ? `<a class="nav-user${PAGE === 'profile' && !new URLSearchParams(location.search).get('u') ? ' on' : ''}" href="profile.html" title="Мой профиль">${avatarHTML(p?.avatar, p?.nick || u.email)}<span>${esc(p?.nick || 'Профиль')}</span></a>`
+    : `<a class="btn sm nav-login" href="profile.html${PAGE !== 'profile' && PAGE !== 'home' ? '?next=' + encodeURIComponent(location.pathname.split('/').pop() + location.search) : ''}">${icon('user')}Войти</a>`;
+}
+// Подсветка переезжает под ссылку под курсором и возвращается к текущей странице;
+// при прокрутке меню становится плотнее; на узком экране ссылки прячутся в «бургер».
+function initNav() {
+  const bar = $('#navbar'); if (!bar) return;
+  const links = $('#navLinks'), hl = $('.nav-hl', links), cur = $('a[aria-current]', links);
+  const moveTo = a => {
+    if (!a) { hl.style.opacity = 0; return; }
+    hl.style.width = a.offsetWidth + 'px'; hl.style.transform = `translateX(${a.offsetLeft}px)`; hl.style.opacity = 1;
+  };
+  const home = () => moveTo(cur);
+  links.addEventListener('mouseover', e => { const a = e.target.closest('a'); if (a) moveTo(a); });
+  links.addEventListener('mouseleave', home);
+  // без перехода при первой расстановке — иначе подсветка «приезжает» из угла
+  hl.style.transition = 'none'; home(); requestAnimationFrame(() => { hl.style.transition = ''; });
+  document.fonts?.ready.then(home); addEventListener('resize', home);
+
+  const onScroll = () => bar.classList.toggle('scrolled', scrollY > 12);
+  onScroll(); addEventListener('scroll', onScroll, { passive: true });
+
+  const burger = $('#navBurger');
+  const setOpen = on => { bar.classList.toggle('open', on); burger.setAttribute('aria-expanded', on); burger.setAttribute('aria-label', on ? 'Закрыть меню' : 'Открыть меню'); };
+  burger.onclick = e => { e.stopPropagation(); setOpen(!bar.classList.contains('open')); };
+  document.addEventListener('click', e => { if (!bar.contains(e.target)) setOpen(false); });
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') setOpen(false); });
+}
+// число сеток в каталоге — в меню и в блоках главной
+function setCatCount(total) {
+  for (const el of $$('[data-cat-count]')) { el.textContent = num(total); el.hidden = !total && el.classList.contains('nav-badge'); }
+}
+
+// ---------- полоса снизу: автор, поддержка, Telegram, реклама, GitHub, версия ----------
+function renderBottomBars() {
+  const a = SITE.author || {};
+  const html = `<div class="bb-left">
+      <span class="bb-authors">Автор <button class="bb-author" data-info="author">${avatarHTML(a.avatar, a.nick)}@${esc(a.nick || 'ahttps')}</button></span>
+      <button class="bb-link" data-info="support">${icon('heart')}Поддержать разработку</button>
+      ${SITE.telegram ? `<a class="bb-link" href="${esc(SITE.telegram)}" target="_blank" rel="noopener">${icon('send')}Чат и новости</a>` : ''}
+      <button class="bb-link" data-info="ads">${icon('megaphone')}Реклама</button>
+    </div>
+    <div class="bb-right">
+      ${SITE.repo ? `<a class="bb-link" href="${esc(SITE.repo)}" target="_blank" rel="noopener">${icon('github')}GitHub${icon('ext')}</a>` : ''}
+      <a class="bb-ver" href="${esc(SITE.repo || '#')}/commits/main" target="_blank" rel="noopener" title="Что нового — история изменений">v${esc(SITE.version || '1.0.0')}</a>
+    </div>`;
+  for (const el of $$('[data-bottom-bar]')) el.innerHTML = html;
+  document.addEventListener('click', e => { const b = e.target.closest('[data-info]'); if (b) openInfo(b.dataset.info); });
+}
+// небольшие окна: автор, поддержка, реклама
+function openSheet(html) {
+  const root = $('#modalRoot');
+  root.innerHTML = `<div class="modal sheet" role="dialog"><button class="modal-x" data-icon="x" aria-label="Закрыть"></button>${html}</div>`;
+  applyIcons(root);
+  const close = () => { root.innerHTML = ''; document.removeEventListener('keydown', onKey); };
+  const onKey = e => { if (e.key === 'Escape') close(); };
+  document.addEventListener('keydown', onKey);
+  root.onclick = e => { if (e.target === root || e.target.closest('.modal-x')) close(); };
+  return { root, close };
+}
+function openInfo(kind) {
+  const a = SITE.author || {};
+  const discord = `<button class="btn block" data-copy="${esc(a.discord || 'ahttps')}">${icon('discord')}Discord: ${esc(a.discord || 'ahttps')}<span class="sh-note">скопировать</span></button>`;
+  const tg = SITE.telegram ? `<a class="btn block" href="${esc(SITE.telegram)}" target="_blank" rel="noopener">${icon('send')}Telegram: чат и новости</a>` : '';
+  const sheets = {
+    author: `${avatarHTML(a.avatar, a.nick, 'sh-ava')}<h2>@${esc(a.nick || 'ahttps')}</h2>
+      <p>Автор Grid Studio. Пиши по вопросам, насчёт заказа сеток и с интересными предложениями.</p>
+      <div class="sh-actions">${discord}${a.github ? `<a class="btn block" href="https://github.com/${esc(a.github)}" target="_blank" rel="noopener">${icon('github')}GitHub: ${esc(a.github)}</a>` : ''}${tg}</div>`,
+    support: `<div class="sh-ico">${icon('heart')}</div><h2>Поддержать разработку</h2>
+      <p>Grid Studio бесплатный и таким останется. Если сайт пригодился — помоги ему расти: новые режимы, гайды и игры появляются быстрее.</p>
+      <div class="sh-actions">
+        ${SITE.support ? `<a class="btn primary block" href="${esc(SITE.support)}" target="_blank" rel="noopener">${icon('heart')}Поддержать рублём</a>` : ''}
+        ${SITE.repo ? `<a class="btn block" href="${esc(SITE.repo)}" target="_blank" rel="noopener">${icon('star')}Поставить звезду на GitHub</a>` : ''}
+        <button class="btn block" data-copy="${esc(new URL('index.html', location.href).href)}">${icon('link')}Поделиться сайтом с друзьями<span class="sh-note">скопировать ссылку</span></button>
+        <a class="btn block" href="editor.html?publish">${icon('upload')}Выложить свою сетку в каталог</a>
+      </div>`,
+    ads: `<div class="sh-ico">${icon('megaphone')}</div><h2>Реклама на Grid Studio</h2>
+      <p>Аудитория — игроки Dota 2, которые настраивают игру под себя. Места: главная, каталог сеток, гайды и «Угадайка». Обсудим формат и цену.</p>
+      <div class="sh-actions">${SITE.ads ? `<a class="btn primary block" href="${esc(SITE.ads)}" target="_blank" rel="noopener">${icon('send')}Написать насчёт рекламы</a>` : ''}${discord}${tg}</div>`,
+  };
+  const m = openSheet(`<div class="sh-body">${sheets[kind]}</div>`);
+  m.root.addEventListener('click', e => { const b = e.target.closest('[data-copy]'); if (b) copyText(b.dataset.copy, 'Скопировано'); });
+}
 
 // ---------- карточка сетки ----------
 function cardHTML(g, k = 0) {
   return `<button class="gcard" data-id="${esc(g.id)}" style="animation-delay:${Math.min(k, 12) * 40}ms">
     <span class="gthumb"><img src="${esc(g.thumb)}" alt="" loading="lazy">
       <span class="gkind">${esc(API.KINDS[g.kind] || 'Сетка')} · ${num(g.cats)} кат.</span>
-      ${API.isMine(g.id) ? '<span class="gkind gmine">моя</span>' : ''}</span>
+      ${API.isMine(g.id, g.user_id) ? '<span class="gkind gmine">моя</span>' : ''}</span>
     <span class="gbody">
       <span class="gtitle">${esc(g.title)}</span>
       <span class="gmeta"><span class="by">${esc(g.author)} · ${ago(g.created_at)}</span>
@@ -102,12 +239,14 @@ async function openGrid(id, { onChange } = {}) {
   try { g = await API.get(id); } catch (e) { if (alive) { close(); toast(e.message, 'err'); } return; }
   if (!alive) return;
   const cats = g.config?.categories || [];
-  const mine = API.isMine(g.id);
+  const mine = API.isMine(g.id, g.user_id);
+  // у сеток из аккаунта автор — ссылка на его профиль
+  const author = g.user_id && ACC?.enabled ? `<a href="profile.html?u=${encodeURIComponent(g.user_id)}">${esc(g.author)}</a>` : `<b>${esc(g.author)}</b>`;
   root.innerHTML = `<div class="modal" role="dialog" aria-label="${esc(g.title)}">
     <button class="modal-x" data-icon="x" aria-label="Закрыть"></button>
     <div class="modal-view"><canvas id="gv"></canvas></div>
     <div class="modal-side">
-      <div><h2>${esc(g.title)}</h2><div class="by">от <b>${esc(g.author)}</b> · ${ago(g.created_at)}</div></div>
+      <div><h2>${esc(g.title)}</h2><div class="by">от ${author} · ${ago(g.created_at)}</div></div>
       ${g.description ? `<div class="desc">${esc(g.description)}</div>` : ''}
       <div class="stats">
         <div><b data-likes>${num(g.likes)}</b><span>${plural(g.likes, 'лайк', 'лайка', 'лайков')}</span></div>
@@ -181,13 +320,13 @@ async function openGrid(id, { onChange } = {}) {
   };
 }
 function setUrlId(id) {
-  if (document.body.dataset.page !== 'catalog') return;
+  if (PAGE !== 'catalog') return;
   const u = new URL(location.href);
   id ? u.searchParams.set('id', id) : u.searchParams.delete('id');
   history.replaceState(null, '', u);
 }
 
-// ---------- главная ----------
+// ---------- герои ----------
 // портрет героя в сетке — вертикальный, как в игре
 const portrait = h => 'https://cdn.cloudflare.steamstatic.com/apps/dota2/images/' + (h.v ? `heroes/${h.s}_vert.jpg` : `dota_react/heroes/${h.s}.png`);
 const heroImgTag = (h, lazy = true) => `<img src="${portrait(h)}" alt="${esc(h.n)}" title="${esc(h.n)}" ${lazy ? 'loading="lazy"' : ''} decoding="async">`;
@@ -197,68 +336,48 @@ function shuffled(list, seed = 7) {
   return a;
 }
 
-// ---------- меню ----------
-// Подсветка переезжает под ссылку под курсором и возвращается к текущей странице;
-// при прокрутке таблетка становится плотнее; на узком экране ссылки прячутся в «бургер».
-function initNav() {
-  const bar = $('#navbar'); if (!bar) return;
-  const links = $('#navLinks'), hl = $('.nav-hl', links), cur = $('a[aria-current]', links);
-  const moveTo = a => {
-    if (!a) { hl.style.opacity = 0; return; }
-    hl.style.width = a.offsetWidth + 'px'; hl.style.transform = `translateX(${a.offsetLeft}px)`; hl.style.opacity = 1;
-  };
-  const home = () => moveTo(cur);
-  links.addEventListener('mouseover', e => { const a = e.target.closest('a'); if (a) moveTo(a); });
-  links.addEventListener('mouseleave', home);
-  // без перехода при первой расстановке — иначе подсветка «приезжает» из угла
-  hl.style.transition = 'none'; home(); requestAnimationFrame(() => { hl.style.transition = ''; });
-  document.fonts?.ready.then(home); addEventListener('resize', home);
-
-  const onScroll = () => bar.classList.toggle('scrolled', scrollY > 12);
-  onScroll(); addEventListener('scroll', onScroll, { passive: true });
-
-  const burger = $('#navBurger');
-  const setOpen = on => { bar.classList.toggle('open', on); burger.setAttribute('aria-expanded', on); burger.setAttribute('aria-label', on ? 'Закрыть меню' : 'Открыть меню'); };
-  burger.onclick = e => { e.stopPropagation(); setOpen(!bar.classList.contains('open')); };
-  document.addEventListener('click', e => { if (!bar.contains(e.target)) setOpen(false); });
-  document.addEventListener('keydown', e => { if (e.key === 'Escape') setOpen(false); });
-}
-// число сеток в каталоге — в меню и в блоках главной
-function setCatCount(total) {
-  for (const el of $$('[data-cat-count]')) { el.textContent = num(total); el.hidden = !total && el.classList.contains('nav-badge'); }
-}
+// ---------- гайды: список (статьи — в guides.html) ----------
+const GUIDES = [
+  ['start', 'Старт', 'Как поставить свою сетку в Доту', 'Где лежит hero_grid_config.json, как не потерять старые сетки и где выбрать новую в игре.', 4],
+  ['lineart', 'Картинки', 'Line-art, который читается в игре', 'Какую картинку брать, как выставить кадр, детализацию и тени, чтобы арт не превратился в кашу.', 6],
+  ['limits', 'Производительность', 'Сколько категорий можно', 'Почему экран героев думает дольше и как сэкономить категории без потери картинки.', 3],
+  ['mosaic', 'Мозаика', 'Мозаика из портретов героев', 'Как Дота раскладывает портреты, какую ширину выбрать и зачем исключать героев из палитры.', 4],
+  ['steam', 'Steam', 'Брайль-арт для профиля Steam', 'Арт для «Своего информационного поля»: ширина, лимит 8000 символов и почему строки переносятся.', 3],
+  ['text', 'Текст', 'Подписи и текст в сетке', 'Как Дота показывает названия категорий и как сделать надписи ровными.', 3],
+  ['share', 'Каталог', 'Профиль, «Мои работы» и каталог', 'Как хранить работы приватно, возвращаться к ним и выкладывать сетки от своего имени.', 3],
+];
+const guideCard = ([id, tag, title, desc, min], k) => `<a class="guide-card" href="guides.html#${id}" data-reveal style="--d:${(k % 3) * 0.06}s">
+  <span class="gc-tag">${esc(tag)}</span><b>${esc(title)}</b><span>${esc(desc)}</span><small>${icon('clock')}${min} мин чтения</small></a>`;
 
 // ---------- главная ----------
+const BRAILLE = `⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢠⣶⣶⣶⣆⣀⣤⣄⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢀⣀⣤⣤⣶⣶⣞⢿⢿⣿⣿⡿⣯⡉⠉⠁⠀⠀⠀⠀
+⠀⠀⣠⣴⣦⣤⠈⠲⣀⣀⠀⢁⡶⠿⠛⠉⢻⣏⡙⣿⣿⣿⣾⣿⣷⣄⠀⠀⠀⠀
+⣀⡤⠎⠉⠁⠀⠈⠁⣶⡶⠚⠋⠉⠀⠘⣲⣬⣵⣶⣿⠿⠿⠿⠿⠿⢿⣿⣄⠀⠀
+⠉⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣏⣻⣞⠋⠛⢿⡇⠀⠀⠈⠻⢿⢻⣷⣤
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠈⣽⠽⠷⣾⠶⠒⣒⡀⠀⠀⣠⣤⣍⣛`;
 function initHome() {
-  $('#authorChip').onclick = () => copyText('ahttps', 'Ник в Discord скопирован: ahttps');
   const heroes = window.HEROES || [], still = matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-  // витрина наклонена назад и выпрямляется, пока доезжает до середины экрана
+  // карточки разделов: портреты героев, Брайль
+  $('#fcFacesGrid').innerHTML = shuffled(heroes, 5).slice(0, 10).map(h => heroImgTag(h, false)).join('');
+  $('#fcBraille').textContent = BRAILLE;
+
+  // «Угадайка»: номер дня и, если сегодня уже играли, — результат
+  const day = gameDay(), today = (() => { try { return JSON.parse(localStorage.getItem('gs.game.daily')); } catch { return null; } })();
+  $('#gameTitle').textContent = `Угадайка #${day}`;
+  if (today?.day === day && today.done) $('#gameSub').textContent = today.win ? `Сегодня угадано с ${today.guesses.length}-й попытки — заходи завтра` : 'Сегодня не угадано — завтра новый герой';
+
+  // ноутбук чуть поворачивается за курсором
   const scene = $('#scene');
-  if (!still) {
-    let queued = false;
-    const tilt = () => {
-      queued = false;
-      const r = scene.getBoundingClientRect(), t = Math.min(1, Math.max(0, (r.top - innerHeight * 0.18) / (innerHeight * 0.55)));
-      scene.style.setProperty('--tilt', t.toFixed(3));
-    };
-    tilt();
-    addEventListener('scroll', () => { if (!queued) { queued = true; requestAnimationFrame(tilt); } }, { passive: true });
-    addEventListener('resize', tilt);
-  } else scene.style.setProperty('--tilt', 0);
+  if (!still && matchMedia('(pointer: fine)').matches) {
+    addEventListener('pointermove', e => {
+      const x = e.clientX / innerWidth - .5, y = e.clientY / innerHeight - .5;
+      scene.style.setProperty('--mx', x.toFixed(3)); scene.style.setProperty('--my', y.toFixed(3));
+    }, { passive: true });
+  }
 
-  // плашка «127 героев»: три портрета
-  const pick = shuffled(heroes, 11);
-  $('#fcFaces').innerHTML = pick.slice(0, 3).map(h => heroImgTag(h, false)).join('');
-  $('.fc-heroes b').textContent = `${heroes.length} ${plural(heroes.length, 'герой', 'героя', 'героев')}`;
-  $('#heroCount').textContent = heroes.length;
-
-  // лента портретов: каждый ряд продублирован, чтобы прокрутка была бесконечной
-  const half = Math.ceil(pick.length / 2), rowA = pick.slice(0, half), rowB = pick.slice(half);
-  $('#mqA').innerHTML = [...rowA, ...rowA].map(h => heroImgTag(h)).join('');
-  $('#mqB').innerHTML = [...rowB, ...rowB].map(h => heroImgTag(h)).join('');
-
-  // мозаика: 8 × 3 портрета, проявляются, когда плитка доезжает до экрана
+  // лента портретов, мозаика
   const mosaic = $('#mosaic');
   mosaic.innerHTML = shuffled(heroes, 3).slice(0, 24).map((h, i) => heroImgTag(h).replace('<img', `<img style="transition-delay:${(i % 8) * 45 + Math.floor(i / 8) * 90}ms"`)).join('');
   new IntersectionObserver((es, io) => { if (es.some(e => e.isIntersecting)) { mosaic.classList.add('in'); io.disconnect(); } }, { threshold: .3 }).observe(mosaic);
@@ -280,7 +399,7 @@ function initHome() {
     requestAnimationFrame(step);
   }, { threshold: .5 }).observe(cmp);
 
-  // док инструментов: оранжевая «таблетка» ходит по инструментам, как в редакторе
+  // док инструментов: «таблетка» ходит по инструментам, как в редакторе
   const dock = $('#toolsDemo'), ind = $('.tools-ind', dock), tools = $$('span', dock);
   let cur = 0, timer = 0;
   const place = () => { const b = tools[cur]; ind.style.transform = `translate(${b.offsetLeft}px, ${b.offsetTop}px)`; tools.forEach((x, k) => x.classList.toggle('on', k === cur)); };
@@ -291,15 +410,22 @@ function initHome() {
     if (es.some(e => e.isIntersecting)) timer = setInterval(() => { if (!dock.matches(':hover')) { cur = (cur + 1) % tools.length; place(); } }, 1500);
   }, { threshold: .4 }).observe(dock);
 
+  $('#guideTeaser').innerHTML = GUIDES.slice(0, 3).map(guideCard).join('');
+
   const box = $('#latest');
   box.innerHTML = skeletons(3);
-  API.list({ limit: 6 }).then(({ items, total }) => {
-    // пустой каталог — не «0», а приглашение стать первым
+  API.list({ limit: 24 }).then(({ items, total }) => {
     setCatCount(total);
     $('#catNum').textContent = total ? num(total) : '#1';
     $('.big-num span').textContent = total ? plural(total, 'сетка', 'сетки', 'сеток') + ' в каталоге' : 'стань первым автором';
-    if (total) $('#eyebrowText').textContent = `${num(total)} ${plural(total, 'сетка', 'сетки', 'сеток')} от игроков в каталоге`;
-    box.innerHTML = items.length ? items.map(cardHTML).join('') : `<div class="cards-empty">${MARK}<b>Здесь пока пусто</b><span>Стань первым: нарисуй сетку в редакторе и нажми «В каталог».</span><a class="btn primary sm" href="editor.html">Открыть редактор</a></div>`;
+    box.innerHTML = items.length ? items.slice(0, 6).map(cardHTML).join('') : `<div class="cards-empty">${MARK}<b>Здесь пока пусто</b><span>Стань первым: нарисуй сетку в редакторе и нажми «В каталог».</span><a class="btn primary sm" href="editor.html">Открыть редактор</a></div>`;
+    // плашка «случайная сетка из каталога» поверх ноутбука
+    if (items.length) {
+      const g = items[Math.floor(Math.random() * items.length)], rg = $('#randomGrid');
+      rg.href = 'catalog.html?id=' + encodeURIComponent(g.id);
+      rg.innerHTML = `<span class="rg-likes">${icon('heart')}${num(g.likes)}</span><b>«${esc(g.title)}» — ${esc(g.author)}</b><span class="rg-note">случайная сетка из каталога</span>`;
+      rg.hidden = false;
+    }
   }).catch(() => { box.closest('.section').hidden = true; $('#catNum').textContent = '∞'; setCatCount(0); });
   box.onclick = e => { const c = e.target.closest('.gcard[data-id]'); if (c) location.href = 'catalog.html?id=' + encodeURIComponent(c.dataset.id); };
 }
@@ -307,7 +433,7 @@ function initHome() {
 // ---------- каталог ----------
 function initCatalog() {
   $('#demoNote').hidden = API.remote;
-  const PAGE = 24;
+  const PAGE_SIZE = 24;
   const f = { q: '', kind: 'all', sort: 'new' };
   let offset = 0, total = 0, seq = 0;
   const cards = $('#cards'), more = $('#more');
@@ -317,7 +443,7 @@ function initCatalog() {
     if (reset) { offset = 0; cards.innerHTML = skeletons(6); }
     more.disabled = true;
     try {
-      const r = await API.list({ q: f.q, kind: f.kind === 'mine' ? 'all' : f.kind, onlyMine: f.kind === 'mine', sort: f.sort, offset, limit: PAGE });
+      const r = await API.list({ q: f.q, kind: f.kind === 'mine' ? 'all' : f.kind, onlyMine: f.kind === 'mine', sort: f.sort, offset, limit: PAGE_SIZE });
       if (my !== seq) return;
       total = r.total;
       if (f.kind === 'all' && !f.q) setCatCount(total);
@@ -334,7 +460,7 @@ function initCatalog() {
     more.disabled = false;
   }
   const emptyHTML = () => f.q || f.kind !== 'all'
-    ? `<div class="cards-empty"><b>Ничего не нашлось</b><span>${f.kind === 'mine' ? 'Ты ещё ничего не выкладывал из этого браузера.' : 'Попробуй другой запрос или фильтр.'}</span></div>`
+    ? `<div class="cards-empty"><b>Ничего не нашлось</b><span>${f.kind === 'mine' ? 'Ты ещё ничего не выкладывал из этого браузера или аккаунта.' : 'Попробуй другой запрос или фильтр.'}</span></div>`
     : `<div class="cards-empty">${MARK}<b>Здесь пока пусто</b><span>Стань первым: нарисуй сетку в редакторе и выложи её сюда.</span><a class="btn primary sm" href="editor.html?publish">Выложить сетку</a></div>`;
 
   let qt = 0;
@@ -363,15 +489,171 @@ function initCatalog() {
   if (id) openGrid(id, { onChange });
 }
 
+// ---------- гайды ----------
+function initGuides() {
+  $('#guideList').innerHTML = GUIDES.map(guideCard).join('');
+  // оглавление сбоку подсвечивает статью, которую сейчас читают
+  const toc = $('#guideToc');
+  toc.innerHTML = GUIDES.map(([id, , title]) => `<a href="#${id}" data-id="${id}">${esc(title)}</a>`).join('');
+  const links = new Map($$('a', toc).map(a => [a.dataset.id, a]));
+  const io = new IntersectionObserver(es => {
+    for (const e of es) if (e.isIntersecting) { for (const a of links.values()) a.classList.remove('on'); links.get(e.target.id)?.classList.add('on'); }
+  }, { rootMargin: '-30% 0px -60% 0px' });
+  for (const id of links.keys()) { const el = document.getElementById(id); if (el) io.observe(el); }
+  document.addEventListener('click', e => { const b = e.target.closest('[data-copy]'); if (b) copyText(b.dataset.copy, 'Скопировано'); });
+}
+
+// ---------- профиль ----------
+async function initProfile() {
+  const box = $('#profile'), qs = new URLSearchParams(location.search);
+  const viewId = qs.get('u'), next = safeNext(qs.get('next'));
+  if (!ACC?.enabled) {
+    box.innerHTML = `<div class="auth-card">${LOGO}<h1>Профили скоро появятся</h1><p>Здесь можно будет хранить работы приватно, возвращаться к ним с любого устройства и выкладывать сетки от своего имени. Пока редактор сохраняет всё в этом браузере.</p><a class="btn primary" href="editor.html">Открыть редактор</a></div>`;
+    return;
+  }
+  const err = ACC.error(); if (err) toast(err, 'err');
+  await ACC.ready();
+  if (viewId && viewId !== ACC.user()?.id) return renderPublicProfile(box, viewId);
+  if (!ACC.signedIn()) return renderSignIn(box, next);
+  if (next) { location.replace(next); return; }
+  renderMyProfile(box);
+}
+
+function renderSignIn(box, next) {
+  const redirect = new URL('profile.html' + (next ? '?next=' + encodeURIComponent(next) : ''), location.href).href;
+  const PROV = { discord: ['discord', 'Discord'], github: ['github', 'GitHub'] };
+  box.innerHTML = `<div class="auth-card">${LOGO}
+    <h1>Вход в Grid Studio</h1>
+    <p>Сохраняй работы в профиль и возвращайся к ним с любого устройства. Выкладывай сетки в каталог от своего имени.</p>
+    ${ACC.providers.length ? `<div class="auth-prov">${ACC.providers.map(p => `<button class="btn block" data-prov="${p}">${icon(PROV[p]?.[0] || 'user')}Войти через ${PROV[p]?.[1] || p}</button>`).join('')}</div><div class="auth-or"><span>или по почте</span></div>` : ''}
+    <form class="auth-form" id="authForm">
+      <label class="auth-field">${icon('mail')}<input class="input" id="authEmail" type="email" required placeholder="почта@пример.ru" autocomplete="email"></label>
+      <button class="btn primary block" id="authGo">Получить ссылку для входа</button>
+    </form>
+    <div class="hint">Пароль не нужен — пришлём письмо со ссылкой. Почту никто не увидит: в профиле только ник.</div>
+  </div>`;
+  for (const b of $$('[data-prov]', box)) b.onclick = () => ACC.oauth(b.dataset.prov, redirect);
+  $('#authForm').onsubmit = async e => {
+    e.preventDefault();
+    const email = $('#authEmail').value.trim(), go = $('#authGo');
+    go.disabled = true; go.textContent = 'Отправляю…';
+    try { await ACC.sendLink(email, redirect); renderSent(box, email, next); }
+    catch (er) { toast(er.message, 'err'); go.disabled = false; go.textContent = 'Получить ссылку для входа'; }
+  };
+}
+function renderSent(box, email, next) {
+  box.innerHTML = `<div class="auth-card"><div class="sh-ico">${icon('mail')}</div>
+    <h1>Проверь почту</h1>
+    <p>Письмо со ссылкой отправлено на <b>${esc(email)}</b>. Открой ссылку в этом браузере — и сразу окажешься в профиле. Письма нет — загляни в «Спам».</p>
+    <form class="auth-form" id="codeForm">
+      <input class="input code" id="authCode" inputmode="numeric" autocomplete="one-time-code" maxlength="10" placeholder="Код из письма, если есть">
+      <button class="btn block">Войти по коду</button>
+    </form>
+    <button class="link" id="authBack">Другая почта</button>
+  </div>`;
+  $('#authBack').onclick = () => renderSignIn(box, next);
+  $('#codeForm').onsubmit = async e => {
+    e.preventDefault();
+    try { await ACC.verifyCode(email, $('#authCode').value); if (next) location.replace(next); else renderMyProfile(box); }
+    catch (er) { toast(er.message, 'err'); }
+  };
+}
+
+function profileHead(p, { me, count }) {
+  return `<section class="pf-head">
+    ${avatarHTML(p.avatar, p.nick, 'pf-ava')}
+    <div class="pf-info">
+      ${me ? `<input class="pf-nick" id="pfNick" value="${esc(p.nick)}" maxlength="32" spellcheck="false" title="Ник — его видят в каталоге">` : `<h1 class="pf-nick">${esc(p.nick || 'Игрок')}</h1>`}
+      <span class="pf-meta">${me ? `${icon('lock')}${esc(ACC.user()?.email || '')} — видишь только ты` : `${num(count)} ${plural(count, 'сетка', 'сетки', 'сеток')} в каталоге`} · с ${new Date(p.created_at).toLocaleDateString('ru', { month: 'long', year: 'numeric' })}</span>
+    </div>
+    ${me ? `<div class="pf-actions"><a class="btn primary" href="editor.html?new">${icon('brush')}Новая сетка</a><button class="btn" id="pfOut">${icon('logout')}Выйти</button></div>` : ''}
+  </section>`;
+}
+async function renderMyProfile(box) {
+  const p = ACC.profile() || await ACC.loadProfile();
+  box.innerHTML = `${profileHead(p, { me: true })}
+    <div class="pf-tabs chips" id="pfTabs"><i class="chip-ind" id="pfInd"></i>
+      <button class="chip on" data-tab="works">${icon('lock')}Мои работы <b id="pfWorksN"></b></button>
+      <button class="chip" data-tab="pub">${icon('globe')}Опубликованные <b id="pfPubN"></b></button>
+    </div>
+    <div class="cards" id="pfList">${skeletons(3)}</div>`;
+  applyIcons(box);
+  const nick = $('#pfNick');
+  nick.onchange = async () => {
+    const v = nick.value.trim().slice(0, 32);
+    if (!v) { nick.value = p.nick; return; }
+    try { await ACC.updateProfile({ nick: v }); toast('Ник сохранён', 'ok'); } catch (e) { toast(e.message, 'err'); nick.value = p.nick; }
+  };
+  nick.onkeydown = e => { if (e.key === 'Enter') nick.blur(); };
+  $('#pfOut').onclick = async () => { await ACC.signOut(); location.href = 'index.html'; };
+
+  let works = [], pub = [], tab = 'works';
+  const ind = () => { const b = $('#pfTabs .chip.on'); $('#pfInd').style.cssText = `width:${b.offsetWidth}px;transform:translateX(${b.offsetLeft}px)`; };
+  const draw = () => {
+    $('#pfWorksN').textContent = works.length; $('#pfPubN').textContent = pub.length;
+    const list = $('#pfList');
+    if (tab === 'works') list.innerHTML = works.length ? works.map(workCard).join('')
+      : `<div class="cards-empty">${MARK}<b>Пока нет сохранённых работ</b><span>В редакторе открой меню у названия сетки → «Сохранить в мои работы». Работы видишь только ты.</span><a class="btn primary sm" href="editor.html">Открыть редактор</a></div>`;
+    else list.innerHTML = pub.length ? pub.map(cardHTML).join('')
+      : `<div class="cards-empty"><b>Ничего не опубликовано</b><span>Сетки, которые ты выложишь в каталог, войдя в профиль, появятся здесь.</span></div>`;
+    applyIcons(list);
+  };
+  $('#pfTabs').onclick = e => { const b = e.target.closest('.chip'); if (!b) return; tab = b.dataset.tab; $$('#pfTabs .chip').forEach(c => c.classList.toggle('on', c === b)); ind(); draw(); };
+  ind(); document.fonts?.ready.then(ind);
+  $('#pfList').onclick = async e => {
+    const del = e.target.closest('[data-del]');
+    if (del) {
+      e.preventDefault();
+      const w = works.find(x => x.id === del.dataset.del);
+      if (!confirm(`Удалить «${w?.title}» из твоих работ? Это нельзя отменить.`)) return;
+      try { await ACC.projects.remove(del.dataset.del); works = works.filter(x => x.id !== del.dataset.del); draw(); toast('Работа удалена', 'ok'); } catch (er) { toast(er.message, 'err'); }
+      return;
+    }
+    const c = e.target.closest('.gcard[data-id]');
+    if (c && tab === 'pub') openGrid(c.dataset.id, { onChange: (g, removed) => { if (removed) { pub = pub.filter(x => x.id !== g.id); draw(); } } });
+  };
+  try {
+    [works, pub] = await Promise.all([ACC.projects.list(), ACC.userGrids(ACC.user().id)]);
+    draw();
+  } catch (e) { $('#pfList').innerHTML = `<div class="cards-empty"><b>Не удалось загрузить работы</b><span>${esc(e.message)}</span></div>`; }
+}
+const workCard = (w, k) => `<a class="gcard wcard" href="editor.html?project=${encodeURIComponent(w.id)}" style="animation-delay:${Math.min(k, 12) * 40}ms">
+  <span class="gthumb">${w.thumb ? `<img src="${esc(w.thumb)}" alt="" loading="lazy">` : ''}
+    <span class="gkind">${w.grid_id ? `${icon('globe')}В каталоге` : `${icon('lock')}Приватная`} · ${num(w.cats)} кат.</span></span>
+  <span class="gbody"><span class="gtitle">${esc(w.title)}</span>
+    <span class="gmeta"><span class="by">${icon('clock')}изменена ${ago(w.updated_at)}</span>
+      <button class="w-del" data-del="${esc(w.id)}" title="Удалить работу" aria-label="Удалить">${icon('trash')}</button></span></span>
+</a>`;
+async function renderPublicProfile(box, id) {
+  box.innerHTML = `<div class="loading">Загружаю профиль…</div>`;
+  try {
+    const [p, grids] = await Promise.all([ACC.getProfile(id), ACC.userGrids(id)]);
+    if (!p) throw new Error('Такого профиля нет.');
+    document.title = `${p.nick} · Grid Studio`;
+    box.innerHTML = `${profileHead(p, { me: false, count: grids.length })}
+      <div class="cards" id="pfList">${grids.length ? grids.map(cardHTML).join('') : `<div class="cards-empty"><b>Сеток пока нет</b><span>Автор ещё ничего не выложил в каталог.</span></div>`}</div>`;
+    $('#pfList').onclick = e => { const c = e.target.closest('.gcard[data-id]'); if (c) openGrid(c.dataset.id); };
+  } catch (e) { box.innerHTML = `<div class="auth-card"><h1>Профиль не найден</h1><p>${esc(e.message)}</p><a class="btn" href="catalog.html">В каталог</a></div>`; }
+}
+
+// ---------- запуск ----------
+renderNav();
+renderBottomBars();
 applyIcons();
 initNav();
 // блоки с data-reveal проявляются, когда доезжают до экрана
-{
-  const els = $$('[data-reveal]');
-  if ('IntersectionObserver' in window) {
-    const io = new IntersectionObserver(es => { for (const e of es) if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); } }, { threshold: .15, rootMargin: '0px 0px -40px 0px' });
-    els.forEach(el => io.observe(el));
-  } else els.forEach(el => el.classList.add('in'));
+function reveal(root = document) {
+  const els = $$('[data-reveal]:not(.in)', root);
+  if (!('IntersectionObserver' in window)) { els.forEach(el => el.classList.add('in')); return; }
+  const io = new IntersectionObserver(es => { for (const e of es) if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); } }, { threshold: .15, rootMargin: '0px 0px -40px 0px' });
+  els.forEach(el => io.observe(el));
 }
-if (document.body.dataset.page === 'home') initHome();
-if (document.body.dataset.page === 'catalog') initCatalog();
+if (PAGE === 'home') initHome();
+if (PAGE === 'catalog') initCatalog();
+if (PAGE === 'guides') initGuides();
+if (PAGE === 'profile') initProfile();
+reveal();
+// профиль подтягивается в фоне — меню обновится само
+if (ACC?.enabled && PAGE !== 'profile') ACC.ready();
+// число сеток в меню на страницах, где каталог сам его не грузит
+if (PAGE === 'guides' || PAGE === 'game' || PAGE === 'profile') API.list({ limit: 1 }).then(r => setCatCount(r.total)).catch(() => {});
