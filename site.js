@@ -41,6 +41,9 @@ const ICONS = {
   eraser: 'M8.5 19.5L4 15l9.5-9.5 5.5 5.5-9 8.5zM9 10.5l5 5M8.5 19.5H20',
   heroes: '<rect x="4" y="4" width="6.5" height="6.5" rx="1.2"/><rect x="13.5" y="4" width="6.5" height="6.5" rx="1.2"/><rect x="4" y="13.5" width="6.5" height="6.5" rx="1.2"/><rect x="13.5" y="13.5" width="6.5" height="6.5" rx="1.2" fill="currentColor"/>',
   home: 'M4 11l8-7 8 7M6.5 9v11h11V9',
+  hand: 'M12 3v18M3 12h18M9.5 5.5L12 3l2.5 2.5M9.5 18.5L12 21l2.5-2.5M5.5 9.5L3 12l2.5 2.5M18.5 9.5L21 12l-2.5 2.5',
+  chev: 'M8 10l4 4 4-4',
+  plus: 'M12 5v14M5 12h14',
   github: 'M9 19c-4 1.5-4-2-6-2.5M15 21v-3.5c0-1 .1-1.4-.5-2 2.8-.3 5.5-1.4 5.5-6a4.6 4.6 0 00-1.3-3.2 4.3 4.3 0 00-.1-3.2s-1.1-.3-3.5 1.3a12 12 0 00-6.2 0C6.5 2.8 5.4 3.1 5.4 3.1a4.3 4.3 0 00-.1 3.2A4.6 4.6 0 004 9.5c0 4.6 2.7 5.7 5.5 6-.6.6-.6 1.2-.5 2V21',
   user: '<circle cx="12" cy="8" r="3.75"/><path d="M4.5 20a7.5 7.5 0 0115 0"/>',
   book: 'M4 5.5A1.5 1.5 0 015.5 4H11v15.5H5.5A1.5 1.5 0 014 18zM20 5.5A1.5 1.5 0 0018.5 4H13v15.5h5.5A1.5 1.5 0 0020 18z',
@@ -397,6 +400,26 @@ function initHome() {
   }
 
   glyphField($('#bgGlyphs'));
+
+  // экран ноутбука: арт прорисовывается слева направо, счётчик категорий бежит вместе с ним
+  const mock = $('#mock');
+  if (mock) {
+    const N = 11821, counters = [$('#mkCount'), $('#mkCount2')];
+    const run = () => {
+      mock.classList.remove('drawn'); void mock.offsetWidth; mock.classList.add('drawing');
+      const t0 = performance.now(), D = 2600;
+      const tick = now => {
+        const t = Math.min(1, (now - t0) / D), v = Math.round(N * (1 - (1 - t) ** 2));
+        counters.forEach(c => { c.textContent = num(v); });
+        if (t < 1) requestAnimationFrame(tick); else { mock.classList.remove('drawing'); mock.classList.add('drawn'); }
+      };
+      requestAnimationFrame(tick);
+      // вкладка в фоне и кадры не идут — всё равно приходим к итоговому числу
+      setTimeout(() => { counters.forEach(c => { c.textContent = num(N); }); mock.classList.remove('drawing'); mock.classList.add('drawn'); }, D + 400);
+    };
+    if (still) { counters.forEach(c => { c.textContent = num(N); }); mock.classList.add('drawn'); }
+    else { const img = $('.mk-sheet img', mock); const go = () => setTimeout(run, 900); img.complete ? go() : img.addEventListener('load', go, { once: true }); }
+  }
 
   // примеры артов в блоке сравнения: картинка ↔ сетка
   const cmpBox = $('#compare');

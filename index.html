@@ -11,10 +11,10 @@
 <meta property="og:type" content="website">
 <meta property="og:image" content="https://shttps.github.io/GridPainter/docs/ingame.webp">
 <link rel="icon" href="logo.svg" type="image/svg+xml">
-<link rel="preload" href="docs/hero.gif" as="image" fetchpriority="high">
+<link rel="preload" href="docs/hero-art.webp" as="image" fetchpriority="high">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap">
-<link rel="stylesheet" href="site.css?v=8">
+<link rel="stylesheet" href="site.css?v=9">
 <script>try { const a = localStorage.getItem('gs.accent'); if (a) document.documentElement.dataset.accent = a; } catch {}</script>
 </head>
 <body data-page="home">
@@ -68,7 +68,31 @@
     <div class="landing-device" id="scene">
       <div class="laptop">
         <div class="lt-lid">
-          <div class="lt-screen"><img src="docs/hero.gif" alt="Редактор Grid Studio: line-art Джаггернаута рисуется на холсте, потом тот же рисунок показан в экране героев Доты" width="1280" height="800" fetchpriority="high"></div>
+          <!-- экран: редактор в его нынешнем виде, собранный разметкой (чёткий на любом экране и в цветах темы) -->
+          <div class="lt-screen">
+            <div class="mock" id="mock" role="img" aria-label="Редактор Grid Studio: line-art из аниме-арта на холсте сетки героев, 11 821 категория">
+              <div class="mk-label">Холст · 1204 × 612</div>
+              <div class="mk-sheet"><img src="docs/hero-art.webp" alt="" width="1686" height="857" fetchpriority="high"><i class="mk-scan"></i></div>
+              <div class="mk-pill mk-brand"><i class="mk-logo"></i><span><b>C.C.</b><small>Grid Studio · <em>сохранено</em></small></span><i class="mk-chev" data-icon="chev"></i></div>
+              <div class="mk-pill mk-seg"><span class="on" data-icon="pencil">Редактор</span><span data-icon="eye">В игре</span></div>
+              <div class="mk-right"><span class="mk-pill mk-sq" data-icon="search"></span><span class="mk-pill mk-btn" data-icon="upload">В каталог</span><span class="mk-btn pri" data-icon="download">Экспорт</span></div>
+              <div class="mk-pill mk-layers">
+                <div class="mk-h">Категории <b id="mkCount">0</b></div>
+                <div class="mk-row on" data-icon="pencil">Рисунок 1<b id="mkCount2">0</b></div>
+                <div class="mk-row" data-icon="text">«C.C.»<b>1</b></div>
+                <p>Каждая фигура на холсте станет категорией в игре</p>
+              </div>
+              <div class="mk-pill mk-insp">
+                <div class="mk-h">Импорт · Line-art</div>
+                <div class="mk-chips"><span>2k</span><span>5k</span><span>8k</span><span class="on">12k</span></div>
+                <div class="mk-sl"><span>Сглаживание</span><i style="--v:.42"></i></div>
+                <div class="mk-sl"><span>Резкость</span><i style="--v:.3"></i></div>
+                <div class="mk-sl"><span>Тени точками</span><i style="--v:0"></i></div>
+                <div class="mk-add" data-icon="plus">Добавить на холст</div>
+              </div>
+              <div class="mk-pill mk-dock"><span class="on" data-icon="cursor"></span><span data-icon="hand"></span><b></b><span data-icon="pencil"></span><span data-icon="line"></span><span data-icon="rect"></span><span data-icon="ellipse"></span><span data-icon="triangle"></span><span data-icon="eraser"></span><b></b><span data-icon="text"></span><span data-icon="heroes"></span></div>
+            </div>
+          </div>
         </div>
         <div class="lt-base"></div>
       </div>
@@ -112,6 +136,7 @@
         <div class="cmp-picks" id="cmpPicks" role="tablist" aria-label="Примеры артов">
           <button class="on" data-src="docs/art-cc-src.webp" data-out="docs/art-cc-out.webp" title="Контуры, 12k категорий"><img src="docs/art-cc-src.webp" alt="" loading="lazy">Аниме</button>
           <button data-src="docs/art-white-src.webp" data-out="docs/art-white-out.webp" title="Контуры и тени точками, 12k категорий"><img src="docs/art-white-src.webp" alt="" loading="lazy">С тенями</button>
+          <button data-src="docs/art-cc2-src.webp" data-out="docs/hero-art.webp" title="Кадр на весь холст 1204 × 612, 12k категорий"><img src="docs/art-cc2-src.webp" alt="" loading="lazy">Весь холст</button>
           <button data-src="docs/lineart-src.webp" data-out="docs/lineart-out.webp" title="Рендер героя"><img src="docs/lineart-src.webp" alt="" loading="lazy">Герой</button>
         </div>
         <span class="cmp-line"><span class="cmp-knob" data-icon="swap"></span></span>
@@ -155,6 +180,6 @@
 <script src="auth.js?v=2"></script>
 <script src="gridrender.js?v=6"></script>
 <script src="catalog-api.js?v=8"></script>
-<script src="site.js?v=8"></script>
+<script src="site.js?v=9"></script>
 </body>
 </html>
