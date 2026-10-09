@@ -386,6 +386,7 @@ declare
   v_mime  text;
   v_size  bigint;
   v_kind  text;
+  v_max   bigint;
   v_nick  text;
   v_id    uuid;
 begin
@@ -399,8 +400,10 @@ begin
   if not exists (select 1 from storage.objects o where o.bucket_id = 'backgrounds' and o.name = p_poster and o.metadata ->> 'mimetype' in ('image/webp', 'image/jpeg')) then
     raise exception 'bad_file';
   end if;
+  -- лимит считаем заранее: CASE прямо внутри IF сбивает разбор PL/pgSQL
   v_kind := case when v_mime like 'video/%' then 'video' else 'image' end;
-  if v_size > case v_kind when 'video' then 15728640 else 5242880 end then raise exception 'too_big'; end if;
+  v_max := case when v_kind = 'video' then 15728640 else 5242880 end;
+  if v_size > v_max then raise exception 'too_big'; end if;
   if p_aspect not in ('16:9', '16:10', '21:9', '4:3', 'other') then p_aspect := 'other'; end if;
   -- не больше 10 фонов за сутки с одного аккаунта
   if (select count(*) from backgrounds where user_id = v_uid and created_at > now() - interval '1 day') >= 10 then
