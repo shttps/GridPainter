@@ -226,6 +226,18 @@ create index if not exists projects_owner_idx on public.projects (owner, updated
 alter table public.profiles enable row level security;
 alter table public.projects enable row level security;
 
+-- профиль: «о себе», ссылка на Steam; аватар — ссылка (Discord/GitHub/портрет героя) или своя картинка data:image до ~90 КБ
+alter table public.profiles add column if not exists bio   text not null default '';
+alter table public.profiles add column if not exists steam text not null default '';
+alter table public.profiles drop constraint if exists profiles_avatar;
+alter table public.profiles add constraint profiles_avatar check (avatar = ''
+  or (avatar ~ '^https://' and char_length(avatar) <= 500)
+  or (avatar ~ '^data:image/(webp|jpeg|png);base64,' and octet_length(avatar) <= 90000));
+alter table public.profiles drop constraint if exists profiles_bio;
+alter table public.profiles add constraint profiles_bio check (char_length(bio) <= 200);
+alter table public.profiles drop constraint if exists profiles_steam;
+alter table public.profiles add constraint profiles_steam check (steam = '' or (steam ~ '^https://(steamcommunity\.com|s\.team)/' and char_length(steam) <= 200));
+
 drop policy if exists "profiles are public" on public.profiles;
 create policy "profiles are public" on public.profiles for select to anon, authenticated using (true);
 drop policy if exists "own profile insert" on public.profiles;
@@ -234,7 +246,7 @@ drop policy if exists "own profile update" on public.profiles;
 create policy "own profile update" on public.profiles for update to authenticated using (id = auth.uid()) with check (id = auth.uid());
 grant select on public.profiles to anon, authenticated;
 grant insert on public.profiles to authenticated;
-grant update (nick, avatar) on public.profiles to authenticated;
+grant update (nick, avatar, bio, steam) on public.profiles to authenticated;
 
 drop policy if exists "own projects" on public.projects;
 create policy "own projects" on public.projects for all to authenticated using (owner = auth.uid()) with check (owner = auth.uid());

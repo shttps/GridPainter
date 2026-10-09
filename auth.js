@@ -28,6 +28,9 @@ window.Accounts = (() => {
     too_many_projects: 'В профиле уже 200 работ — удали старые, чтобы сохранить новую.',
     projects_size: 'Работа слишком большая для сохранения в профиль.',
     profiles_nick: 'Ник — до 32 символов.',
+    profiles_avatar: 'Картинка для аватара слишком большая — выбери другую.',
+    profiles_bio: '«О себе» — до 200 символов.',
+    profiles_steam: 'Ссылка на Steam должна начинаться с https://steamcommunity.com/',
     JWT: 'Сессия истекла — войди ещё раз.',
   };
   const nice = (msg, code) => {
@@ -96,22 +99,28 @@ window.Accounts = (() => {
   }
 
   // ---------- профиль ----------
-  const PROFILE_COLS = 'id,nick,avatar,created_at';
+  // bio и steam появляются после обновления базы (SQL из README); до этого профиль работает без них
+  let ext = load('gs.profileExt', true);
+  const pcols = () => 'id,nick,avatar,created_at' + (ext ? ',bio,steam' : '');
+  async function prest(path, opts) {
+    try { return await rest(path.replace('{cols}', pcols()), opts); }
+    catch (e) { if (ext && /bio|steam/.test(e.message)) { ext = false; save('gs.profileExt', false); return rest(path.replace('{cols}', pcols()), opts); } throw e; }
+  }
   async function loadProfile() {
     const u = session?.user; if (!u) return null;
-    let p = (await rest(`/profiles?select=${PROFILE_COLS}&id=eq.${u.id}`))[0];
+    let p = (await prest(`/profiles?select={cols}&id=eq.${u.id}`))[0];
     // профиль создаёт триггер при регистрации; если его нет (аккаунт старше таблицы) — создаём сами
-    if (!p) p = (await rest('/profiles?select=' + PROFILE_COLS, { method: 'POST', headers: { Prefer: 'return=representation' },
+    if (!p) p = (await prest('/profiles?select={cols}', { method: 'POST', headers: { Prefer: 'return=representation' },
       body: { id: u.id, nick: (u.meta.name || 'Игрок ' + u.id.replace(/-/g, '').slice(0, 4).toUpperCase()).slice(0, 32), avatar: /^https:\/\//.test(u.meta.avatar) ? u.meta.avatar.slice(0, 500) : '' } }))[0];
     profile = p; save('gs.profile', p); emit();
     return p;
   }
   async function updateProfile(fields) {
-    const p = (await rest(`/profiles?id=eq.${session.user.id}&select=${PROFILE_COLS}`, { method: 'PATCH', headers: { Prefer: 'return=representation' }, body: fields }))[0];
+    const p = (await prest(`/profiles?id=eq.${session.user.id}&select={cols}`, { method: 'PATCH', headers: { Prefer: 'return=representation' }, body: fields }))[0];
     profile = p; save('gs.profile', p); emit();
     return p;
   }
-  const getProfile = async id => (await rest(`/profiles?select=${PROFILE_COLS}&id=eq.${encodeURIComponent(id)}`))[0] || null;
+  const getProfile = async id => (await prest(`/profiles?select={cols}&id=eq.${encodeURIComponent(id)}`))[0] || null;
 
   // ---------- мои работы (приватные) ----------
   const PROJECT_COLS = 'id,title,thumb,cats,grid_id,created_at,updated_at';
@@ -152,5 +161,6 @@ window.Accounts = (() => {
     error: () => { const e = lastError; lastError = ''; return e; },
     onChange: f => { listeners.add(f); return () => listeners.delete(f); },
     ready, token, sendLink, verifyCode, oauth, signOut, loadProfile, updateProfile, getProfile, projects, userGrids,
+    ext: () => ext,
   };
 })();

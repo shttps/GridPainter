@@ -167,11 +167,30 @@ function renderBottomBars() {
       <button class="bb-link" data-info="ads">${icon('megaphone')}Реклама</button>
     </div>
     <div class="bb-right">
+      <div class="bb-themes" role="radiogroup" aria-label="Цвет сайта"><span>Цвет</span>${THEMES.map(([v, name]) => `<button data-accent-v="${v}" role="radio" title="${name}" aria-label="${name}"></button>`).join('')}</div>
       ${SITE.repo ? `<a class="bb-link" href="${esc(SITE.repo)}" target="_blank" rel="noopener">${icon('github')}GitHub${icon('ext')}</a>` : ''}
       <a class="bb-ver" href="${esc(SITE.repo || '#')}/commits/main" target="_blank" rel="noopener" title="Что нового — история изменений">v${esc(SITE.version || '1.0.0')}</a>
     </div>`;
   for (const el of $$('[data-bottom-bar]')) el.innerHTML = html;
-  document.addEventListener('click', e => { const b = e.target.closest('[data-info]'); if (b) openInfo(b.dataset.info); });
+  document.addEventListener('click', e => {
+    const b = e.target.closest('[data-info]'); if (b) openInfo(b.dataset.info);
+    const t = e.target.closest('[data-accent-v]'); if (t) setAccent(t.dataset.accentV);
+  });
+  markAccent();
+}
+// ---------- цвет сайта: четыре темы, выбор запоминается ----------
+const THEMES = [['fire', 'Огонь'], ['arcana', 'Аркана'], ['radiant', 'Рэдиант'], ['frost', 'Лёд']];
+const accent = () => document.documentElement.dataset.accent || 'fire';
+const markAccent = () => $$('[data-accent-v]').forEach(b => { const on = b.dataset.accentV === accent(); b.classList.toggle('on', on); b.setAttribute('aria-checked', on); });
+function setAccent(v) {
+  if (v === accent()) return;
+  const root = document.documentElement;
+  root.classList.add('theme-anim');
+  v === 'fire' ? delete root.dataset.accent : root.dataset.accent = v;
+  try { localStorage.setItem('gs.accent', v); } catch {}
+  markAccent();
+  dispatchEvent(new Event('accentchange'));
+  clearTimeout(setAccent.t); setAccent.t = setTimeout(() => root.classList.remove('theme-anim'), 650);
 }
 // небольшие окна: автор, поддержка, реклама
 function openSheet(html) {
@@ -377,6 +396,23 @@ function initHome() {
     }, { passive: true });
   }
 
+  glyphField($('#bgGlyphs'));
+
+  // примеры артов в блоке сравнения: картинка ↔ сетка
+  const cmpBox = $('#compare');
+  $('#cmpPicks').onclick = e => {
+    const b = e.target.closest('button'); if (!b || b.classList.contains('on')) return;
+    $$('#cmpPicks button').forEach(x => x.classList.toggle('on', x === b));
+    cmpBox.classList.add('swap');
+    setTimeout(() => {
+      const [before, after] = [$('.before', cmpBox), $('.after', cmpBox)];
+      let n = 0; const done = () => { if (++n === 2) cmpBox.classList.remove('swap'); };
+      before.onload = after.onload = done;
+      before.src = b.dataset.src; after.src = b.dataset.out;
+      if (before.complete && after.complete) cmpBox.classList.remove('swap');
+    }, 200);
+  };
+
   // лента портретов, мозаика
   const mosaic = $('#mosaic');
   mosaic.innerHTML = shuffled(heroes, 3).slice(0, 24).map((h, i) => heroImgTag(h).replace('<img', `<img style="transition-delay:${(i % 8) * 45 + Math.floor(i / 8) * 90}ms"`)).join('');
@@ -428,6 +464,60 @@ function initHome() {
     }
   }).catch(() => { box.closest('.section').hidden = true; $('#catNum').textContent = '∞'; setCatCount(0); });
   box.onclick = e => { const c = e.target.closest('.gcard[data-id]'); if (c) location.href = 'catalog.html?id=' + encodeURIComponent(c.dataset.id); };
+}
+
+// Фон главной: поле ASCII-символов. Яркость клетки — сумма нескольких бегущих волн, у курсора светлее;
+// цвет — градиент темы по диагонали. ~24 кадра в секунду, только пока первый экран виден.
+function glyphField(cv) {
+  if (!cv) return;
+  const ctx = cv.getContext('2d'), RAMP = ' .·:-=+*#%@', CW = 15, CH = 24;
+  const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  let W = 0, H = 0, cols = 0, rows = 0, mx = -1e4, my = -1e4, sx = -1e4, sy = -1e4, fill = null, raf = 0, last = 0, visible = true;
+  const paintStyle = () => {
+    const cs = getComputedStyle(document.documentElement), g = ctx.createLinearGradient(0, 0, W, H);
+    g.addColorStop(0, cs.getPropertyValue('--c1').trim()); g.addColorStop(.55, cs.getPropertyValue('--c2').trim()); g.addColorStop(1, cs.getPropertyValue('--c3').trim());
+    fill = g;
+  };
+  const resize = () => {
+    const dpr = Math.min(2, window.devicePixelRatio || 1);
+    W = cv.clientWidth; H = cv.clientHeight; cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    cols = Math.ceil(W / CW); rows = Math.ceil(H / CH);
+    paintStyle();
+    if (still) draw(0);
+  };
+  function draw(t) {
+    ctx.clearRect(0, 0, W, H);
+    ctx.font = '600 13px "JetBrains Mono", Consolas, monospace'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillStyle = fill;
+    // курсор догоняется плавно — пятно света не дёргается
+    sx += (mx - sx) * 0.12; sy += (my - sy) * 0.12;
+    const cx = cols * 0.68, cy = rows * 0.35;
+    for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
+      const x = (c + 0.5) * CW, y = (r + 0.5) * CH;
+      let v = Math.sin(c * 0.11 + t * 0.55) + Math.sin(r * 0.19 - t * 0.4) + Math.sin((c + r) * 0.07 + t * 0.3) + Math.sin(Math.hypot(c - cx, (r - cy) * 1.6) * 0.32 - t * 0.9);
+      v = (v + 4) / 8;
+      const d = Math.hypot(x - sx, y - sy), glow = d < 260 ? (1 - d / 260) ** 1.6 : 0;
+      const lvl = Math.min(1, v ** 2.4 + glow * 0.85);
+      const k = Math.round(lvl * (RAMP.length - 1));
+      if (k < 1) continue;
+      ctx.globalAlpha = Math.min(0.95, 0.1 + lvl * 0.6 + glow * 0.4);
+      ctx.fillText(RAMP[k], x, y);
+    }
+    ctx.globalAlpha = 1;
+  }
+  const loop = now => {
+    raf = requestAnimationFrame(loop);
+    if (now - last < 42) return;
+    last = now; draw(now / 1000);
+  };
+  resize();
+  addEventListener('resize', resize);
+  addEventListener('accentchange', () => { setTimeout(() => { paintStyle(); if (still) draw(0); }, 30); });
+  if (still) return;
+  addEventListener('pointermove', e => { const r = cv.getBoundingClientRect(); mx = e.clientX - r.left; my = e.clientY - r.top; if (sx < -1e3) { sx = mx; sy = my; } }, { passive: true });
+  new IntersectionObserver(es => { visible = es.some(e => e.isIntersecting); cancelAnimationFrame(raf); if (visible && !document.hidden) raf = requestAnimationFrame(loop); }).observe(cv);
+  document.addEventListener('visibilitychange', () => { cancelAnimationFrame(raf); if (visible && !document.hidden) raf = requestAnimationFrame(loop); });
 }
 
 // ---------- каталог ----------
@@ -559,70 +649,184 @@ function renderSent(box, email, next) {
   };
 }
 
-function profileHead(p, { me, count }) {
+// шапка профиля: аватар, ник, «о себе», Steam, цифры
+function profileHead(p, { me, grids = [], works = null }) {
+  const likes = grids.reduce((a, g) => a + (+g.likes || 0), 0), dls = grids.reduce((a, g) => a + (+g.downloads || 0), 0);
+  const steam = p.steam ? `<a class="pf-steam" href="${esc(p.steam)}" target="_blank" rel="noopener">${icon('ext')}Профиль Steam</a>` : '';
   return `<section class="pf-head">
-    ${avatarHTML(p.avatar, p.nick, 'pf-ava')}
+    <div class="pf-ava-wrap">${avatarHTML(p.avatar, p.nick, 'pf-ava')}${me ? `<button class="pf-ava-edit" id="pfAva" title="Сменить аватар" aria-label="Сменить аватар">${icon('image')}</button>` : ''}</div>
     <div class="pf-info">
       ${me ? `<input class="pf-nick" id="pfNick" value="${esc(p.nick)}" maxlength="32" spellcheck="false" title="Ник — его видят в каталоге">` : `<h1 class="pf-nick">${esc(p.nick || 'Игрок')}</h1>`}
-      <span class="pf-meta">${me ? `${icon('lock')}${esc(ACC.user()?.email || '')} — видишь только ты` : `${num(count)} ${plural(count, 'сетка', 'сетки', 'сеток')} в каталоге`} · с ${new Date(p.created_at).toLocaleDateString('ru', { month: 'long', year: 'numeric' })}</span>
+      ${me && ACC.ext() ? `<textarea class="pf-bio" id="pfBio" maxlength="200" rows="1" placeholder="Пара слов о себе: какие сетки делаешь, за кого играешь…">${esc(p.bio || '')}</textarea>` : p.bio ? `<p class="pf-bio">${esc(p.bio)}</p>` : ''}
+      <span class="pf-meta">${me ? `${icon('lock')}${esc(ACC.user()?.email || '')} — видишь только ты` : ''} ${p.created_at ? `с ${new Date(p.created_at).toLocaleDateString('ru', { month: 'long', year: 'numeric' })}` : ''} ${steam}</span>
     </div>
-    ${me ? `<div class="pf-actions"><a class="btn primary" href="editor.html?new">${icon('brush')}Новая сетка</a><button class="btn" id="pfOut">${icon('logout')}Выйти</button></div>` : ''}
+    <div class="pf-side">
+      <div class="pf-stats">
+        ${works ? `<div><b>${num(works.length)}</b><span>${plural(works.length, 'работа', 'работы', 'работ')}</span></div>` : ''}
+        <div><b>${num(grids.length)}</b><span>в каталоге</span></div>
+        <div><b>${num(likes)}</b><span>${plural(likes, 'лайк', 'лайка', 'лайков')}</span></div>
+        <div><b>${num(dls)}</b><span>скачиваний</span></div>
+      </div>
+      <div class="pf-actions">
+        ${me ? `<a class="btn primary sm" href="editor.html?new">${icon('brush')}Новая сетка</a>${ACC.ext() ? `<button class="btn sm" id="pfSteam">${icon('link')}Steam</button>` : ''}` : ''}
+        <button class="btn sm" id="pfShare" data-copy="${esc(new URL('profile.html?u=' + p.id, location.href).href)}">${icon('link')}Ссылка на профиль</button>
+        ${me ? `<button class="btn sm ghost" id="pfOut">${icon('logout')}Выйти</button>` : ''}
+      </div>
+    </div>
   </section>`;
 }
+
+// работа → hero_grid_config.json (как экспорт в редакторе)
+function workToConfig(w) {
+  const r6 = v => Math.round(v * 1e6) / 1e6, d = w.data || {};
+  const categories = (d.els || []).map(e => e.t === 'hero'
+    ? { category_name: e.name, x_position: r6(e.x), y_position: r6(e.y), width: r6(e.w), height: r6(e.h), hero_ids: (e.heroes || []).slice() }
+    : { category_name: e.name, x_position: r6(e.x), y_position: r6(e.y), width: 0, height: 0, hero_ids: [] });
+  return JSON.stringify({ version: 3, configs: [{ config_name: d.settings?.configName || w.title, categories }] }, null, '\t');
+}
+
+// аватар: своя картинка (квадрат 160 px, webp), портрет героя или картинка из Discord/GitHub
+function openAvatarSheet(p, onDone) {
+  const heroes = (window.HEROES || []).slice().sort((a, b) => a.n.localeCompare(b.n));
+  const prov = ACC.user()?.meta?.avatar;
+  const m = openSheet(`<div class="sh-body ava-sheet">
+    ${avatarHTML(p.avatar, p.nick, 'sh-ava')}
+    <h2>Аватар</h2>
+    <div class="sh-actions">
+      ${ACC.ext() ? `<button class="btn primary block" data-av="upload">${icon('upload')}Загрузить картинку<span class="sh-note">png, jpg, webp</span></button>` : ''}
+      ${prov ? `<button class="btn block" data-av="prov">${icon('user')}Как в Discord / GitHub</button>` : ''}
+      ${p.avatar ? `<button class="btn block ghost" data-av="clear">${icon('trash')}Убрать аватар</button>` : ''}
+    </div>
+    <div class="ava-heroes-head"><b>Или портрет героя</b><input class="input" id="avQ" placeholder="Найти героя…"></div>
+    <div class="ava-heroes" id="avHeroes"></div>
+  </div><input type="file" id="avFile" accept="image/*" hidden>`);
+  const grid = $('#avHeroes', m.root);
+  const draw = q => { grid.innerHTML = heroes.filter(h => !q || h.n.toLowerCase().includes(q)).map(h => `<button data-hero="${esc(portrait(h))}" title="${esc(h.n)}"><img src="${esc(portrait(h))}" alt="" loading="lazy"></button>`).join(''); };
+  draw('');
+  $('#avQ', m.root).oninput = e => draw(e.target.value.trim().toLowerCase());
+  const set = async avatar => {
+    try { const np = await ACC.updateProfile({ avatar }); toast('Аватар обновлён', 'ok'); m.close(); onDone(np); }
+    catch (e) { toast(e.message, 'err'); }
+  };
+  m.root.addEventListener('click', e => {
+    const h = e.target.closest('[data-hero]'); if (h) { set(h.dataset.hero); return; }
+    const a = e.target.closest('[data-av]')?.dataset.av;
+    if (a === 'upload') $('#avFile', m.root).click();
+    else if (a === 'prov') set(prov);
+    else if (a === 'clear') set('');
+  });
+  $('#avFile', m.root).onchange = async e => {
+    const f = e.target.files[0]; if (!f) return;
+    try {
+      const img = await new Promise((res, rej) => { const im = new Image(); im.onload = () => res(im); im.onerror = () => rej(new Error('Не удалось открыть картинку')); im.src = URL.createObjectURL(f); });
+      // квадрат из середины, 160 × 160
+      const S = 160, side = Math.min(img.naturalWidth, img.naturalHeight), cv = document.createElement('canvas');
+      cv.width = cv.height = S;
+      const c = cv.getContext('2d'); c.imageSmoothingQuality = 'high';
+      c.drawImage(img, (img.naturalWidth - side) / 2, (img.naturalHeight - side) / 2, side, side, 0, 0, S, S);
+      let url = cv.toDataURL('image/webp', 0.86);
+      if (!url.startsWith('data:image/webp')) url = cv.toDataURL('image/jpeg', 0.86);
+      await set(url);
+    } catch (er) { toast(er.message, 'err'); }
+  };
+}
+
 async function renderMyProfile(box) {
-  const p = ACC.profile() || await ACC.loadProfile();
-  box.innerHTML = `${profileHead(p, { me: true })}
+  let p = ACC.profile() || await ACC.loadProfile();
+  let works = [], pub = [], liked = null, tab = 'works';
+  const head = () => {
+    $('#pfHeadBox').innerHTML = profileHead(p, { me: true, grids: pub, works });
+    applyIcons($('#pfHeadBox'));
+    bindHead();
+  };
+  box.innerHTML = `<div id="pfHeadBox"></div>
     <div class="pf-tabs chips" id="pfTabs"><i class="chip-ind" id="pfInd"></i>
       <button class="chip on" data-tab="works">${icon('lock')}Мои работы <b id="pfWorksN"></b></button>
       <button class="chip" data-tab="pub">${icon('globe')}Опубликованные <b id="pfPubN"></b></button>
+      <button class="chip" data-tab="liked">${icon('heart')}Понравившиеся <b id="pfLikedN"></b></button>
     </div>
     <div class="cards" id="pfList">${skeletons(3)}</div>`;
-  applyIcons(box);
-  const nick = $('#pfNick');
-  nick.onchange = async () => {
-    const v = nick.value.trim().slice(0, 32);
-    if (!v) { nick.value = p.nick; return; }
-    try { await ACC.updateProfile({ nick: v }); toast('Ник сохранён', 'ok'); } catch (e) { toast(e.message, 'err'); nick.value = p.nick; }
-  };
-  nick.onkeydown = e => { if (e.key === 'Enter') nick.blur(); };
-  $('#pfOut').onclick = async () => { await ACC.signOut(); location.href = 'index.html'; };
+  head();
+  function bindHead() {
+    const nick = $('#pfNick');
+    nick.onchange = async () => {
+      const v = nick.value.trim().slice(0, 32);
+      if (!v) { nick.value = p.nick; return; }
+      try { p = await ACC.updateProfile({ nick: v }); toast('Ник сохранён', 'ok'); } catch (e) { toast(e.message, 'err'); nick.value = p.nick; }
+    };
+    nick.onkeydown = e => { if (e.key === 'Enter') nick.blur(); };
+    const bio = $('#pfBio');
+    if (bio) {
+      const fit = () => { bio.style.height = 'auto'; bio.style.height = bio.scrollHeight + 'px'; };
+      fit(); bio.oninput = fit;
+      bio.onchange = async () => { try { p = await ACC.updateProfile({ bio: bio.value.trim().slice(0, 200) }); toast('Сохранено', 'ok'); } catch (e) { toast(e.message, 'err'); } };
+    }
+    $('#pfAva').onclick = () => openAvatarSheet(p, np => { p = np; head(); });
+    $('#pfOut').onclick = async () => { await ACC.signOut(); location.href = 'index.html'; };
+    $('#pfShare').onclick = e => copyText(e.currentTarget.dataset.copy, 'Ссылка на профиль скопирована');
+    const st = $('#pfSteam');
+    if (st) st.onclick = async () => {
+      const v = prompt('Ссылка на профиль Steam (https://steamcommunity.com/…). Пусто — убрать.', p.steam || '');
+      if (v === null) return;
+      try { p = await ACC.updateProfile({ steam: v.trim() }); head(); toast(v.trim() ? 'Steam добавлен в профиль' : 'Ссылка убрана', 'ok'); } catch (e) { toast(e.message, 'err'); }
+    };
+  }
 
-  let works = [], pub = [], tab = 'works';
   const ind = () => { const b = $('#pfTabs .chip.on'); $('#pfInd').style.cssText = `width:${b.offsetWidth}px;transform:translateX(${b.offsetLeft}px)`; };
   const draw = () => {
-    $('#pfWorksN').textContent = works.length; $('#pfPubN').textContent = pub.length;
+    $('#pfWorksN').textContent = works.length; $('#pfPubN').textContent = pub.length; $('#pfLikedN').textContent = liked ? liked.length : API.likedIds().length;
     const list = $('#pfList');
     if (tab === 'works') list.innerHTML = works.length ? works.map(workCard).join('')
       : `<div class="cards-empty">${MARK}<b>Пока нет сохранённых работ</b><span>В редакторе открой меню у названия сетки → «Сохранить в мои работы». Работы видишь только ты.</span><a class="btn primary sm" href="editor.html">Открыть редактор</a></div>`;
-    else list.innerHTML = pub.length ? pub.map(cardHTML).join('')
+    else if (tab === 'pub') list.innerHTML = pub.length ? pub.map(cardHTML).join('')
       : `<div class="cards-empty"><b>Ничего не опубликовано</b><span>Сетки, которые ты выложишь в каталог, войдя в профиль, появятся здесь.</span></div>`;
+    else list.innerHTML = !liked ? skeletons(3) : liked.length ? liked.map(cardHTML).join('')
+      : `<div class="cards-empty"><b>Пока пусто</b><span>Ставь лайки сеткам в каталоге — они соберутся здесь.</span><a class="btn sm" href="catalog.html">В каталог</a></div>`;
     applyIcons(list);
   };
-  $('#pfTabs').onclick = e => { const b = e.target.closest('.chip'); if (!b) return; tab = b.dataset.tab; $$('#pfTabs .chip').forEach(c => c.classList.toggle('on', c === b)); ind(); draw(); };
+  $('#pfTabs').onclick = async e => {
+    const b = e.target.closest('.chip'); if (!b) return;
+    tab = b.dataset.tab; $$('#pfTabs .chip').forEach(c => c.classList.toggle('on', c === b)); ind(); draw();
+    if (tab === 'liked' && !liked) { try { liked = await API.byIds(API.likedIds()); } catch { liked = []; } if (tab === 'liked') draw(); }
+  };
   ind(); document.fonts?.ready.then(ind);
   $('#pfList').onclick = async e => {
-    const del = e.target.closest('[data-del]');
-    if (del) {
+    const act = e.target.closest('[data-wact]');
+    if (act) {
       e.preventDefault();
-      const w = works.find(x => x.id === del.dataset.del);
-      if (!confirm(`Удалить «${w?.title}» из твоих работ? Это нельзя отменить.`)) return;
-      try { await ACC.projects.remove(del.dataset.del); works = works.filter(x => x.id !== del.dataset.del); draw(); toast('Работа удалена', 'ok'); } catch (er) { toast(er.message, 'err'); }
+      const id = act.dataset.id, w = works.find(x => x.id === id); if (!w) return;
+      try {
+        if (act.dataset.wact === 'del') {
+          if (!confirm(`Удалить «${w.title}» из твоих работ? Это нельзя отменить.`)) return;
+          await ACC.projects.remove(id); works = works.filter(x => x.id !== id); draw(); head(); toast('Работа удалена', 'ok');
+        } else if (act.dataset.wact === 'ren') {
+          const t = prompt('Новое название работы', w.title); if (!t || !t.trim()) return;
+          const r = await ACC.projects.save({ id, title: t.trim().slice(0, 60) }); Object.assign(w, r); draw(); toast('Переименовано', 'ok');
+        } else if (act.dataset.wact === 'dl') {
+          const full = await ACC.projects.get(id);
+          download('hero_grid_config.json', workToConfig(full)); toast('Файл скачан — положи его в Steam\\userdata\\<ID>\\570\\remote\\cfg', 'ok');
+        }
+      } catch (er) { toast(er.message, 'err'); }
       return;
     }
     const c = e.target.closest('.gcard[data-id]');
-    if (c && tab === 'pub') openGrid(c.dataset.id, { onChange: (g, removed) => { if (removed) { pub = pub.filter(x => x.id !== g.id); draw(); } } });
+    if (c && tab !== 'works') openGrid(c.dataset.id, { onChange: (g, removed) => { if (removed) { pub = pub.filter(x => x.id !== g.id); draw(); head(); } } });
   };
   try {
     [works, pub] = await Promise.all([ACC.projects.list(), ACC.userGrids(ACC.user().id)]);
-    draw();
+    head(); draw();
   } catch (e) { $('#pfList').innerHTML = `<div class="cards-empty"><b>Не удалось загрузить работы</b><span>${esc(e.message)}</span></div>`; }
 }
 const workCard = (w, k) => `<a class="gcard wcard" href="editor.html?project=${encodeURIComponent(w.id)}" style="animation-delay:${Math.min(k, 12) * 40}ms">
   <span class="gthumb">${w.thumb ? `<img src="${esc(w.thumb)}" alt="" loading="lazy">` : ''}
-    <span class="gkind">${w.grid_id ? `${icon('globe')}В каталоге` : `${icon('lock')}Приватная`} · ${num(w.cats)} кат.</span></span>
+    <span class="gkind">${w.grid_id ? `${icon('globe')}В каталоге` : `${icon('lock')}Приватная`} · ${num(w.cats)} кат.</span>
+    <span class="w-acts">
+      <button data-wact="ren" data-id="${esc(w.id)}" title="Переименовать" aria-label="Переименовать">${icon('edit')}</button>
+      <button data-wact="dl" data-id="${esc(w.id)}" title="Скачать hero_grid_config.json" aria-label="Скачать">${icon('download')}</button>
+      <button data-wact="del" data-id="${esc(w.id)}" title="Удалить работу" aria-label="Удалить" class="danger">${icon('trash')}</button>
+    </span></span>
   <span class="gbody"><span class="gtitle">${esc(w.title)}</span>
-    <span class="gmeta"><span class="by">${icon('clock')}изменена ${ago(w.updated_at)}</span>
-      <button class="w-del" data-del="${esc(w.id)}" title="Удалить работу" aria-label="Удалить">${icon('trash')}</button></span></span>
+    <span class="gmeta"><span class="by">${icon('clock')}изменена ${ago(w.updated_at)}</span><span class="w-open">Открыть ${icon('arrow')}</span></span></span>
 </a>`;
 async function renderPublicProfile(box, id) {
   box.innerHTML = `<div class="loading">Загружаю профиль…</div>`;
@@ -630,8 +834,10 @@ async function renderPublicProfile(box, id) {
     const [p, grids] = await Promise.all([ACC.getProfile(id), ACC.userGrids(id)]);
     if (!p) throw new Error('Такого профиля нет.');
     document.title = `${p.nick} · Grid Studio`;
-    box.innerHTML = `${profileHead(p, { me: false, count: grids.length })}
+    box.innerHTML = `${profileHead(p, { me: false, grids })}
       <div class="cards" id="pfList">${grids.length ? grids.map(cardHTML).join('') : `<div class="cards-empty"><b>Сеток пока нет</b><span>Автор ещё ничего не выложил в каталог.</span></div>`}</div>`;
+    applyIcons(box);
+    $('#pfShare').onclick = e => copyText(e.currentTarget.dataset.copy, 'Ссылка на профиль скопирована');
     $('#pfList').onclick = e => { const c = e.target.closest('.gcard[data-id]'); if (c) openGrid(c.dataset.id); };
   } catch (e) { box.innerHTML = `<div class="auth-card"><h1>Профиль не найден</h1><p>${esc(e.message)}</p><a class="btn" href="catalog.html">В каталог</a></div>`; }
 }

@@ -118,6 +118,15 @@ window.CatalogAPI = (() => {
     return r.data[0];
   }
 
+  // несколько сеток по id — например, понравившиеся
+  async function byIds(ids) {
+    ids = ids.filter(id => /^[0-9a-f-]{36}$/i.test(id)).slice(0, 100);
+    if (!ids.length) return [];
+    if (!remote) return localAll().filter(g => ids.includes(g.id) && !g.hidden).map(pick);
+    const q = () => rest(`/grids?select=${cols()}&id=in.(${ids.join(',')})&order=created_at.desc`);
+    try { return (await q()).data; } catch (e) { if (!noUserCol(e)) throw e; return (await q()).data; }
+  }
+
   async function publish({ title, author, description, config, thumb }) {
     const st = window.GridRender.stats(config.categories);
     let id;
@@ -167,7 +176,7 @@ window.CatalogAPI = (() => {
   }
 
   return {
-    remote, list, get, publish, like, hit, report, remove,
+    remote, list, get, byIds, publish, like, hit, report, remove, likedIds: () => [...liked],
     isMine: (id, userId) => mine.has(id) || (!!userId && userId === window.Accounts?.user()?.id), isLiked: id => liked.has(id), isReported: id => reported.has(id), mineCount: () => mine.size,
     author: () => load('gs.author', ''), setAuthor: a => save('gs.author', a),
     KINDS: { ascii: 'ASCII', mosaic: 'Мозаика', mixed: 'Смешанная' },

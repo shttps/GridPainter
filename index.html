@@ -14,15 +14,19 @@
 <link rel="preload" href="docs/hero.gif" as="image" fetchpriority="high">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap">
-<link rel="stylesheet" href="site.css?v=7">
+<link rel="stylesheet" href="site.css?v=8">
+<script>try { const a = localStorage.getItem('gs.accent'); if (a) document.documentElement.dataset.accent = a; } catch {}</script>
 </head>
 <body data-page="home">
 
 <!-- первый экран: слева заголовок и разделы сайта, справа — редактор на наклонённом ноутбуке -->
 <section class="landing" id="hero">
+  <!-- фон: цветные сполохи темы, поле ASCII-символов, которое переливается волнами и светится у курсора, зерно, виньетка -->
   <div class="hero-bg" aria-hidden="true">
-    <div class="aurora au-red"></div><div class="aurora au-gold"></div><div class="aurora au-ember"></div>
-    <div class="bg-grid"></div>
+    <div class="aurora au-1"></div><div class="aurora au-2"></div><div class="aurora au-3"></div>
+    <canvas class="bg-glyphs" id="bgGlyphs"></canvas>
+    <div class="bg-grain"></div>
+    <div class="bg-vignette"></div>
   </div>
 
   <div class="wrap landing-grid">
@@ -39,7 +43,7 @@
           <a class="fc-more" href="catalog.html">Готовые <span data-icon="arrow"></span></a>
         </article>
         <article class="fcard" style="--d:.42s">
-          <div class="fc-media fc-lineart" aria-hidden="true"><img src="docs/lineart-out.webp" alt="" width="810" height="918"></div>
+          <div class="fc-media fc-lineart" aria-hidden="true"><img src="docs/art-cc-out.webp" alt="" width="980" height="936"><img src="docs/art-white-out.webp" alt="" width="980" height="980" loading="lazy"><img src="docs/lineart-out.webp" alt="" width="810" height="918" loading="lazy"></div>
           <b>Арт из картинки</b>
           <span>Line-art, ASCII или мозаика из героев: вставь картинку — и готово.</span>
           <a class="btn block" href="editor.html?import">Загрузить картинку</a>
@@ -103,13 +107,18 @@
   <div class="bento">
     <article class="tile t-compare" data-reveal>
       <div class="compare" id="compare" style="--pos:50%">
-        <img src="docs/lineart-src.webp" alt="Исходная картинка: Джаггернаут" width="810" height="918" loading="lazy">
-        <img class="after" src="docs/lineart-out.webp" alt="Он же в виде line-art из символов сетки" width="810" height="918" loading="lazy">
+        <img class="before" src="docs/art-cc-src.webp" alt="Исходная картинка" width="735" height="702" loading="lazy">
+        <img class="after" src="docs/art-cc-out.webp" alt="Она же в виде line-art из символов сетки" width="980" height="936" loading="lazy">
+        <div class="cmp-picks" id="cmpPicks" role="tablist" aria-label="Примеры артов">
+          <button class="on" data-src="docs/art-cc-src.webp" data-out="docs/art-cc-out.webp" title="Контуры, 12k категорий"><img src="docs/art-cc-src.webp" alt="" loading="lazy">Аниме</button>
+          <button data-src="docs/art-white-src.webp" data-out="docs/art-white-out.webp" title="Контуры и тени точками, 12k категорий"><img src="docs/art-white-src.webp" alt="" loading="lazy">С тенями</button>
+          <button data-src="docs/lineart-src.webp" data-out="docs/lineart-out.webp" title="Рендер героя"><img src="docs/lineart-src.webp" alt="" loading="lazy">Герой</button>
+        </div>
         <span class="cmp-line"><span class="cmp-knob" data-icon="swap"></span></span>
         <span class="cmp-tag l">Картинка</span><span class="cmp-tag r">Сетка</span>
         <input type="range" min="0" max="100" value="50" aria-label="Сравнить картинку и результат">
       </div>
-      <div class="tile-text"><span class="tile-ico" data-icon="image"></span><b>Картинка → line-art</b><span>Контуры через Canny, символы сами поворачиваются по линии: <code>- \ | /</code>. Тени точками, кадр на весь холст, детализация до 12 000 категорий.</span></div>
+      <div class="tile-text"><span class="tile-ico" data-icon="image"></span><b>Картинка → line-art</b><span>Контуры через Canny, символы сами поворачиваются по линии: <code>- \ | /</code>. Тени точками, кадр на весь холст, детализация до 12 000 категорий. Переключай примеры внизу картинки.</span></div>
     </article>
     <article class="tile t-mosaic" data-reveal style="--d:.08s">
       <div class="mosaic" id="mosaic" aria-hidden="true"></div>
@@ -142,10 +151,10 @@
 <div class="modal-root" id="modalRoot"></div>
 <div class="toasts" id="toasts"></div>
 <script src="heroes.js?v=6"></script>
-<script src="config.js?v=8"></script>
-<script src="auth.js?v=1"></script>
+<script src="config.js?v=9"></script>
+<script src="auth.js?v=2"></script>
 <script src="gridrender.js?v=6"></script>
-<script src="catalog-api.js?v=7"></script>
-<script src="site.js?v=7"></script>
+<script src="catalog-api.js?v=8"></script>
+<script src="site.js?v=8"></script>
 </body>
 </html>

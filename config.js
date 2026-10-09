@@ -14,7 +14,7 @@ window.GRID_CATALOG = {
 
 // Сайт: версия, автор и ссылки внизу главной. Пустая ссылка — пункт не показывается.
 window.SITE = {
-  version: '2.0.0',
+  version: '2.1.0',
   author: { nick: 'ahttps', discord: 'ahttps', github: 'shttps', avatar: 'https://avatars.githubusercontent.com/u/184304697?v=4&s=96' },
   repo: 'https://github.com/shttps/GridPainter',
   telegram: 'https://t.me/gridstudio_example',   // ПРИМЕР — замени на свой канал/чат: чат и новости

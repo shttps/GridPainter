@@ -12,7 +12,8 @@
 <link rel="icon" href="logo.svg" type="image/svg+xml">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap">
-<link rel="stylesheet" href="site.css?v=7">
+<link rel="stylesheet" href="site.css?v=8">
+<script>try { const a = localStorage.getItem('gs.accent'); if (a) document.documentElement.dataset.accent = a; } catch {}</script>
 </head>
 <body data-page="game">
 
@@ -20,7 +21,7 @@
   <header class="page-head game-head">
     <span class="kicker">Мини-игра</span>
     <h1>Угадайка</h1>
-    <p>Угадай героя по портрету из символов. С каждой ошибкой арт становится чётче, а после второй и четвёртой — открываются подсказки.</p>
+    <p>Угадай героя по портрету из символов. С каждой ошибкой арт становится чётче и открывается подсказка, а у каждой попытки видно, что совпало с загаданным: атрибут, тип атаки, роли.</p>
     <div class="chips game-modes" id="gModes">
       <i class="chip-ind" id="gModeInd"></i>
       <button class="chip on" data-mode="daily" data-icon="clock"> Герой дня</button>
@@ -33,6 +34,7 @@
       <canvas id="gArt" aria-label="Портрет героя из символов"></canvas>
       <img id="gReveal" alt="" hidden>
       <span class="g-stage" id="gStage"></span>
+      <button class="g-color" id="gColor" type="button" title="Цветной арт проще, чёрно-белый — для хардкора"><i></i>Цвет</button>
     </div>
 
     <div class="game-side">
@@ -59,12 +61,12 @@
 <div class="modal-root" id="modalRoot"></div>
 <div class="toasts" id="toasts"></div>
 <script src="heroes.js?v=6"></script>
-<script src="game-data.js?v=1"></script>
-<script src="config.js?v=8"></script>
-<script src="auth.js?v=1"></script>
+<script src="game-data.js?v=2"></script>
+<script src="config.js?v=9"></script>
+<script src="auth.js?v=2"></script>
 <script src="gridrender.js?v=6"></script>
-<script src="catalog-api.js?v=7"></script>
-<script src="site.js?v=7"></script>
-<script src="game.js?v=1"></script>
+<script src="catalog-api.js?v=8"></script>
+<script src="site.js?v=8"></script>
+<script src="game.js?v=2"></script>
 </body>
 </html>

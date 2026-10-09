@@ -1,7 +1,11 @@
-"""Генерирует game-data.js для «Угадайки»: портрет каждого героя в оттенках серого.
+"""Генерирует game-data.js для «Угадайки»: портреты героев и подсказки.
 
 Valve CDN отдаёт портреты с CORS только для dota2.com, поэтому браузер не может прочитать
 их пиксели и построить ASCII-арт сам — портреты готовим заранее этим скриптом.
+В данных на героя:
+  l — яркость 56×98, 16 оттенков (4 бита на пиксель) — по ней выбираются символы;
+  c — цвет 14×24, RGB по байту — им символы раскрашиваются;
+  m — подсказки из OpenDota: тип атаки (0 ближний, 1 дальний) и роли (битовая маска ROLES).
 
 Запуск:  pip install pillow  &&  python update_game.py
 Нужен после update_heroes.py, когда выходят новые герои.
@@ -23,8 +27,9 @@ urllib.request.install_opener(op)
 CDN = "https://cdn.cloudflare.steamstatic.com/apps/dota2/images/"
 # Пропорции картинки карточки в сетке (51×83 минус отступы 4px) — как портрет в игре
 CARD_W, CARD_H = 43, 75
-# Размер портрета в данных: 56×98, 4 бита на пиксель (16 оттенков хватает для ASCII)
-W, H = 56, 98
+W, H = 56, 98          # яркость
+CW, CH = 14, 24        # цвет
+ROLES = ["Carry", "Support", "Nuker", "Disabler", "Jungler", "Durable", "Escape", "Pusher", "Initiator"]
 
 
 def fetch(url):
@@ -45,22 +50,29 @@ def portrait(h):
         im = fetch(CDN + "heroes/" + h["s"] + "_vert.jpg")
     except Exception:  # у новых героев вертикального портрета нет — берём широкий
         im = fetch(CDN + "dota_react/heroes/" + h["s"] + ".png")
-    g = ImageOps.autocontrast(cover_crop(im).convert("L"), cutoff=1)
+    im = cover_crop(im)
+    g = ImageOps.autocontrast(im.convert("L"), cutoff=1)
     px = g.resize((W, H), Image.LANCZOS).tobytes()
-    packed = bytes((px[i] >> 4) << 4 | (px[i + 1] >> 4) for i in range(0, len(px), 2))
-    return h["id"], base64.b64encode(packed).decode("ascii")
+    lum = bytes((px[i] >> 4) << 4 | (px[i + 1] >> 4) for i in range(0, len(px), 2))
+    col = ImageOps.autocontrast(im, cutoff=1).resize((CW, CH), Image.BOX).tobytes()
+    return h["id"], {"l": base64.b64encode(lum).decode("ascii"), "c": base64.b64encode(col).decode("ascii")}
 
 
 def main():
     src = pathlib.Path(__file__).with_name("heroes.js").read_text(encoding="utf-8")
     heroes = json.loads(src[src.index("["): src.rindex("]") + 1])
+    meta = {h["id"]: h for h in json.load(urllib.request.urlopen("https://api.opendota.com/api/heroes"))}
     with cf.ThreadPoolExecutor(16) as ex:
         arts = dict(sorted(ex.map(portrait, heroes)))
+    for hid, a in arts.items():
+        m = meta.get(hid, {})
+        mask = sum(1 << i for i, r in enumerate(ROLES) if r in m.get("roles", []))
+        a["m"] = [1 if m.get("attack_type") == "Ranged" else 0, mask]
     out = pathlib.Path(__file__).with_name("game-data.js")
     out.write_text(
-        "// Сгенерировано update_game.py: портреты героев для «Угадайки», "
-        f"{W}×{H}, 16 оттенков серого (4 бита на пиксель, base64).\n"
-        "window.GAME_ARTS = " + json.dumps({"w": W, "h": H, "d": arts}, separators=(",", ":")) + ";\n",
+        "// Сгенерировано update_game.py: портреты героев для «Угадайки» — яркость 56×98 (4 бита),\n"
+        "// цвет 14×24 (RGB) и подсказки из OpenDota: [дальний бой, маска ролей].\n"
+        "window.GAME_ARTS = " + json.dumps({"w": W, "h": H, "cw": CW, "ch": CH, "roles": ROLES, "d": arts}, separators=(",", ":")) + ";\n",
         encoding="utf-8",
     )
     print(f"{len(arts)} портретов → {out} ({out.stat().st_size // 1024} КБ)")
