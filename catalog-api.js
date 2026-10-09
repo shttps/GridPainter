@@ -3,12 +3,12 @@
    Читать можно всем, а публикация, лайки, скачивания, жалобы и удаление идут через функции из supabase/schema.sql.
    У каждого браузера свой случайный ключ: им подписываются лайки и им же можно удалить свою сетку.
    Если Supabase не настроен (config.js), сетки работают локально в localStorage — «демо-режим».
-   Фоны: файлы лежат в Cloudflare R2, загружает и удаляет их воркер (workers/backgrounds.js), список — в Supabase. */
+   Фоны: файлы лежат в Supabase Storage (бакет backgrounds, у каждого автора своя папка), список — в таблице backgrounds. */
 window.CatalogAPI = (() => {
   const cfg = window.GRID_CATALOG || {};
   const remote = !!(cfg.url && cfg.key);
   const base = remote ? cfg.url.replace(/\/+$/, '') + '/rest/v1' : '';
-  const worker = String(cfg.backgrounds || '').replace(/\/+$/, '');
+  const storage = remote ? cfg.url.replace(/\/+$/, '') + '/storage/v1/object' : '';
   // config (сама сетка) в список не входит — его тянет живое превью карточки, когда та доезжает до экрана
   const BASE_COLS = 'id,title,author,description,kind,cats,heroes,likes,downloads,created_at';
   // колонки появляются по мере того, как в Supabase выполняют новые куски schema.sql; если какой-то нет — живём без неё
@@ -36,7 +36,7 @@ window.CatalogAPI = (() => {
     bad_author: 'Ник — до 32 символов.',
     bad_description: 'Описание — до 500 символов.',
     bad_config: 'Сетка пустая или повреждена.',
-    too_big: 'Файл слишком большой.',
+    too_big: 'Файл слишком большой: картинка — до 5 МБ, видео — до 15 МБ.',
     bad_thumb: 'Не удалось сохранить превью.',
     bad_file: 'Этот файл не подходит: нужны PNG, JPEG, WebP, GIF, MP4 или WebM.',
     not_signed_in: 'Войди в профиль, чтобы выкладывать фоны.',
@@ -236,10 +236,40 @@ window.CatalogAPI = (() => {
   const bgLiked = new Set(load('gs.bg.liked', []));
   const bgReported = new Set(load('gs.bg.reported', []));
   const BG_COLS = 'id,created_at,user_id,title,author,tags,nsfw,kind,aspect,width,height,duration,size,file,poster,likes,downloads';
+  // в базе — пути внутри бакета; наружу отдаём готовые публичные адреса
+  const bgUrl = path => `${storage}/public/backgrounds/${String(path).split('/').map(encodeURIComponent).join('/')}`;
+  const withUrls = b => ({ ...b, path: b.file, posterPath: b.poster, file: bgUrl(b.file), poster: bgUrl(b.poster) });
+  const EXT = { 'image/png': 'png', 'image/jpeg': 'jpg', 'image/webp': 'webp', 'image/gif': 'gif', 'video/mp4': 'mp4', 'video/webm': 'webm' };
+  // один файл в Storage; XMLHttpRequest, а не fetch — ради полоски прогресса
+  function put(path, blob, token, onProgress) {
+    return new Promise((resolve, reject) => {
+      const x = new XMLHttpRequest();
+      x.open('POST', `${storage}/backgrounds/${path}`);
+      x.setRequestHeader('apikey', cfg.key);
+      x.setRequestHeader('Authorization', 'Bearer ' + token);
+      x.setRequestHeader('Content-Type', blob.type);
+      x.setRequestHeader('Cache-Control', 'max-age=31536000');
+      if (onProgress) x.upload.onprogress = e => { if (e.lengthComputable) onProgress(e.loaded / e.total); };
+      x.onload = () => {
+        if (x.status >= 200 && x.status < 300) return resolve();
+        let d = null; try { d = JSON.parse(x.responseText); } catch {}
+        const m = String(d?.message || d?.error || '');
+        reject(new Error(/size|large/i.test(m) || x.status === 413 ? ERRORS.too_big : /mime|type/i.test(m) ? ERRORS.bad_file
+          : /bucket/i.test(m) ? 'Хранилище фонов ещё не настроено.' : m || 'Не удалось загрузить фон.'));
+      };
+      x.onerror = () => reject(new Error('Нет связи с хранилищем фонов. Проверь интернет.'));
+      x.send(blob);
+    });
+  }
+  async function unlink(paths, token) {
+    await fetch(`${storage}/backgrounds`, {
+      method: 'DELETE', headers: { apikey: cfg.key, Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' }, body: JSON.stringify({ prefixes: paths }),
+    }).catch(() => {});
+  }
   const bg = {
-    // можно ли смотреть (есть база) и выкладывать (есть воркер и аккаунты)
+    // смотреть можно, когда есть база; выкладывать — ещё и с аккаунтами
     enabled: remote,
-    canUpload: () => remote && !!worker && !!window.Accounts?.enabled,
+    canUpload: () => remote && !!window.Accounts?.enabled,
     async list({ q = '', tag = '', aspect = '', sort = 'popular', offset = 0, limit = 24, onlyMine = false } = {}) {
       if (!remote) return { items: [], total: 0 };
       q = clean(q);
@@ -258,7 +288,7 @@ window.CatalogAPI = (() => {
       p.set('offset', offset); p.set('limit', limit);
       try {
         const r = await rest('/backgrounds?' + p, { count: true });
-        return { items: r.data, total: r.total ?? r.data.length };
+        return { items: r.data.map(withUrls), total: r.total ?? r.data.length };
       } catch (e) {
         // таблицы ещё нет — фоны просто пустые, а не ошибка на всю страницу
         if (/backgrounds/.test(e.message)) return { items: [], total: 0, missing: true };
@@ -268,40 +298,36 @@ window.CatalogAPI = (() => {
     async get(id) {
       const r = await rest(`/backgrounds?select=${BG_COLS}&id=eq.${encodeURIComponent(id)}`);
       if (!r.data?.length) throw new Error('Фон не найден — возможно, его удалили.');
-      return r.data[0];
+      return withUrls(r.data[0]);
     },
-    // загрузка: файл + постер + описание; onProgress(0…1)
-    upload({ file, poster, meta }, onProgress) {
-      return new Promise(async (resolve, reject) => {
-        if (!bg.canUpload()) return reject(new Error('Загрузка фонов ещё не подключена.'));
-        const token = await window.Accounts.token();
-        if (!token) return reject(new Error(ERRORS.not_signed_in));
-        const fd = new FormData();
-        fd.append('meta', JSON.stringify(meta));
-        fd.append('poster', poster, 'poster.webp');
-        fd.append('file', file, file.name || 'background');
-        // XMLHttpRequest, а не fetch — ради полоски прогресса загрузки
-        const x = new XMLHttpRequest();
-        x.open('POST', worker + '/upload');
-        x.setRequestHeader('Authorization', 'Bearer ' + token);
-        x.upload.onprogress = e => { if (e.lengthComputable && onProgress) onProgress(e.loaded / e.total); };
-        x.onload = () => {
-          let d = null; try { d = JSON.parse(x.responseText); } catch {}
-          if (x.status >= 200 && x.status < 300 && d?.id) resolve(d.id);
-          else reject(new Error(niceError(d?.error && ERRORS[d.error] ? d.error : d?.message || 'Не удалось загрузить фон.')));
-        };
-        x.onerror = () => reject(new Error('Нет связи с хранилищем фонов. Проверь интернет.'));
-        x.send(fd);
-      });
+    // скачать с понятным именем файла: Storage сам ставит Content-Disposition
+    downloadUrl: (b, name) => b.file + '?download=' + encodeURIComponent(name),
+    // загрузка: файл и постер в свою папку бакета, потом запись в базе; onProgress(0…1)
+    async upload({ file, poster, meta }, onProgress) {
+      if (!bg.canUpload()) throw new Error('Загрузка фонов ещё не подключена.');
+      const token = await window.Accounts.token(), uid = window.Accounts.user()?.id;
+      if (!token || !uid) throw new Error(ERRORS.not_signed_in);
+      const ext = EXT[file.type]; if (!ext) throw new Error(ERRORS.bad_file);
+      const id = uuid(), path = `${uid}/${id}.${ext}`, posterPath = `${uid}/${id}.poster.${poster.type === 'image/webp' ? 'webp' : 'jpg'}`;
+      await put(posterPath, poster, token);
+      try {
+        await put(path, file, token, onProgress);
+        return await rpc('publish_background', {
+          p_title: meta.title, p_tags: meta.tags, p_nsfw: !!meta.nsfw, p_aspect: meta.aspect,
+          p_width: meta.width | 0, p_height: meta.height | 0, p_duration: +meta.duration || 0, p_file: path, p_poster: posterPath,
+        });
+      } catch (e) {
+        // не опубликовалось — загруженное не нужно
+        await unlink([path, posterPath], token);
+        throw e;
+      }
     },
     async remove(id) {
       const token = await window.Accounts?.token();
       if (!token) throw new Error(ERRORS.not_signed_in);
-      let res;
-      try { res = await fetch(worker + '/bg/' + id, { method: 'DELETE', headers: { Authorization: 'Bearer ' + token } }); }
-      catch { throw new Error('Нет связи с хранилищем фонов.'); }
-      const d = await res.json().catch(() => null);
-      if (!res.ok) throw new Error(niceError(d?.error || d?.message || 'Не удалось удалить фон.'));
+      const r = await rpc('delete_background', { p_id: id });
+      if (!r) throw new Error(ERRORS.not_yours);
+      await unlink([r.file, r.poster], token);
     },
     async like(id) {
       const r = await rpc('bg_like', { p_id: id, p_key: browserKey });

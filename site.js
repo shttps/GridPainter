@@ -760,7 +760,7 @@ function initWorkshop() {
 const secs = s => s ? `${(Math.round(s * 10) / 10).toLocaleString('ru')} с` : '';
 const mb = n => `${(n / 1048576).toLocaleString('ru', { maximumFractionDigits: 1 })} МБ`;
 const bgName = b => `${String(b.title || 'background').replace(/[\\/:*?"<>|]+/g, ' ').trim().slice(0, 50) || 'background'}.${String(b.file).split('.').pop()}`;
-const bgDlUrl = b => b.file + '?dl=' + encodeURIComponent(bgName(b));
+const bgDlUrl = b => API.bg.downloadUrl(b, bgName(b));
 function bgCardHTML(b, k = 0) {
   const hide = b.nsfw && !API.adult(), gif = /\.gif$/i.test(b.file);
   return `<article class="bcard${hide ? ' hide18' : ''}" data-bg="${esc(b.id)}" style="animation-delay:${Math.min(k, 12) * 40}ms">
@@ -902,7 +902,7 @@ function openBgUpload(onDone) {
   const m = openSheet(`<div class="sh-body up-body">
     <h2>Выложить фон</h2>
     <label class="drop" id="upDrop"><input type="file" id="upFile" accept="image/png,image/jpeg,image/webp,image/gif,video/mp4,video/webm" hidden>
-      <span class="drop-empty">${icon('upload')}<b>Перетащи картинку, GIF или видео</b><span>или нажми, чтобы выбрать · картинки до 10 МБ, видео до 30 МБ</span></span>
+      <span class="drop-empty">${icon('upload')}<b>Перетащи картинку, GIF или видео</b><span>или нажми, чтобы выбрать · картинки и GIF до 5 МБ, видео до 15 МБ</span></span>
       <img class="drop-prev" id="upPrev" alt="" hidden><span class="drop-facts" id="upFacts" hidden></span></label>
     <label class="field"><span>Название</span><input class="input" id="upTitle" maxlength="60" placeholder="Например, «Закат над Рошаном»"></label>
     <div class="field"><span>Теги · до 5</span><div class="tchips" id="upTags">${API.TAGS.bg.map(t => `<button type="button" class="tchip" data-v="${esc(t)}">${esc(t)}</button>`).join('')}</div></div>
@@ -916,7 +916,7 @@ function openBgUpload(onDone) {
     if (!f) return;
     const isVideo = /^video\/(mp4|webm)$/.test(f.type), isImage = /^image\/(png|jpeg|webp|gif)$/.test(f.type);
     if (!isVideo && !isImage) { toast('Подходят PNG, JPEG, WebP, GIF, MP4 и WebM', 'err'); return; }
-    if (f.size > (isVideo ? 30 : 10) * 1048576) { toast(isVideo ? 'Видео — до 30 МБ. Сожми его или укороти.' : 'Картинка — до 10 МБ.', 'err'); return; }
+    if (f.size > (isVideo ? 15 : 5) * 1048576) { toast(isVideo ? 'Видео — до 15 МБ. Сожми его или укороти.' : 'Картинка — до 5 МБ.', 'err'); return; }
     go.disabled = true; drop.classList.add('busy');
     try {
       info = await bgProbe(f); file = f;

@@ -10,9 +10,6 @@ window.GRID_CATALOG = {
   // Вход через Discord / GitHub — только если провайдер включён в Supabase → Authentication → Providers.
   // Вход по ссылке на почту работает всегда.
   providers: { discord: false, github: false },
-  // Фоны Мастерской: адрес воркера Cloudflare с хранилищем R2 (README, раздел «Фоны: Cloudflare R2»),
-  // например 'https://gridstudio-bg.<аккаунт>.workers.dev'. Пусто — фоны можно смотреть, но не выкладывать.
-  backgrounds: '',
 };
 
 // Сайт: версия, автор и ссылки внизу главной. Пустая ссылка — пункт не показывается.

@@ -301,11 +301,27 @@ revoke all on function public._new_profile(), public._projects_touch() from publ
 
 -- =====================================================================
 -- Мастерская: фоны главного меню Dota 2.
--- Файлы (картинка/видео и постер) лежат в Cloudflare R2; загружает и удаляет их воркер
--- (workers/backgrounds.js) — он же проверяет вход и вызывает publish_background / delete_background
--- с secret-ключом. Из браузера эти две функции недоступны: только через воркер.
+-- Файлы лежат в Supabase Storage, в публичном бакете backgrounds: каждый пишет только в свою папку <id аккаунта>/.
+-- Публикация (publish_background) проверяет, что файл действительно загружен в эту папку,
+-- и берёт его тип и размер из Storage, а не со слов браузера: картинка/GIF до 5 МБ, видео (MP4/WebM) до 15 МБ.
 -- Лайки, скачивания и жалобы — как у сеток, по ключу браузера.
 -- =====================================================================
+
+-- бакет: публичное чтение, лимит размера и типы файлов проверяет сам Storage
+insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+values ('backgrounds', 'backgrounds', true, 15728640,
+        array['image/png', 'image/jpeg', 'image/webp', 'image/gif', 'video/mp4', 'video/webm'])
+on conflict (id) do update set public = excluded.public, file_size_limit = excluded.file_size_limit, allowed_mime_types = excluded.allowed_mime_types;
+
+drop policy if exists "backgrounds: upload to own folder" on storage.objects;
+create policy "backgrounds: upload to own folder" on storage.objects for insert to authenticated
+  with check (bucket_id = 'backgrounds' and (storage.foldername(name))[1] = auth.uid()::text);
+drop policy if exists "backgrounds: see own files" on storage.objects;
+create policy "backgrounds: see own files" on storage.objects for select to authenticated
+  using (bucket_id = 'backgrounds' and (storage.foldername(name))[1] = auth.uid()::text);
+drop policy if exists "backgrounds: delete own files" on storage.objects;
+create policy "backgrounds: delete own files" on storage.objects for delete to authenticated
+  using (bucket_id = 'backgrounds' and (storage.foldername(name))[1] = auth.uid()::text);
 
 create table if not exists public.backgrounds (
   id         uuid primary key default gen_random_uuid(),
@@ -321,8 +337,8 @@ create table if not exists public.backgrounds (
   height     int  not null default 0,
   duration   real not null default 0,           -- секунды, у картинок 0
   size       int  not null default 0,           -- байты файла
-  file       text not null,                     -- https://<воркер>/f/bg/<uuid>.<ext>
-  poster     text not null,                     -- https://<воркер>/f/bg/<uuid>.poster.webp
+  file       text not null,                     -- путь в бакете: <id аккаунта>/<uuid>.<ext>
+  poster     text not null,                     -- <id аккаунта>/<uuid>.poster.webp
   likes      int  not null default 0,
   downloads  int  not null default 0,
   reports    int  not null default 0,
@@ -353,42 +369,59 @@ grant select on public.backgrounds to anon, authenticated;
 revoke insert, update, delete on public.backgrounds from anon, authenticated;
 revoke all on public.background_likes, public.background_reports from anon, authenticated;
 
--- публикация — вызывает только воркер (service_role) после загрузки файлов; p_user — проверенный им id
+-- первые версии этих функций (под воркер Cloudflare) больше не нужны
+drop function if exists public.publish_background(uuid, text, text[], boolean, text, text, int, int, real, int, text, text);
+drop function if exists public.delete_background(uuid, uuid);
+
+-- публикация: файл и постер уже загружены в свою папку бакета
 create or replace function public.publish_background(
-  p_user uuid, p_title text, p_tags text[], p_nsfw boolean, p_kind text, p_aspect text,
-  p_width int, p_height int, p_duration real, p_size int, p_file text, p_poster text
+  p_title text, p_tags text[], p_nsfw boolean, p_aspect text,
+  p_width int, p_height int, p_duration real, p_file text, p_poster text
 ) returns uuid
 language plpgsql security definer set search_path = public as $$
 declare
+  v_uid   uuid := auth.uid();
   v_title text := btrim(coalesce(p_title, ''));
+  v_dir   text;
+  v_mime  text;
+  v_size  bigint;
+  v_kind  text;
   v_nick  text;
   v_id    uuid;
 begin
-  if p_user is null then raise exception 'not_signed_in'; end if;
+  if v_uid is null then raise exception 'not_signed_in'; end if;
+  v_dir := v_uid::text || '/';
   if char_length(v_title) not between 1 and 60 then raise exception 'bad_title'; end if;
-  if p_kind not in ('image', 'video') then raise exception 'bad_file'; end if;
+  if left(coalesce(p_file, ''), char_length(v_dir)) <> v_dir or left(coalesce(p_poster, ''), char_length(v_dir)) <> v_dir then raise exception 'bad_file'; end if;
+  select o.metadata ->> 'mimetype', (o.metadata ->> 'size')::bigint into v_mime, v_size
+    from storage.objects o where o.bucket_id = 'backgrounds' and o.name = p_file;
+  if v_mime is null then raise exception 'bad_file'; end if;
+  if not exists (select 1 from storage.objects o where o.bucket_id = 'backgrounds' and o.name = p_poster and o.metadata ->> 'mimetype' in ('image/webp', 'image/jpeg')) then
+    raise exception 'bad_file';
+  end if;
+  v_kind := case when v_mime like 'video/%' then 'video' else 'image' end;
+  if v_size > case v_kind when 'video' then 15728640 else 5242880 end then raise exception 'too_big'; end if;
   if p_aspect not in ('16:9', '16:10', '21:9', '4:3', 'other') then p_aspect := 'other'; end if;
-  if p_file !~ '^https://' or p_poster !~ '^https://' then raise exception 'bad_file'; end if;
   -- не больше 10 фонов за сутки с одного аккаунта
-  if (select count(*) from backgrounds where user_id = p_user and created_at > now() - interval '1 day') >= 10 then
+  if (select count(*) from backgrounds where user_id = v_uid and created_at > now() - interval '1 day') >= 10 then
     raise exception 'rate_limit';
   end if;
-  select nullif(nick, '') into v_nick from profiles where id = p_user;
+  select nullif(nick, '') into v_nick from profiles where id = v_uid;
   insert into backgrounds (user_id, title, author, tags, nsfw, kind, aspect, width, height, duration, size, file, poster)
-  values (p_user, v_title, coalesce(v_nick, 'Игрок'),
+  values (v_uid, v_title, coalesce(v_nick, 'Игрок'),
           public._clean_tags(p_tags, array['Аниме', 'Dota 2', 'Игры', 'Милота', 'Мемы', 'Dead inside', 'Природа', 'Космос', 'Абстракция']),
-          coalesce(p_nsfw, false), p_kind, p_aspect, greatest(coalesce(p_width, 0), 0), greatest(coalesce(p_height, 0), 0),
-          greatest(coalesce(p_duration, 0), 0), greatest(coalesce(p_size, 0), 0), p_file, p_poster)
+          coalesce(p_nsfw, false), v_kind, p_aspect, greatest(coalesce(p_width, 0), 0), greatest(coalesce(p_height, 0), 0),
+          greatest(coalesce(p_duration, 0), 0), v_size, p_file, p_poster)
   returning id into v_id;
   return v_id;
 end $$;
 
--- удаление своего фона — тоже через воркер: он получает адреса файлов и стирает их из R2
-create or replace function public.delete_background(p_id uuid, p_user uuid) returns json
+-- удаление своего фона: запись уходит сразу, файлы браузер стирает из своей папки по возвращённым путям
+create or replace function public.delete_background(p_id uuid) returns json
 language plpgsql security definer set search_path = public as $$
 declare v_file text; v_poster text;
 begin
-  delete from backgrounds where id = p_id and user_id = p_user returning file, poster into v_file, v_poster;
+  delete from backgrounds where id = p_id and user_id = auth.uid() returning file, poster into v_file, v_poster;
   if not found then return null; end if;
   return json_build_object('file', v_file, 'poster', v_poster);
 end $$;
@@ -421,9 +454,9 @@ begin
   end if;
 end $$;
 
-revoke all on function public.publish_background(uuid, text, text[], boolean, text, text, int, int, real, int, text, text),
-  public.delete_background(uuid, uuid), public.bg_like(uuid, uuid), public.bg_hit(uuid), public.bg_report(uuid, uuid),
+revoke all on function public.publish_background(text, text[], boolean, text, int, int, real, text, text),
+  public.delete_background(uuid), public.bg_like(uuid, uuid), public.bg_hit(uuid), public.bg_report(uuid, uuid),
   public._clean_tags(text[], text[]) from public, anon, authenticated;
-grant execute on function public.publish_background(uuid, text, text[], boolean, text, text, int, int, real, int, text, text),
-  public.delete_background(uuid, uuid) to service_role;
+grant execute on function public.publish_background(text, text[], boolean, text, int, int, real, text, text),
+  public.delete_background(uuid) to authenticated;
 grant execute on function public.bg_like(uuid, uuid), public.bg_hit(uuid), public.bg_report(uuid, uuid) to anon, authenticated;
