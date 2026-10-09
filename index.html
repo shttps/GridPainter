@@ -4,18 +4,17 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Grid Studio — оформи Dota 2 под себя</title>
-<meta name="description" content="Grid Studio — сетки героев Dota 2, арты из картинок и Брайль для профиля Steam. Бесплатно, прямо в браузере. Каталог сеток от игроков, гайды и «Угадайка» героя дня.">
+<meta name="description" content="Grid Studio — сетки героев Dota 2, арты из картинок и Брайль для профиля Steam. Бесплатно, прямо в браузере. Мастерская сеток и фонов от игроков, гайды и «Угадайка» героя дня.">
 <meta name="theme-color" content="#0e0a09">
 <meta property="og:title" content="Grid Studio — оформи Dota 2 под себя">
-<meta property="og:description" content="Сетки героев, line-art из картинок, каталог от игроков, гайды и «Угадайка» героя дня.">
+<meta property="og:description" content="Сетки героев, line-art из картинок, Мастерская сеток и фонов, гайды и «Угадайка» героя дня.">
 <meta property="og:type" content="website">
 <meta property="og:image" content="https://shttps.github.io/GridPainter/docs/ingame.webp">
 <link rel="icon" href="logo.svg" type="image/svg+xml">
 <link rel="preload" href="docs/hero-art.webp" as="image" fetchpriority="high">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap">
-<link rel="stylesheet" href="site.css?v=9">
-<script>try { const a = localStorage.getItem('gs.accent'); if (a) document.documentElement.dataset.accent = a; } catch {}</script>
+<link rel="stylesheet" href="site.css?v=25">
 </head>
 <body data-page="home">
 
@@ -40,7 +39,7 @@
           <b>Сетка героев</b>
           <span>Герои, рисунки и ASCII-арты из символов — прямо в экран выбора.</span>
           <a class="btn primary block" href="editor.html">Создать сетку</a>
-          <a class="fc-more" href="catalog.html">Готовые <span data-icon="arrow"></span></a>
+          <a class="fc-more" href="workshop.html">Готовые в Мастерской <span data-icon="arrow"></span></a>
         </article>
         <article class="fcard" style="--d:.42s">
           <div class="fc-media fc-lineart" aria-hidden="true"><img src="docs/art-cc-out.webp" alt="" width="980" height="936"><img src="docs/art-white-out.webp" alt="" width="980" height="980" loading="lazy"><img src="docs/lineart-out.webp" alt="" width="810" height="918" loading="lazy"></div>
@@ -58,11 +57,19 @@
         </article>
       </div>
 
-      <a class="game-card" href="game.html" id="gameCard">
-        <span class="gc-art" aria-hidden="true"><i>.:+</i><i>=#@</i><i>-*%</i></span>
-        <span class="gc-text"><b id="gameTitle">Угадайка</b><small id="gameSub">Угадай героя дня по портрету из символов</small></span>
-        <span class="gc-go" data-icon="arrow"></span>
-      </a>
+      <!-- вторая строка панелей: новое — фоны главного меню — и «Угадайка» дня -->
+      <div class="frow">
+        <a class="fwide" href="workshop.html?backgrounds" style="--d:.56s">
+          <span class="wc-art wc-bg" aria-hidden="true"><i class="wc-sky"></i><i class="wc-hud"></i><i class="wc-hud b"></i></span>
+          <span class="wc-text"><b>Фоны меню <em>новое</em></b><small>Видео и картинки на главный экран Доты</small></span>
+          <span class="wc-go" data-icon="arrow"></span>
+        </a>
+        <a class="fwide" href="game.html" id="gameCard" style="--d:.62s">
+          <span class="wc-art gc-art" aria-hidden="true"><i>.:+</i><i>=#@</i><i>-*%</i></span>
+          <span class="wc-text"><b id="gameTitle">Угадайка</b><small id="gameSub">Герой дня по портрету из символов</small></span>
+          <span class="wc-go" data-icon="arrow"></span>
+        </a>
+      </div>
     </div>
 
     <div class="landing-device" id="scene">
@@ -75,7 +82,7 @@
               <div class="mk-sheet"><img src="docs/hero-art.webp" alt="" width="1686" height="857" fetchpriority="high"><i class="mk-scan"></i></div>
               <div class="mk-pill mk-brand"><i class="mk-logo"></i><span><b>C.C.</b><small>Grid Studio · <em>сохранено</em></small></span><i class="mk-chev" data-icon="chev"></i></div>
               <div class="mk-pill mk-seg"><span class="on" data-icon="pencil">Редактор</span><span data-icon="eye">В игре</span></div>
-              <div class="mk-right"><span class="mk-pill mk-sq" data-icon="search"></span><span class="mk-pill mk-btn" data-icon="upload">В каталог</span><span class="mk-btn pri" data-icon="download">Экспорт</span></div>
+              <div class="mk-right"><span class="mk-pill mk-sq" data-icon="search"></span><span class="mk-pill mk-btn" data-icon="upload">В Мастерскую</span><span class="mk-btn pri" data-icon="download">Экспорт</span></div>
               <div class="mk-pill mk-layers">
                 <div class="mk-h">Категории <b id="mkCount">0</b></div>
                 <div class="mk-row on" data-icon="pencil">Рисунок 1<b id="mkCount2">0</b></div>
@@ -96,7 +103,7 @@
         </div>
         <div class="lt-base"></div>
       </div>
-      <a class="random-grid" id="randomGrid" href="catalog.html" hidden></a>
+      <a class="random-grid" id="randomGrid" href="workshop.html" hidden></a>
     </div>
   </div>
 
@@ -106,10 +113,10 @@
 <!-- сетки игроков — живой контент сайта -->
 <section class="section wrap" id="community">
   <div class="section-head" data-reveal>
-    <div><span class="kicker">Каталог</span><h2>Свежие сетки игроков</h2><p>Открой любую в редакторе, доработай под себя — или выложи свою.</p></div>
+    <div><span class="kicker">Мастерская</span><h2>Свежие сетки игроков</h2><p>Открой любую в редакторе, доработай под себя — или выложи свою.</p></div>
     <div class="head-actions">
       <a class="btn sm" href="editor.html?publish"><span data-icon="upload"></span>Выложить свою</a>
-      <a class="btn sm" href="catalog.html">Весь каталог <span data-icon="arrow"></span></a>
+      <a class="btn sm" href="workshop.html">Вся Мастерская <span data-icon="arrow"></span></a>
     </div>
   </div>
   <div class="cards" id="latest"></div>
@@ -161,9 +168,9 @@
       <div class="tile-text"><span class="tile-ico" data-icon="brush"></span><b>Рисуй сам</b><span>Карандаш, фигуры, текст, группы, поворот и отражение.</span></div>
     </article>
     <article class="tile t-catalog" data-reveal style="--d:.16s">
-      <div class="big-num"><b id="catNum">—</b><span>сеток в каталоге</span></div>
-      <div class="tile-text"><span class="tile-ico" data-icon="user"></span><b>Профиль и «Мои работы»</b><span>Держи работы приватно и возвращайся к ним с любого устройства — или выкладывай в каталог.</span></div>
-      <a class="tile-link" href="catalog.html" aria-label="Открыть каталог"></a>
+      <div class="big-num"><b id="catNum">—</b><span>сеток в Мастерской</span></div>
+      <div class="tile-text"><span class="tile-ico" data-icon="user"></span><b>Профиль и «Мои работы»</b><span>Держи работы приватно и возвращайся к ним с любого устройства — или выкладывай в Мастерскую.</span></div>
+      <a class="tile-link" href="workshop.html" aria-label="Открыть Мастерскую"></a>
     </article>
   </div>
 </section>
@@ -175,11 +182,11 @@
 
 <div class="modal-root" id="modalRoot"></div>
 <div class="toasts" id="toasts"></div>
-<script src="heroes.js?v=6"></script>
-<script src="config.js?v=9"></script>
-<script src="auth.js?v=2"></script>
-<script src="gridrender.js?v=6"></script>
-<script src="catalog-api.js?v=8"></script>
-<script src="site.js?v=9"></script>
+<script src="heroes.js?v=25"></script>
+<script src="config.js?v=25"></script>
+<script src="auth.js?v=25"></script>
+<script src="gridrender.js?v=25"></script>
+<script src="catalog-api.js?v=25"></script>
+<script src="site.js?v=25"></script>
 </body>
 </html>

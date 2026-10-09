@@ -33,6 +33,10 @@ create index if not exists grids_dl_idx   on public.grids (downloads desc, creat
 -- аккаунт автора (если выкладывал, войдя в профиль); у старых и анонимных сеток — null
 alter table public.grids add column if not exists user_id uuid references auth.users(id) on delete set null;
 create index if not exists grids_user_idx on public.grids (user_id, created_at desc) where user_id is not null;
+-- Мастерская: теги (из списка ниже, до 5) и пометка 18+ — такие сетки показываются размытыми, пока не откроешь
+alter table public.grids add column if not exists tags text[] not null default '{}';
+alter table public.grids add column if not exists nsfw boolean not null default false;
+create index if not exists grids_tags_idx on public.grids using gin (tags);
 
 create table if not exists public.grid_owners (
   grid_id    uuid primary key references public.grids(id) on delete cascade,
@@ -75,9 +79,19 @@ language sql stable as $$
     (current_setting('request.headers', true)::json ->> 'x-forwarded-for'), ''), ',', 1), '')
 $$;
 
+-- теги: только из разрешённого списка, без повторов, не больше 5
+create or replace function public._clean_tags(p_tags text[], p_allowed text[]) returns text[]
+language sql immutable as $$
+  select coalesce(array_agg(t), '{}') from (
+    select distinct t from unnest(coalesce(p_tags, '{}')) t where t = any(p_allowed) limit 5) x
+$$;
+
 -- ---------- публикация ----------
+-- старая версия без тегов (до 2.2) — убираем, чтобы PostgREST не путал две функции с одним именем
+drop function if exists public.publish_grid(text, text, text, jsonb, text, uuid);
 create or replace function public.publish_grid(
-  p_title text, p_author text, p_description text, p_config jsonb, p_thumb text, p_key uuid
+  p_title text, p_author text, p_description text, p_config jsonb, p_thumb text, p_key uuid,
+  p_tags text[] default '{}', p_nsfw boolean default false
 ) returns uuid
 language plpgsql security definer set search_path = public as $$
 declare
@@ -139,8 +153,10 @@ begin
     when v_hero > 0 and v_label > 0 then case when v_hero > 3 and v_label > 3 then 'mixed' when v_hero > v_label then 'mosaic' else 'ascii' end
     when v_hero > 0 then 'mosaic' else 'ascii' end;
 
-  insert into grids (title, author, description, kind, cats, heroes, config, thumb, user_id)
-  values (v_title, v_author, v_desc, v_kind, v_n, v_ids, jsonb_build_object('config_name', v_title, 'categories', v_cats), p_thumb, auth.uid())
+  insert into grids (title, author, description, kind, cats, heroes, config, thumb, user_id, tags, nsfw)
+  values (v_title, v_author, v_desc, v_kind, v_n, v_ids, jsonb_build_object('config_name', v_title, 'categories', v_cats), p_thumb, auth.uid(),
+          public._clean_tags(p_tags, array['Аниме', 'Милота', 'Рамки', 'С упором на героя', 'Мемы', 'Dead inside', 'Надписи', 'Игры']),
+          coalesce(p_nsfw, false))
   returning id into v_id;
   insert into grid_owners (grid_id, key, ip) values (v_id, p_key, v_ip);
   return v_id;
@@ -187,9 +203,9 @@ begin
   return found;
 end $$;
 
-revoke all on function public.publish_grid(text, text, text, jsonb, text, uuid), public.grid_like(uuid, uuid),
+revoke all on function public.publish_grid(text, text, text, jsonb, text, uuid, text[], boolean), public.grid_like(uuid, uuid),
   public.grid_hit(uuid), public.grid_report(uuid, uuid), public.grid_delete(uuid, uuid), public._client_ip() from public;
-grant execute on function public.publish_grid(text, text, text, jsonb, text, uuid), public.grid_like(uuid, uuid),
+grant execute on function public.publish_grid(text, text, text, jsonb, text, uuid, text[], boolean), public.grid_like(uuid, uuid),
   public.grid_hit(uuid), public.grid_report(uuid, uuid), public.grid_delete(uuid, uuid) to anon, authenticated;
 
 -- =====================================================================
@@ -282,3 +298,132 @@ end $$;
 drop trigger if exists on_auth_user_created on auth.users;
 create trigger on_auth_user_created after insert on auth.users for each row execute function public._new_profile();
 revoke all on function public._new_profile(), public._projects_touch() from public, anon, authenticated;
+
+-- =====================================================================
+-- Мастерская: фоны главного меню Dota 2.
+-- Файлы (картинка/видео и постер) лежат в Cloudflare R2; загружает и удаляет их воркер
+-- (workers/backgrounds.js) — он же проверяет вход и вызывает publish_background / delete_background
+-- с secret-ключом. Из браузера эти две функции недоступны: только через воркер.
+-- Лайки, скачивания и жалобы — как у сеток, по ключу браузера.
+-- =====================================================================
+
+create table if not exists public.backgrounds (
+  id         uuid primary key default gen_random_uuid(),
+  created_at timestamptz not null default now(),
+  user_id    uuid not null references auth.users(id) on delete cascade,
+  title      text not null,
+  author     text not null default '',
+  tags       text[] not null default '{}',
+  nsfw       boolean not null default false,
+  kind       text not null default 'image',     -- image | video
+  aspect     text not null default '16:9',      -- 16:9 | 16:10 | 21:9 | 4:3 | other
+  width      int  not null default 0,
+  height     int  not null default 0,
+  duration   real not null default 0,           -- секунды, у картинок 0
+  size       int  not null default 0,           -- байты файла
+  file       text not null,                     -- https://<воркер>/f/bg/<uuid>.<ext>
+  poster     text not null,                     -- https://<воркер>/f/bg/<uuid>.poster.webp
+  likes      int  not null default 0,
+  downloads  int  not null default 0,
+  reports    int  not null default 0,
+  hidden     boolean not null default false
+);
+create index if not exists backgrounds_new_idx  on public.backgrounds (created_at desc) where not hidden;
+create index if not exists backgrounds_top_idx  on public.backgrounds (likes desc, created_at desc) where not hidden;
+create index if not exists backgrounds_user_idx on public.backgrounds (user_id, created_at desc);
+create index if not exists backgrounds_tags_idx on public.backgrounds using gin (tags);
+
+create table if not exists public.background_likes (
+  bg_id uuid references public.backgrounds(id) on delete cascade,
+  key   uuid not null,
+  primary key (bg_id, key)
+);
+create table if not exists public.background_reports (
+  bg_id uuid references public.backgrounds(id) on delete cascade,
+  key   uuid not null,
+  primary key (bg_id, key)
+);
+
+alter table public.backgrounds        enable row level security;
+alter table public.background_likes   enable row level security;
+alter table public.background_reports enable row level security;
+drop policy if exists "backgrounds are public" on public.backgrounds;
+create policy "backgrounds are public" on public.backgrounds for select to anon, authenticated using (not hidden);
+grant select on public.backgrounds to anon, authenticated;
+revoke insert, update, delete on public.backgrounds from anon, authenticated;
+revoke all on public.background_likes, public.background_reports from anon, authenticated;
+
+-- публикация — вызывает только воркер (service_role) после загрузки файлов; p_user — проверенный им id
+create or replace function public.publish_background(
+  p_user uuid, p_title text, p_tags text[], p_nsfw boolean, p_kind text, p_aspect text,
+  p_width int, p_height int, p_duration real, p_size int, p_file text, p_poster text
+) returns uuid
+language plpgsql security definer set search_path = public as $$
+declare
+  v_title text := btrim(coalesce(p_title, ''));
+  v_nick  text;
+  v_id    uuid;
+begin
+  if p_user is null then raise exception 'not_signed_in'; end if;
+  if char_length(v_title) not between 1 and 60 then raise exception 'bad_title'; end if;
+  if p_kind not in ('image', 'video') then raise exception 'bad_file'; end if;
+  if p_aspect not in ('16:9', '16:10', '21:9', '4:3', 'other') then p_aspect := 'other'; end if;
+  if p_file !~ '^https://' or p_poster !~ '^https://' then raise exception 'bad_file'; end if;
+  -- не больше 10 фонов за сутки с одного аккаунта
+  if (select count(*) from backgrounds where user_id = p_user and created_at > now() - interval '1 day') >= 10 then
+    raise exception 'rate_limit';
+  end if;
+  select nullif(nick, '') into v_nick from profiles where id = p_user;
+  insert into backgrounds (user_id, title, author, tags, nsfw, kind, aspect, width, height, duration, size, file, poster)
+  values (p_user, v_title, coalesce(v_nick, 'Игрок'),
+          public._clean_tags(p_tags, array['Аниме', 'Dota 2', 'Игры', 'Милота', 'Мемы', 'Dead inside', 'Природа', 'Космос', 'Абстракция']),
+          coalesce(p_nsfw, false), p_kind, p_aspect, greatest(coalesce(p_width, 0), 0), greatest(coalesce(p_height, 0), 0),
+          greatest(coalesce(p_duration, 0), 0), greatest(coalesce(p_size, 0), 0), p_file, p_poster)
+  returning id into v_id;
+  return v_id;
+end $$;
+
+-- удаление своего фона — тоже через воркер: он получает адреса файлов и стирает их из R2
+create or replace function public.delete_background(p_id uuid, p_user uuid) returns json
+language plpgsql security definer set search_path = public as $$
+declare v_file text; v_poster text;
+begin
+  delete from backgrounds where id = p_id and user_id = p_user returning file, poster into v_file, v_poster;
+  if not found then return null; end if;
+  return json_build_object('file', v_file, 'poster', v_poster);
+end $$;
+
+create or replace function public.bg_like(p_id uuid, p_key uuid) returns json
+language plpgsql security definer set search_path = public as $$
+declare v_liked boolean; v_likes int;
+begin
+  if p_key is null or not exists (select 1 from backgrounds where id = p_id and not hidden) then raise exception 'not_found'; end if;
+  delete from background_likes where bg_id = p_id and key = p_key;
+  if found then v_liked := false;
+  else insert into background_likes (bg_id, key) values (p_id, p_key); v_liked := true;
+  end if;
+  update backgrounds set likes = (select count(*) from background_likes where bg_id = p_id) where id = p_id returning likes into v_likes;
+  return json_build_object('likes', v_likes, 'liked', v_liked);
+end $$;
+
+create or replace function public.bg_hit(p_id uuid) returns void
+language sql security definer set search_path = public as $$
+  update backgrounds set downloads = downloads + 1 where id = p_id and not hidden;
+$$;
+
+create or replace function public.bg_report(p_id uuid, p_key uuid) returns void
+language plpgsql security definer set search_path = public as $$
+begin
+  if p_key is null then return; end if;
+  insert into background_reports (bg_id, key) values (p_id, p_key) on conflict do nothing;
+  if found then
+    update backgrounds set reports = reports + 1, hidden = hidden or reports + 1 >= 5 where id = p_id;
+  end if;
+end $$;
+
+revoke all on function public.publish_background(uuid, text, text[], boolean, text, text, int, int, real, int, text, text),
+  public.delete_background(uuid, uuid), public.bg_like(uuid, uuid), public.bg_hit(uuid), public.bg_report(uuid, uuid),
+  public._clean_tags(text[], text[]) from public, anon, authenticated;
+grant execute on function public.publish_background(uuid, text, text[], boolean, text, text, int, int, real, int, text, text),
+  public.delete_background(uuid, uuid) to service_role;
+grant execute on function public.bg_like(uuid, uuid), public.bg_hit(uuid), public.bg_report(uuid, uuid) to anon, authenticated;

@@ -129,7 +129,7 @@
           <button class="wl-card hot" data-w="image"><span class="wl-ico" data-icon="image"></span><b>Картинка → арт</b><span>Line-art, ASCII или мозаика из героев. Самый быстрый путь.</span></button>
           <button class="wl-card" data-w="draw"><span class="wl-ico" data-icon="pencil"></span><b>Нарисовать самому</b><span>Карандаш, линии, фигуры и текст — покажем, где что.</span></button>
           <button class="wl-card" data-w="json"><span class="wl-ico" data-icon="folder"></span><b>Открыть свой JSON</b><span>hero_grid_config.json из папки Доты — чтобы не потерять старые сетки.</span></button>
-          <a class="wl-card" href="catalog.html" data-w="catalog"><span class="wl-ico" data-icon="grid"></span><b>Взять готовую</b><span>Сетки игроков из каталога — открой любую и доработай.</span></a>
+          <a class="wl-card" href="workshop.html" data-w="catalog"><span class="wl-ico" data-icon="grid"></span><b>Взять готовую</b><span>Сетки игроков из Мастерской — открой любую и доработай.</span></a>
         </div>
         ${sw('wlTour', 'Показать подсказки по интерфейсу', true)}
       </div>

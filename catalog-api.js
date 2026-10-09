@@ -1,17 +1,24 @@
 'use strict';
-/* Каталог сеток: Supabase REST (PostgREST) без SDK.
+/* Мастерская: сетки и фоны. Supabase REST (PostgREST) без SDK.
    Читать можно всем, а публикация, лайки, скачивания, жалобы и удаление идут через функции из supabase/schema.sql.
    У каждого браузера свой случайный ключ: им подписываются лайки и им же можно удалить свою сетку.
-   Если Supabase не настроен (config.js), всё то же самое работает локально в localStorage — «демо-режим». */
+   Если Supabase не настроен (config.js), сетки работают локально в localStorage — «демо-режим».
+   Фоны: файлы лежат в Cloudflare R2, загружает и удаляет их воркер (workers/backgrounds.js), список — в Supabase. */
 window.CatalogAPI = (() => {
   const cfg = window.GRID_CATALOG || {};
   const remote = !!(cfg.url && cfg.key);
   const base = remote ? cfg.url.replace(/\/+$/, '') + '/rest/v1' : '';
-  const BASE_COLS = 'id,title,author,description,thumb,kind,cats,heroes,likes,downloads,created_at';
-  // user_id (автор-аккаунт) есть в базе только после SQL из раздела «Аккаунты»; если колонки нет — живём без неё
-  let userCol = remote && !!cfg.accounts;
-  const cols = () => BASE_COLS + (userCol ? ',user_id' : '');
-  const noUserCol = e => { if (userCol && /user_id/.test(e.message)) { userCol = false; return true; } return false; };
+  const worker = String(cfg.backgrounds || '').replace(/\/+$/, '');
+  // config (сама сетка) в список не входит — его тянет живое превью карточки, когда та доезжает до экрана
+  const BASE_COLS = 'id,title,author,description,kind,cats,heroes,likes,downloads,created_at';
+  // колонки появляются по мере того, как в Supabase выполняют новые куски schema.sql; если какой-то нет — живём без неё
+  let userCol = remote && !!cfg.accounts, tagCols = remote;
+  const cols = () => BASE_COLS + (userCol ? ',user_id' : '') + (tagCols ? ',tags,nsfw' : '');
+  const missingCol = e => {
+    if (userCol && /user_id/.test(e.message)) { userCol = false; return true; }
+    if (tagCols && /tags|nsfw/.test(e.message)) { tagCols = false; return true; }
+    return false;
+  };
 
   const load = (k, d) => { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : d; } catch { return d; } };
   const save = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); return true; } catch { return false; } };
@@ -24,31 +31,38 @@ window.CatalogAPI = (() => {
   const remember = (set, key) => save(key, [...set]);
 
   const ERRORS = {
-    rate_limit: 'Слишком часто. Подожди пару минут и попробуй снова.',
+    rate_limit: 'Слишком часто. Подожди немного и попробуй снова.',
     bad_title: 'Название — от 1 до 60 символов.',
     bad_author: 'Ник — до 32 символов.',
     bad_description: 'Описание — до 500 символов.',
     bad_config: 'Сетка пустая или повреждена.',
-    too_big: 'Сетка слишком большая для каталога.',
+    too_big: 'Файл слишком большой.',
     bad_thumb: 'Не удалось сохранить превью.',
+    bad_file: 'Этот файл не подходит: нужны PNG, JPEG, WebP, GIF, MP4 или WebM.',
+    not_signed_in: 'Войди в профиль, чтобы выкладывать фоны.',
+    not_yours: 'Удалить можно только свой фон.',
   };
   function niceError(msg) {
     for (const k in ERRORS) if (String(msg).includes(k)) return ERRORS[k];
     return msg;
   }
 
-  async function rest(path, { method = 'GET', body, count = false } = {}) {
+  async function headers(json) {
     // новые ключи sb_publishable_… — не JWT, их передают только в apikey; старый anon key — ещё и в Authorization
-    const headers = { apikey: cfg.key };
+    const h = { apikey: cfg.key };
     // вошёл в аккаунт — запрос от его имени: публикация привяжется к профилю, удалить можно с любого устройства
     const userToken = window.Accounts?.enabled ? await window.Accounts.token() : null;
-    if (userToken) headers.Authorization = 'Bearer ' + userToken;
-    else if (!cfg.key.startsWith('sb_')) headers.Authorization = 'Bearer ' + cfg.key;
-    if (body !== undefined) headers['Content-Type'] = 'application/json';
-    if (count) headers.Prefer = 'count=exact';
+    if (userToken) h.Authorization = 'Bearer ' + userToken;
+    else if (!cfg.key.startsWith('sb_')) h.Authorization = 'Bearer ' + cfg.key;
+    if (json) h['Content-Type'] = 'application/json';
+    return h;
+  }
+  async function rest(path, { method = 'GET', body, count = false } = {}) {
+    const h = await headers(body !== undefined);
+    if (count) h.Prefer = 'count=exact';
     let res;
-    try { res = await fetch(base + path, { method, headers, body: body === undefined ? undefined : JSON.stringify(body) }); }
-    catch { throw new Error('Нет связи с каталогом. Проверь интернет.'); }
+    try { res = await fetch(base + path, { method, headers: h, body: body === undefined ? undefined : JSON.stringify(body) }); }
+    catch { throw new Error('Нет связи с Мастерской. Проверь интернет.'); }
     const text = await res.text();
     const data = text ? JSON.parse(text) : null;
     if (!res.ok) throw new Error(niceError(data?.message || data?.hint || res.statusText));
@@ -56,66 +70,103 @@ window.CatalogAPI = (() => {
     return { data, total: range ? +range.split('/')[1] || 0 : undefined };
   }
   const rpc = (fn, args) => rest('/rpc/' + fn, { method: 'POST', body: args }).then(r => r.data);
+  // запрос, который переживает отсутствие новых колонок: убираем их и пробуем ещё раз
+  async function tolerant(make) {
+    for (let i = 0; i < 3; i++) {
+      try { return await make(); } catch (e) { if (!missingCol(e)) throw e; }
+    }
+    return make();
+  }
 
   // ---------- демо-режим: то же самое в localStorage ----------
   const LOCAL = 'gs.catalog.local';
   const localAll = () => load(LOCAL, []);
   function localSave(list) {
-    if (!save(LOCAL, list)) throw new Error('В браузере закончилось место для демо-каталога. Удали пару своих сеток.');
+    if (!save(LOCAL, list)) throw new Error('В браузере закончилось место для демо-Мастерской. Удали пару своих сеток.');
   }
-  const pick = g => { const o = {}; for (const k of BASE_COLS.split(',')) o[k] = g[k]; return o; };
+  const pick = g => { const o = {}; for (const k of BASE_COLS.split(',').concat('tags', 'nsfw')) o[k] = g[k]; return o; };
 
   // ---------- общий интерфейс ----------
-  const clean = q => String(q || '').replace(/[,()*%\\"]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 60);
+  const clean = q => String(q || '').replace(/[,()*%\\"{}]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 60);
+  const WEEK = () => new Date(Date.now() - 7 * 864e5).toISOString();
+  const tagList = tag => `{"${String(tag).replace(/["\\]/g, '')}"}`;
 
-  async function list({ q = '', kind = 'all', sort = 'new', offset = 0, limit = 24, onlyMine = false } = {}) {
+  // sort: popular | week (популярные за 7 дней) | new | downloads; tag: один из TAGS.grid или '18+'
+  async function list({ q = '', tag = '', sort = 'new', offset = 0, limit = 24, onlyMine = false } = {}) {
     q = clean(q);
+    if (sort === 'top') sort = 'popular';
     if (!remote) {
       let all = localAll().filter(g => !g.hidden);
       if (onlyMine) all = all.filter(g => mine.has(g.id));
-      if (kind !== 'all') all = all.filter(g => g.kind === kind);
+      if (tag === '18+') all = all.filter(g => g.nsfw);
+      else if (tag) all = all.filter(g => (g.tags || []).includes(tag));
+      if (sort === 'week') all = all.filter(g => g.created_at >= WEEK());
       if (q) { const s = q.toLowerCase(); all = all.filter(g => g.title.toLowerCase().includes(s) || g.author.toLowerCase().includes(s)); }
-      const by = sort === 'top' ? 'likes' : sort === 'downloads' ? 'downloads' : null;
+      const by = sort === 'popular' || sort === 'week' ? 'likes' : sort === 'downloads' ? 'downloads' : null;
       all.sort((a, b) => (by ? b[by] - a[by] : 0) || b.created_at.localeCompare(a.created_at));
       return { items: all.slice(offset, offset + limit).map(pick), total: all.length };
     }
-    const p = new URLSearchParams({ select: cols() });
-    if (kind !== 'all') p.set('kind', 'eq.' + kind);
-    // «Мои» — выложенные из этого браузера или из моего аккаунта
-    const conds = [];
-    if (q) conds.push(`or(title.ilike.*${q}*,author.ilike.*${q}*)`);
-    if (onlyMine) {
-      const uid = cfg.accounts && window.Accounts?.user()?.id, own = [];
-      if (mine.size) own.push(`id.in.(${[...mine].join(',')})`);
-      if (uid) own.push(`user_id.eq.${uid}`);
-      if (!own.length) return { items: [], total: 0 };
-      conds.push(`or(${own.join(',')})`);
-    }
-    if (conds.length) p.set('and', `(${conds.join(',')})`);
-    p.set('order', sort === 'top' ? 'likes.desc,created_at.desc' : sort === 'downloads' ? 'downloads.desc,created_at.desc' : 'created_at.desc');
-    p.set('offset', offset); p.set('limit', limit);
-    let r;
-    try { r = await rest('/grids?' + p, { count: true }); }
-    catch (e) {
-      if (!noUserCol(e)) throw e;
-      p.set('select', cols());
-      if (p.get('and')?.includes('user_id')) p.set('and', p.get('and').replace(/,?user_id\.eq\.[\w-]+/, '').replace('or()', 'id.is.null'));
-      r = await rest('/grids?' + p, { count: true });
-    }
+    const build = () => {
+      // в базе ещё нет тегов — ни одна сетка им не соответствует
+      if (tag && !tagCols) return null;
+      const p = new URLSearchParams({ select: cols() });
+      if (tagCols && tag === '18+') p.set('nsfw', 'is.true');
+      else if (tagCols && tag) p.set('tags', 'cs.' + tagList(tag));
+      if (sort === 'week') p.set('created_at', 'gte.' + WEEK());
+      // «Мои» — выложенные из этого браузера или из моего аккаунта
+      const conds = [];
+      if (q) conds.push(`or(title.ilike.*${q}*,author.ilike.*${q}*)`);
+      if (onlyMine) {
+        const uid = userCol && window.Accounts?.user()?.id, own = [];
+        if (mine.size) own.push(`id.in.(${[...mine].join(',')})`);
+        if (uid) own.push(`user_id.eq.${uid}`);
+        if (!own.length) return null;
+        conds.push(`or(${own.join(',')})`);
+      }
+      if (conds.length) p.set('and', `(${conds.join(',')})`);
+      p.set('order', sort === 'popular' || sort === 'week' ? 'likes.desc,created_at.desc' : sort === 'downloads' ? 'downloads.desc,created_at.desc' : 'created_at.desc');
+      p.set('offset', offset); p.set('limit', limit);
+      return p;
+    };
+    const r = await tolerant(async () => { const p = build(); return p ? rest('/grids?' + p, { count: true }) : { data: [], total: 0 }; });
     return { items: r.data, total: r.total ?? r.data.length };
   }
 
+  // сетка целиком (с config); config кэшируется — карточка и окно сетки качают его один раз
+  const configs = new Map();
   async function get(id) {
     if (!remote) {
       const g = localAll().find(x => x.id === id && !x.hidden);
       if (!g) throw new Error('Сетка не найдена — возможно, её удалили.');
       return g;
     }
-    const q = () => rest(`/grids?select=${cols()},config&id=eq.${encodeURIComponent(id)}`);
-    let r;
-    try { r = await q(); } catch (e) { if (!noUserCol(e)) throw e; r = await q(); }
+    const r = await tolerant(() => rest(`/grids?select=${cols()},config&id=eq.${encodeURIComponent(id)}`));
     if (!r.data?.length) throw new Error('Сетка не найдена — возможно, её удалили.');
+    configs.set(id, Promise.resolve(r.data[0].config));
     return r.data[0];
+  }
+  // только сетка — для живого превью карточки; не больше 4 загрузок одновременно
+  let active = 0;
+  const queue = [];
+  const slot = () => new Promise(res => { if (active < 4) { active++; res(); } else queue.push(res); });
+  const release = () => { const next = queue.shift(); if (next) next(); else active--; };
+  function config(id) {
+    if (!configs.has(id)) {
+      const p = (async () => {
+        if (!remote) return (localAll().find(x => x.id === id) || {}).config || { categories: [] };
+        await slot();
+        try { return (await rest(`/grids?select=config&id=eq.${encodeURIComponent(id)}`)).data?.[0]?.config || { categories: [] }; }
+        finally { release(); }
+      })();
+      p.catch(() => configs.delete(id));
+      configs.set(id, p);
+    }
+    return configs.get(id);
+  }
+  // сохранённая картинка-превью — запасной вариант, если сетку скачать не вышло
+  async function thumb(id) {
+    if (!remote) return (localAll().find(x => x.id === id) || {}).thumb || '';
+    return (await rest(`/grids?select=thumb&id=eq.${encodeURIComponent(id)}`)).data?.[0]?.thumb || '';
   }
 
   // несколько сеток по id — например, понравившиеся
@@ -123,23 +174,29 @@ window.CatalogAPI = (() => {
     ids = ids.filter(id => /^[0-9a-f-]{36}$/i.test(id)).slice(0, 100);
     if (!ids.length) return [];
     if (!remote) return localAll().filter(g => ids.includes(g.id) && !g.hidden).map(pick);
-    const q = () => rest(`/grids?select=${cols()}&id=in.(${ids.join(',')})&order=created_at.desc`);
-    try { return (await q()).data; } catch (e) { if (!noUserCol(e)) throw e; return (await q()).data; }
+    return (await tolerant(() => rest(`/grids?select=${cols()}&id=in.(${ids.join(',')})&order=created_at.desc`))).data;
   }
 
-  async function publish({ title, author, description, config, thumb }) {
+  async function publish({ title, author, description, config, thumb, tags = [], nsfw = false }) {
     const st = window.GridRender.stats(config.categories);
+    tags = tags.filter(t => TAGS.grid.includes(t)).slice(0, 5);
     let id;
     if (!remote) {
       title = String(title).trim(); author = String(author || '').trim() || 'Аноним';
       if (!title || title.length > 60) throw new Error(ERRORS.bad_title);
       id = uuid();
       const list = localAll();
-      list.unshift({ id, title, author, description: String(description || '').trim(), thumb, kind: st.kind, cats: st.cats, heroes: st.ids,
+      list.unshift({ id, title, author, description: String(description || '').trim(), thumb, kind: st.kind, cats: st.cats, heroes: st.ids, tags, nsfw: !!nsfw,
         likes: 0, downloads: 0, created_at: new Date().toISOString(), config: { config_name: title, categories: config.categories } });
       localSave(list);
     } else {
-      id = await rpc('publish_grid', { p_title: title, p_author: author, p_description: description, p_config: config, p_thumb: thumb, p_key: browserKey });
+      const args = { p_title: title, p_author: author, p_description: description, p_config: config, p_thumb: thumb, p_key: browserKey };
+      try { id = await rpc('publish_grid', { ...args, p_tags: tags, p_nsfw: !!nsfw }); }
+      catch (e) {
+        // база ещё без тегов (не выполнен свежий schema.sql) — публикуем по-старому
+        if (!/p_tags|p_nsfw|publish_grid/.test(e.message)) throw e;
+        id = await rpc('publish_grid', args);
+      }
     }
     mine.add(id); remember(mine, 'gs.mine');
     return id;
@@ -175,10 +232,107 @@ window.CatalogAPI = (() => {
     mine.delete(id); remember(mine, 'gs.mine');
   }
 
+  // ---------- фоны главного меню ----------
+  const bgLiked = new Set(load('gs.bg.liked', []));
+  const bgReported = new Set(load('gs.bg.reported', []));
+  const BG_COLS = 'id,created_at,user_id,title,author,tags,nsfw,kind,aspect,width,height,duration,size,file,poster,likes,downloads';
+  const bg = {
+    // можно ли смотреть (есть база) и выкладывать (есть воркер и аккаунты)
+    enabled: remote,
+    canUpload: () => remote && !!worker && !!window.Accounts?.enabled,
+    async list({ q = '', tag = '', aspect = '', sort = 'popular', offset = 0, limit = 24, onlyMine = false } = {}) {
+      if (!remote) return { items: [], total: 0 };
+      q = clean(q);
+      const p = new URLSearchParams({ select: BG_COLS });
+      if (tag === '18+') p.set('nsfw', 'is.true');
+      else if (tag) p.set('tags', 'cs.' + tagList(tag));
+      if (aspect) p.set('aspect', 'eq.' + aspect);
+      if (sort === 'week') p.set('created_at', 'gte.' + WEEK());
+      if (q) p.set('or', `(title.ilike.*${q}*,author.ilike.*${q}*)`);
+      if (onlyMine) {
+        const uid = window.Accounts?.user()?.id;
+        if (!uid) return { items: [], total: 0 };
+        p.set('user_id', 'eq.' + uid);
+      }
+      p.set('order', sort === 'new' ? 'created_at.desc' : sort === 'downloads' ? 'downloads.desc,created_at.desc' : 'likes.desc,created_at.desc');
+      p.set('offset', offset); p.set('limit', limit);
+      try {
+        const r = await rest('/backgrounds?' + p, { count: true });
+        return { items: r.data, total: r.total ?? r.data.length };
+      } catch (e) {
+        // таблицы ещё нет — фоны просто пустые, а не ошибка на всю страницу
+        if (/backgrounds/.test(e.message)) return { items: [], total: 0, missing: true };
+        throw e;
+      }
+    },
+    async get(id) {
+      const r = await rest(`/backgrounds?select=${BG_COLS}&id=eq.${encodeURIComponent(id)}`);
+      if (!r.data?.length) throw new Error('Фон не найден — возможно, его удалили.');
+      return r.data[0];
+    },
+    // загрузка: файл + постер + описание; onProgress(0…1)
+    upload({ file, poster, meta }, onProgress) {
+      return new Promise(async (resolve, reject) => {
+        if (!bg.canUpload()) return reject(new Error('Загрузка фонов ещё не подключена.'));
+        const token = await window.Accounts.token();
+        if (!token) return reject(new Error(ERRORS.not_signed_in));
+        const fd = new FormData();
+        fd.append('meta', JSON.stringify(meta));
+        fd.append('poster', poster, 'poster.webp');
+        fd.append('file', file, file.name || 'background');
+        // XMLHttpRequest, а не fetch — ради полоски прогресса загрузки
+        const x = new XMLHttpRequest();
+        x.open('POST', worker + '/upload');
+        x.setRequestHeader('Authorization', 'Bearer ' + token);
+        x.upload.onprogress = e => { if (e.lengthComputable && onProgress) onProgress(e.loaded / e.total); };
+        x.onload = () => {
+          let d = null; try { d = JSON.parse(x.responseText); } catch {}
+          if (x.status >= 200 && x.status < 300 && d?.id) resolve(d.id);
+          else reject(new Error(niceError(d?.error && ERRORS[d.error] ? d.error : d?.message || 'Не удалось загрузить фон.')));
+        };
+        x.onerror = () => reject(new Error('Нет связи с хранилищем фонов. Проверь интернет.'));
+        x.send(fd);
+      });
+    },
+    async remove(id) {
+      const token = await window.Accounts?.token();
+      if (!token) throw new Error(ERRORS.not_signed_in);
+      let res;
+      try { res = await fetch(worker + '/bg/' + id, { method: 'DELETE', headers: { Authorization: 'Bearer ' + token } }); }
+      catch { throw new Error('Нет связи с хранилищем фонов.'); }
+      const d = await res.json().catch(() => null);
+      if (!res.ok) throw new Error(niceError(d?.error || d?.message || 'Не удалось удалить фон.'));
+    },
+    async like(id) {
+      const r = await rpc('bg_like', { p_id: id, p_key: browserKey });
+      r.liked ? bgLiked.add(id) : bgLiked.delete(id); remember(bgLiked, 'gs.bg.liked');
+      return r;
+    },
+    async hit(id) { try { await rpc('bg_hit', { p_id: id }); } catch { /* счётчик */ } },
+    async report(id) {
+      if (bgReported.has(id)) return;
+      await rpc('bg_report', { p_id: id, p_key: browserKey });
+      bgReported.add(id); remember(bgReported, 'gs.bg.reported');
+    },
+    isLiked: id => bgLiked.has(id),
+    isReported: id => bgReported.has(id),
+    isMine: b => !!b.user_id && b.user_id === window.Accounts?.user()?.id,
+  };
+
+  // теги: автор выбирает до 5 при публикации; «18+» — отдельная пометка
+  const TAGS = {
+    grid: ['Аниме', 'Милота', 'Рамки', 'С упором на героя', 'Мемы', 'Dead inside', 'Надписи', 'Игры'],
+    bg: ['Аниме', 'Dota 2', 'Игры', 'Милота', 'Мемы', 'Dead inside', 'Природа', 'Космос', 'Абстракция'],
+    aspects: ['16:9', '16:10', '21:9', '4:3'],
+  };
+
   return {
-    remote, list, get, byIds, publish, like, hit, report, remove, likedIds: () => [...liked],
+    remote, list, get, config, thumb, byIds, publish, like, hit, report, remove, likedIds: () => [...liked],
     isMine: (id, userId) => mine.has(id) || (!!userId && userId === window.Accounts?.user()?.id), isLiked: id => liked.has(id), isReported: id => reported.has(id), mineCount: () => mine.size,
     author: () => load('gs.author', ''), setAuthor: a => save('gs.author', a),
     KINDS: { ascii: 'ASCII', mosaic: 'Мозаика', mixed: 'Смешанная' },
+    TAGS, bg,
+    // 18+: размытые карточки открываются по клику; «мне есть 18» запоминается
+    adult: () => load('gs.adult', false), setAdult: v => save('gs.adult', !!v),
   };
 })();

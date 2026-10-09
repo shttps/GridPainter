@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Мастерская — сетки героев Dota 2 · Grid Studio</title>
+<meta name="description" content="Мастерская Grid Studio: готовые сетки героев Dota 2 и фоны главного меню от игроков. ASCII-арт, line-art, мозаики, картинки и видео — смотри, скачивай, выкладывай свои.">
+<meta name="theme-color" content="#0f0d0c">
+<meta property="og:title" content="Мастерская · Grid Studio">
+<meta property="og:description" content="Сетки героев и фоны главного меню Dota 2 от игроков — смотри, скачивай, выкладывай свои.">
+<meta property="og:image" content="https://shttps.github.io/GridPainter/docs/ingame.webp">
+<link rel="icon" href="logo.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="site.css?v=25">
+</head>
+<body data-page="workshop">
+
+<div class="wrap">
+  <div class="ws-head">
+    <div class="ws-title">
+      <span class="ws-ico" data-icon="compass"></span>
+      <h1>Мастерская</h1>
+      <div class="seg" id="wsTabs" role="tablist" aria-label="Что смотреть"><i class="seg-ind"></i><button data-v="grids" class="on">Сетки</button><button data-v="bg">Фоны</button></div>
+    </div>
+    <div class="ws-actions">
+      <button class="btn" id="wsHow">Как установить</button>
+      <a class="btn primary" id="wsCreate" href="editor.html">Создать сетку</a>
+    </div>
+    <p id="wsLead">Найди свой вариант. Открой в редакторе и сделай по-своему.</p>
+    <div class="demo-note" id="demoNote" hidden>
+      <span>⚠</span>
+      <span>Мастерская работает в демо-режиме: база ещё не подключена, поэтому здесь видны только сетки, выложенные из этого браузера.</span>
+    </div>
+  </div>
+
+  <div class="ws-bar">
+    <div class="seg ghost" id="wsSorts" role="tablist" aria-label="Сортировка"></div>
+    <label class="search"><span data-icon="search"></span><input class="input" id="q" type="search" placeholder="Название или автор" autocomplete="off"></label>
+  </div>
+  <div class="ws-filters">
+    <div class="tchips" id="wsTags" aria-label="Теги"></div>
+    <div class="tchips ws-aspect" id="wsAspect" aria-label="Пропорции экрана" hidden></div>
+  </div>
+  <div class="ws-meta">
+    <span class="count" id="count"></span>
+    <div class="seg sm" id="wsBg" aria-label="Подложка превью"></div>
+  </div>
+
+  <div class="cards" id="cards"></div>
+  <div class="more"><button class="btn" id="more" hidden>Показать ещё</button></div>
+
+  <footer class="site-foot">
+    <div class="bottom-bar" data-bottom-bar></div>
+    <span class="foot-note">© 2026 shttps · Dota 2 — товарный знак Valve Corporation, проект с Valve не связан.</span>
+  </footer>
+</div>
+
+<div class="modal-root" id="modalRoot"></div>
+<div class="toasts" id="toasts"></div>
+<script src="heroes.js?v=25"></script>
+<script src="config.js?v=25"></script>
+<script src="auth.js?v=25"></script>
+<script src="gridrender.js?v=25"></script>
+<script src="catalog-api.js?v=25"></script>
+<script src="site.js?v=25"></script>
+</body>
+</html>

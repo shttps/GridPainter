@@ -137,8 +137,13 @@ window.Accounts = (() => {
     },
     remove: id => rest(`/projects?id=eq.${encodeURIComponent(id)}`, { method: 'DELETE' }),
   };
-  // опубликованные сетки автора (каталог виден всем)
-  const userGrids = uid => rest(`/grids?select=id,title,author,description,thumb,kind,cats,heroes,likes,downloads,created_at,user_id&user_id=eq.${encodeURIComponent(uid)}&order=created_at.desc`);
+  // опубликованные сетки автора (Мастерская видна всем); превью рисуется живьём, поэтому thumb не нужен.
+  // tags/nsfw появляются после свежего schema.sql — без них просто без тегов
+  const GRID_COLS = 'id,title,author,description,kind,cats,heroes,likes,downloads,created_at,user_id';
+  const userGrids = async uid => {
+    const q = c => rest(`/grids?select=${c}&user_id=eq.${encodeURIComponent(uid)}&order=created_at.desc`);
+    try { return await q(GRID_COLS + ',tags,nsfw'); } catch (e) { if (!/tags|nsfw/.test(e.message)) throw e; return q(GRID_COLS); }
+  };
 
   // при загрузке: подтянуть пользователя и профиль (после входа по ссылке user ещё пустой)
   let readyP = null;

@@ -1913,24 +1913,33 @@ function openExportModal() {
   };
 }
 
-// ----- каталог сеток -----
+// ----- Мастерская: публикация сетки -----
 function openPublishModal() {
   if (!st.els.length) { toast('Холст пустой — нарисуй что-нибудь или открой JSON, потом выкладывай', 'err'); return; }
   const API = CatalogAPI, cats = st.els.map(elToCategory), info = GridRender.stats(cats);
   let thumb;
   try { thumb = GridRender.thumb(cats, { font: fontFamily() }); } catch (e) { toast('Не удалось сделать превью: ' + e.message, 'err'); return; }
   const m = openModal(`
-    ${modalHead('Выложить в каталог')}
+    ${modalHead('Выложить в Мастерскую')}
     <div class="modal-body" id="pbBody">
       <div class="pub-thumb"><img src="${thumb}" alt="Превью сетки"><span>${API.KINDS[info.kind]} · ${info.cats.toLocaleString('ru')} кат.</span></div>
       <label class="field"><span>Название</span><input class="input" id="pbTitle" maxlength="60" value="${esc(S.configName)}"></label>
       <label class="field"><span>Ник автора</span><input class="input" id="pbAuthor" maxlength="32" placeholder="Аноним" value="${esc(API.author())}"></label>
       <label class="field"><span>Описание · необязательно</span><textarea class="input plain" id="pbDesc" maxlength="500" rows="3" placeholder="Что нарисовано, как лучше смотрится, пожелания"></textarea></label>
-      <div class="hint">${API.remote ? 'Сетку увидят все посетители каталога. Удалить её можно из этого же браузера.' : '<b>Демо-режим:</b> каталог ещё не подключён к базе, поэтому сетка сохранится только в этом браузере.'}
-        На карточке герои показаны цветными плитками, на странице сетки — настоящими портретами.</div>
+      <div class="field"><span>Теги · до 5, по ним ищут в Мастерской</span><div class="pub-tags" id="pbTags">${API.TAGS.grid.map(t => `<button type="button" data-tag="${esc(t)}">${esc(t)}</button>`).join('')}</div></div>
+      <label class="pub-18"><input type="checkbox" id="pb18"><span><b>18+</b> — откровенное: в Мастерской будет размыто, пока не нажмут</span></label>
+      <div class="hint">${API.remote ? 'Сетку увидят все посетители Мастерской. Удалить её можно из этого же браузера.' : '<b>Демо-режим:</b> Мастерская ещё не подключена к базе, поэтому сетка сохранится только в этом браузере.'}
+        В Мастерской сетка показывается живьём, с настоящими портретами героев.</div>
     </div>
     <div class="modal-foot"><span class="info" id="pbInfo"></span><button class="btn" data-close>Отмена</button><button class="btn primary" id="pbGo" data-icon="upload">Опубликовать</button></div>`);
   applyIcons(m.root);
+  const tags = new Set();
+  $('#pbTags').onclick = e => {
+    const b = e.target.closest('[data-tag]'); if (!b) return;
+    const t = b.dataset.tag;
+    if (tags.has(t)) tags.delete(t); else if (tags.size < 5) tags.add(t); else { toast('Не больше 5 тегов', 'err'); return; }
+    b.classList.toggle('on', tags.has(t));
+  };
   const go = $('#pbGo');
   go.onclick = async () => {
     const title = $('#pbTitle').value.trim(), author = $('#pbAuthor').value.trim();
@@ -1938,11 +1947,11 @@ function openPublishModal() {
     go.disabled = true; $('#pbInfo').textContent = 'Публикую…';
     try {
       API.setAuthor(author);
-      const id = await API.publish({ title, author, description: $('#pbDesc').value, config: { config_name: title, categories: cats }, thumb });
-      const url = new URL('catalog.html?id=' + id, location.href).href;
-      $('#pbBody').innerHTML = `<div class="pub-done"><div class="pub-ok">✓</div><b>«${esc(title)}» в каталоге</b><span>Поделись ссылкой — по ней сетку можно посмотреть, скачать и открыть в редакторе.</span>
+      const id = await API.publish({ title, author, description: $('#pbDesc').value, config: { config_name: title, categories: cats }, thumb, tags: [...tags], nsfw: $('#pb18').checked });
+      const url = new URL('workshop.html?id=' + id, location.href).href;
+      $('#pbBody').innerHTML = `<div class="pub-done"><div class="pub-ok">✓</div><b>«${esc(title)}» в Мастерской</b><span>Поделись ссылкой — по ней сетку можно посмотреть, скачать и открыть в редакторе.</span>
         <div class="pub-link"><input class="input" readonly value="${esc(url)}"><button class="btn" id="pbCopy" data-icon="link">Копировать</button></div></div>`;
-      m.root.querySelector('.modal-foot').innerHTML = `<button class="btn" data-close>Закрыть</button><a class="btn primary" href="catalog.html?id=${id}" data-icon="grid">Открыть в каталоге</a>`;
+      m.root.querySelector('.modal-foot').innerHTML = `<button class="btn" data-close>Закрыть</button><a class="btn primary" href="workshop.html?id=${id}" data-icon="grid">Открыть в Мастерской</a>`;
       applyIcons(m.root);
       for (const b of $$('[data-close]', m.root)) b.onclick = m.close;
       $('#pbCopy').onclick = () => copyText(url, 'Ссылка скопирована');
@@ -1952,7 +1961,7 @@ function openPublishModal() {
     }
   };
 }
-// editor.html?grid=<id> — сетка из каталога
+// editor.html?grid=<id> — сетка из Мастерской
 async function openCatalogGrid(id) {
   try {
     const g = await CatalogAPI.get(id);
@@ -1984,7 +1993,7 @@ function commandList() {
   return [
     { g: 'Файл', icon: 'folder', label: 'Открыть hero_grid_config.json', words: 'json импорт', run: openJson },
     { g: 'Файл', icon: 'download', label: 'Экспорт', key: 'Ctrl S', words: 'скачать сохранить json', run: openExportModal },
-    { g: 'Файл', icon: 'upload', label: 'Выложить в каталог', words: 'опубликовать публикация', run: openPublishModal },
+    { g: 'Файл', icon: 'upload', label: 'Выложить в Мастерскую', words: 'опубликовать публикация', run: openPublishModal },
     { g: 'Добавить', icon: 'image', label: 'Картинку — мозаика, ASCII, line-art', key: 'Ctrl V', run: () => doAdd('image') },
     { g: 'Добавить', icon: 'ascii', label: 'ASCII из буфера', words: 'текст арт', run: () => doAdd('ascii') },
     { g: 'Добавить', icon: 'lines', label: 'Генератор линий', run: () => doAdd('lines') },
@@ -2008,7 +2017,7 @@ function commandList() {
     { g: 'Холст', icon: 'image', label: 'Загрузить фон-подложку', words: 'фон картинка обвести', run: () => $('#fileBg').click() },
     { g: 'Холст', icon: 'font', label: 'Загрузить шрифт Radiance', words: 'ttf шрифт', run: () => $('#fileFont').click() },
     { g: 'Прочее', icon: 'help', label: 'Горячие клавиши', key: '?', run: openHelp },
-    { g: 'Прочее', icon: 'grid', label: 'Каталог сеток', words: 'шаблоны готовые', run: () => { location.href = 'catalog.html'; } },
+    { g: 'Прочее', icon: 'grid', label: 'Мастерская', words: 'шаблоны готовые', run: () => { location.href = 'workshop.html'; } },
     { g: 'Прочее', icon: 'home', label: 'На главную', run: () => { location.href = 'index.html'; } },
   ].filter(c => !c.off);
 }
@@ -2258,12 +2267,12 @@ document.addEventListener('input', e => { if (e.target.type === 'range') syncRan
   document.fonts.ready.then(() => { moveDockInd(); moveSegInd(); });
   moveSegInd();
   addEventListener('resize', () => { moveDockInd(); moveSegInd(); });
-  // ссылки из каталога: ?grid=<id> — открыть сетку, ?publish — сразу окно публикации
+  // ссылки из Мастерской: ?grid=<id> — открыть сетку, ?publish — сразу окно публикации
   const qs = new URLSearchParams(location.search);
   if (qs.has('grid') || qs.has('publish')) {
     history.replaceState(null, '', location.pathname);
     if (qs.get('grid')) openCatalogGrid(qs.get('grid'));
     else if (st.els.length) setTimeout(openPublishModal, 250);
-    else toast('Нарисуй сетку или открой свой JSON, потом нажми «В каталог» сверху', 'ok');
+    else toast('Нарисуй сетку или открой свой JSON, потом нажми «В Мастерскую» сверху', 'ok');
   }
 })();

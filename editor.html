@@ -14,7 +14,7 @@
 <link rel="icon" href="logo.svg" type="image/svg+xml">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap">
-<link rel="stylesheet" href="style.css?v=12">
+<link rel="stylesheet" href="style.css?v=25">
 <script>
   // тема до первой отрисовки — чтобы не мигало; по умолчанию тёмная, как в макете
   try { document.documentElement.dataset.theme = localStorage.getItem('gp2.theme') || 'dark'; } catch { document.documentElement.dataset.theme = 'dark'; }
@@ -33,7 +33,7 @@
     <div class="es-actions">
       <button class="pill" id="esOpen" data-icon="folder">Открыть JSON</button>
       <button class="pill" data-add="ascii" data-icon="ascii">ASCII</button>
-      <a class="pill" href="catalog.html" data-icon="layers">Сетки игроков</a>
+      <a class="pill" href="workshop.html" data-icon="layers">Сетки игроков</a>
     </div>
     <div class="es-hint">или <kbd>Ctrl K</kbd> — все команды</div>
   </div>
@@ -57,12 +57,12 @@
         <div class="menu-sec">Файл</div>
         <button data-cmd="open" data-icon="folder"><span>Открыть JSON…<small>hero_grid_config.json из папки Доты</small></span></button>
         <button data-cmd="export" data-icon="download"><span>Экспорт<small>скачать или записать в файл игры</small></span><kbd>Ctrl S</kbd></button>
-        <button data-cmd="publish" data-icon="upload"><span>Выложить в каталог<small>поделиться сеткой с игроками</small></span></button>
+        <button data-cmd="publish" data-icon="upload"><span>Выложить в Мастерскую<small>поделиться сеткой с игроками</small></span></button>
         <div id="menuAccount"></div>
         <hr>
         <div class="menu-theme"><span>Тема</span><div class="seg" id="themeSeg"><button data-theme-v="dark" data-icon="moon">Тёмная</button><button data-theme-v="light" data-icon="sun">Светлая</button></div></div>
         <div class="menu-tiles four">
-          <a href="catalog.html" data-icon="grid">Каталог</a>
+          <a href="workshop.html" data-icon="grid">Мастерская</a>
           <a href="guides.html" data-icon="book">Гайды</a>
           <button data-cmd="tour" data-icon="spark">Подсказки</button>
           <button data-cmd="help" data-icon="help">Клавиши</button>
@@ -78,10 +78,10 @@
     <button data-view="game" data-icon="eye" role="tab" data-tip="Как в игре · Tab">В игре</button>
   </div>
 
-  <!-- справа сверху: команды, каталог, экспорт -->
+  <!-- справа сверху: команды, Мастерская, экспорт -->
   <div class="top-actions">
     <button class="float icon-btn box" id="btnCmd" data-icon="search" data-tip="Все команды · Ctrl K" aria-label="Команды"></button>
-    <button class="float btn box" id="btnPublish" data-icon="upload" data-tip="Выложить в каталог сеток">В каталог</button>
+    <button class="float btn box" id="btnPublish" data-icon="upload" data-tip="Выложить в Мастерскую">В Мастерскую</button>
     <button class="btn primary box" id="btnExport" data-icon="download">Экспорт</button>
   </div>
 
@@ -155,13 +155,13 @@
 <input type="file" id="fileBg" accept="image/*" hidden>
 <input type="file" id="fileFont" accept=".ttf,.otf,.woff,.woff2" hidden>
 
-<script src="heroes.js?v=6"></script>
-<script src="convert.js?v=9"></script>
-<script src="config.js?v=9"></script>
-<script src="auth.js?v=2"></script>
-<script src="gridrender.js?v=6"></script>
-<script src="catalog-api.js?v=8"></script>
-<script src="app.js?v=13"></script>
-<script src="studio.js?v=1"></script>
+<script src="heroes.js?v=25"></script>
+<script src="convert.js?v=25"></script>
+<script src="config.js?v=25"></script>
+<script src="auth.js?v=25"></script>
+<script src="gridrender.js?v=25"></script>
+<script src="catalog-api.js?v=25"></script>
+<script src="app.js?v=25"></script>
+<script src="studio.js?v=25"></script>
 </body>
 </html>

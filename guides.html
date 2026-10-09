@@ -12,8 +12,7 @@
 <link rel="icon" href="logo.svg" type="image/svg+xml">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap">
-<link rel="stylesheet" href="site.css?v=8">
-<script>try { const a = localStorage.getItem('gs.accent'); if (a) document.documentElement.dataset.accent = a; } catch {}</script>
+<link rel="stylesheet" href="site.css?v=25">
 </head>
 <body data-page="guides">
 
@@ -49,8 +48,8 @@
         </ol>
         <h3>4. Выбери сетку в игре</h3>
         <p>Вкладка <b>Герои</b> → <b>Сортировка</b> → выбери свою сетку по названию. Она же появится в выборе героя перед матчем.</p>
-        <div class="tip warn">Скачанный из каталога файл содержит только одну сетку и заменит все твои. Чтобы добавить чужую сетку к своим, открой её в редакторе, потом открой свой JSON и сделай экспорт.</div>
-        <div class="art-cta"><a class="btn primary" href="editor.html">Открыть редактор</a><a class="btn" href="catalog.html">Готовые сетки</a></div>
+        <div class="tip warn">Скачанный из Мастерской файл содержит только одну сетку и заменит все твои. Чтобы добавить чужую сетку к своим, открой её в редакторе, потом открой свой JSON и сделай экспорт.</div>
+        <div class="art-cta"><a class="btn primary" href="editor.html">Открыть редактор</a><a class="btn" href="workshop.html">Готовые сетки</a></div>
       </article>
 
       <article class="article" id="lineart">
@@ -81,7 +80,7 @@
       <article class="article" id="limits">
         <span class="gc-tag">Производительность</span>
         <h2>Сколько категорий можно</h2>
-        <p>Каждый символ арта — отдельная категория сетки. Точного лимита у Доты в документации нет: несколько тысяч категорий работают, в каталоге есть сетки и на 12 000. Но чем их больше, тем дольше думает экран выбора героя при открытии.</p>
+        <p>Каждый символ арта — отдельная категория сетки. Точного лимита у Доты в документации нет: несколько тысяч категорий работают, в Мастерской есть сетки и на 12 000. Но чем их больше, тем дольше думает экран выбора героя при открытии.</p>
         <h3>Как сэкономить</h3>
         <ul>
           <li><b>Брайль строками</b> (ASCII → Брайль): одна строка — одна категория. Самый экономный способ нарисовать картинку.</li>
@@ -130,15 +129,15 @@
       </article>
 
       <article class="article" id="share">
-        <span class="gc-tag">Каталог</span>
-        <h2>Профиль, «Мои работы» и каталог</h2>
+        <span class="gc-tag">Мастерская</span>
+        <h2>Профиль, «Мои работы» и Мастерская</h2>
         <p>Редактор сам сохраняет текущую сетку в этом браузере. Чтобы держать несколько работ и открывать их с любого устройства, войди в профиль.</p>
         <ul>
           <li><b>Мои работы</b> — приватные: их видишь только ты. В редакторе: стрелка у названия → <b>Сохранить в мои работы</b>. Дальше работа сохраняется сама.</li>
-          <li><b>В каталог</b> — публикация для всех: превью, название, описание. Войдя в профиль, ты выкладываешь сетку от своего имени, и её можно удалить с любого устройства.</li>
-          <li>У каждого автора есть страница со всеми его сетками — ссылка на неё в окне сетки в каталоге.</li>
+          <li><b>В Мастерскую</b> — публикация для всех: превью, название, описание. Войдя в профиль, ты выкладываешь сетку от своего имени, и её можно удалить с любого устройства.</li>
+          <li>У каждого автора есть страница со всеми его сетками — ссылка на неё в окне сетки в Мастерской.</li>
         </ul>
-        <div class="art-cta"><a class="btn primary" href="profile.html">Мой профиль</a><a class="btn" href="catalog.html">Каталог сеток</a></div>
+        <div class="art-cta"><a class="btn primary" href="profile.html">Мой профиль</a><a class="btn" href="workshop.html">Мастерская</a></div>
       </article>
 
     </div>
@@ -152,11 +151,11 @@
 
 <div class="modal-root" id="modalRoot"></div>
 <div class="toasts" id="toasts"></div>
-<script src="heroes.js?v=6"></script>
-<script src="config.js?v=9"></script>
-<script src="auth.js?v=2"></script>
-<script src="gridrender.js?v=6"></script>
-<script src="catalog-api.js?v=8"></script>
-<script src="site.js?v=8"></script>
+<script src="heroes.js?v=25"></script>
+<script src="config.js?v=25"></script>
+<script src="auth.js?v=25"></script>
+<script src="gridrender.js?v=25"></script>
+<script src="catalog-api.js?v=25"></script>
+<script src="site.js?v=25"></script>
 </body>
 </html>

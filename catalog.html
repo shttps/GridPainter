@@ -2,71 +2,11 @@
 <html lang="ru">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Каталог сеток · Grid Studio</title>
-<meta name="description" content="Готовые сетки героев Dota 2 от игроков: ASCII-арт, line-art и мозаики. Скачай hero_grid_config.json или открой в редакторе.">
-<meta name="theme-color" content="#0f0d0c">
-<meta property="og:title" content="Каталог сеток героев Dota 2 · Grid Studio">
-<meta property="og:description" content="Готовые сетки героев от игроков — смотри, скачивай, выкладывай свои.">
-<meta property="og:image" content="https://shttps.github.io/GridPainter/docs/ingame.webp">
-<link rel="icon" href="logo.svg" type="image/svg+xml">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap">
-<link rel="stylesheet" href="site.css?v=8">
-<script>try { const a = localStorage.getItem('gs.accent'); if (a) document.documentElement.dataset.accent = a; } catch {}</script>
+<title>Мастерская · Grid Studio</title>
+<!-- «Каталог» переехал в «Мастерскую»: старые ссылки (в том числе ?id=<сетка>) ведут туда же -->
+<script>location.replace('workshop.html' + location.search + location.hash);</script>
+<meta http-equiv="refresh" content="0; url=workshop.html">
+<link rel="canonical" href="workshop.html">
 </head>
-<body data-page="catalog">
-
-
-<div class="wrap">
-  <div class="cat-head">
-    <div class="row">
-      <div>
-        <h1>Каталог сеток</h1>
-        <p>Готовые сетки от игроков. Смотри, скачивай, открывай в редакторе — и выкладывай свои.</p>
-      </div>
-      <a class="btn primary" href="editor.html?publish"><span class="ico-box" data-icon="upload"></span>Выложить свою сетку</a>
-    </div>
-    <div class="demo-note" id="demoNote" hidden>
-      <span>⚠</span>
-      <span>Каталог работает в демо-режиме: база ещё не подключена, поэтому здесь видны только сетки, выложенные из этого браузера.</span>
-    </div>
-  </div>
-
-  <div class="toolbar">
-    <label class="search"><span data-icon="search"></span><input class="input" id="q" type="search" placeholder="Название или автор" autocomplete="off"></label>
-    <div class="chips" id="kinds" role="tablist">
-      <i class="chip-ind" id="chipInd"></i>
-      <button class="chip on" data-kind="all">Все</button>
-      <button class="chip" data-kind="ascii">ASCII</button>
-      <button class="chip" data-kind="mosaic">Мозаика</button>
-      <button class="chip" data-kind="mixed">Смешанные</button>
-      <button class="chip" data-kind="mine">Мои</button>
-    </div>
-    <select class="input" id="sort" aria-label="Сортировка">
-      <option value="new">Новые</option>
-      <option value="top">Популярные</option>
-      <option value="downloads">Скачиваемые</option>
-    </select>
-    <span class="count" id="count"></span>
-  </div>
-
-  <div class="cards" id="cards"></div>
-  <div class="more"><button class="btn" id="more" hidden>Показать ещё</button></div>
-
-  <footer class="site-foot">
-    <div class="bottom-bar" data-bottom-bar></div>
-    <span class="foot-note">© 2026 shttps · Dota 2 — товарный знак Valve Corporation, проект с Valve не связан.</span>
-  </footer>
-</div>
-
-<div class="modal-root" id="modalRoot"></div>
-<div class="toasts" id="toasts"></div>
-<script src="heroes.js?v=6"></script>
-<script src="config.js?v=9"></script>
-<script src="auth.js?v=2"></script>
-<script src="gridrender.js?v=6"></script>
-<script src="catalog-api.js?v=8"></script>
-<script src="site.js?v=8"></script>
-</body>
+<body><a href="workshop.html">Мастерская</a></body>
 </html>

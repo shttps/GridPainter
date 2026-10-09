@@ -1,5 +1,5 @@
 'use strict';
-/* Сайт: главная, каталог, гайды, профиль (и общее меню для «Угадайки»).
+/* Сайт: главная, Мастерская, гайды, профиль (и общее меню для «Угадайки»).
    Меню сверху и полоса снизу рисуются отсюда — разметка одна на все страницы. */
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
@@ -56,6 +56,8 @@ const ICONS = {
   trash: 'M4.5 7h15M9.5 7V4.5h5V7M6.5 7l1 13h9l1-13',
   mail: '<rect x="3.5" y="5.5" width="17" height="13" rx="2"/><path d="M4 7l8 6 8-6"/>',
   star: 'M12 3.5l2.6 5.4 5.9.8-4.3 4.1 1 5.8-5.2-2.8-5.2 2.8 1-5.8-4.3-4.1 5.9-.8z',
+  compass: '<circle cx="12" cy="12" r="8.5"/><path d="M15.5 8.5l-2 5-5 2 2-5z"/>',
+  play: 'M8 5.5v13l10.5-6.5z',
   clock: '<circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/>',
   discord: 'M8.5 16.5c-2 .5-4-.5-4.5-1 0-4 1-7.5 2.5-9.5 1.5-.8 3-1.2 4-1.3l.5 1.3a14 14 0 013.5 0l.5-1.3c1 .1 2.5.5 4 1.3 1.5 2 2.5 5.5 2.5 9.5-.5.5-2.5 1.5-4.5 1l-1-1.8M7 15.5c3.3 1.5 6.7 1.5 10 0M9.5 12.5a.5.5 0 100-1 .5.5 0 000 1zM14.5 12.5a.5.5 0 100-1 .5.5 0 000 1z',
 };
@@ -100,10 +102,10 @@ function avatarHTML(url, nick, cls = 'ava') {
 const GAME_START = new Date(2026, 9, 9);
 const gameDay = (d = new Date()) => Math.round((new Date(d.getFullYear(), d.getMonth(), d.getDate()) - GAME_START) / 864e5) + 1;
 // куда можно вернуться после входа: только страницы этого сайта
-const safeNext = s => /^(index|catalog|editor|guides|game|profile)\.html(\?[\w=&%.-]*)?$/.test(s || '') ? s : '';
+const safeNext = s => /^(index|workshop|editor|guides|game|profile)\.html(\?[\w=&%.-]*)?$/.test(s || '') ? s : '';
 
 // ---------- меню сверху ----------
-const NAV = [['catalog', 'catalog.html', 'grid', 'Каталог'], ['guides', 'guides.html', 'book', 'Гайды'], ['game', 'game.html', 'dice', 'Угадайка']];
+const NAV = [['workshop', 'workshop.html', 'compass', 'Мастерская'], ['guides', 'guides.html', 'book', 'Гайды'], ['game', 'game.html', 'dice', 'Угадайка']];
 function renderNav() {
   const bar = document.createElement('header');
   bar.className = 'navbar'; bar.id = 'navbar';
@@ -111,7 +113,7 @@ function renderNav() {
     <a class="logo" href="index.html" aria-label="Grid Studio — на главную">${LOGO}<span>Grid<b>Studio</b></span></a>
     <div class="nav-links" id="navLinks">
       <span class="nav-hl" aria-hidden="true"></span>
-      ${NAV.map(([k, href, ic, label]) => `<a href="${href}"${k === PAGE ? ' aria-current="page"' : ''}>${icon(ic)}${label}${k === 'catalog' ? '<b class="nav-badge" data-cat-count hidden></b>' : ''}</a>`).join('')}
+      ${NAV.map(([k, href, ic, label]) => `<a href="${href}"${k === PAGE ? ' aria-current="page"' : ''}>${icon(ic)}${label}${k === 'workshop' ? '<b class="nav-badge" data-cat-count hidden></b>' : ''}</a>`).join('')}
       <a href="editor.html" class="nav-studio">${icon('brush')}Редактор${icon('arrow')}</a>
     </div>
     <div class="nav-acc" id="navAcc"></div>
@@ -155,7 +157,7 @@ function initNav() {
   document.addEventListener('click', e => { if (!bar.contains(e.target)) setOpen(false); });
   document.addEventListener('keydown', e => { if (e.key === 'Escape') setOpen(false); });
 }
-// число сеток в каталоге — в меню и в блоках главной
+// число сеток в Мастерской — в меню и в блоках главной
 function setCatCount(total) {
   for (const el of $$('[data-cat-count]')) { el.textContent = num(total); el.hidden = !total && el.classList.contains('nav-badge'); }
 }
@@ -170,30 +172,13 @@ function renderBottomBars() {
       <button class="bb-link" data-info="ads">${icon('megaphone')}Реклама</button>
     </div>
     <div class="bb-right">
-      <div class="bb-themes" role="radiogroup" aria-label="Цвет сайта"><span>Цвет</span>${THEMES.map(([v, name]) => `<button data-accent-v="${v}" role="radio" title="${name}" aria-label="${name}"></button>`).join('')}</div>
       ${SITE.repo ? `<a class="bb-link" href="${esc(SITE.repo)}" target="_blank" rel="noopener">${icon('github')}GitHub${icon('ext')}</a>` : ''}
       <a class="bb-ver" href="${esc(SITE.repo || '#')}/commits/main" target="_blank" rel="noopener" title="Что нового — история изменений">v${esc(SITE.version || '1.0.0')}</a>
     </div>`;
   for (const el of $$('[data-bottom-bar]')) el.innerHTML = html;
   document.addEventListener('click', e => {
     const b = e.target.closest('[data-info]'); if (b) openInfo(b.dataset.info);
-    const t = e.target.closest('[data-accent-v]'); if (t) setAccent(t.dataset.accentV);
   });
-  markAccent();
-}
-// ---------- цвет сайта: четыре темы, выбор запоминается ----------
-const THEMES = [['fire', 'Огонь'], ['arcana', 'Аркана'], ['radiant', 'Рэдиант'], ['frost', 'Лёд']];
-const accent = () => document.documentElement.dataset.accent || 'fire';
-const markAccent = () => $$('[data-accent-v]').forEach(b => { const on = b.dataset.accentV === accent(); b.classList.toggle('on', on); b.setAttribute('aria-checked', on); });
-function setAccent(v) {
-  if (v === accent()) return;
-  const root = document.documentElement;
-  root.classList.add('theme-anim');
-  v === 'fire' ? delete root.dataset.accent : root.dataset.accent = v;
-  try { localStorage.setItem('gs.accent', v); } catch {}
-  markAccent();
-  dispatchEvent(new Event('accentchange'));
-  clearTimeout(setAccent.t); setAccent.t = setTimeout(() => root.classList.remove('theme-anim'), 650);
 }
 // небольшие окна: автор, поддержка, реклама
 function openSheet(html) {
@@ -220,10 +205,10 @@ function openInfo(kind) {
         ${SITE.support ? `<a class="btn primary block" href="${esc(SITE.support)}" target="_blank" rel="noopener">${icon('heart')}Поддержать рублём</a>` : ''}
         ${SITE.repo ? `<a class="btn block" href="${esc(SITE.repo)}" target="_blank" rel="noopener">${icon('star')}Поставить звезду на GitHub</a>` : ''}
         <button class="btn block" data-copy="${esc(new URL('index.html', location.href).href)}">${icon('link')}Поделиться сайтом с друзьями<span class="sh-note">скопировать ссылку</span></button>
-        <a class="btn block" href="editor.html?publish">${icon('upload')}Выложить свою сетку в каталог</a>
+        <a class="btn block" href="editor.html?publish">${icon('upload')}Выложить свою сетку в Мастерскую</a>
       </div>`,
     ads: `<div class="sh-ico">${icon('megaphone')}</div><h2>Реклама на Grid Studio</h2>
-      <p>Аудитория — игроки Dota 2, которые настраивают игру под себя. Места: главная, каталог сеток, гайды и «Угадайка». Обсудим формат и цену.</p>
+      <p>Аудитория — игроки Dota 2, которые настраивают игру под себя. Места: главная, Мастерская, гайды и «Угадайка». Обсудим формат и цену.</p>
       <div class="sh-actions">${SITE.ads ? `<a class="btn primary block" href="${esc(SITE.ads)}" target="_blank" rel="noopener">${icon('send')}Написать насчёт рекламы</a>` : ''}${discord}${tg}</div>`,
   };
   const m = openSheet(`<div class="sh-body">${sheets[kind]}</div>`);
@@ -231,20 +216,75 @@ function openInfo(kind) {
 }
 
 // ---------- карточка сетки ----------
+// Превью — живой холст (GridRender.mount) с настоящими портретами: сетка подгружается, когда карточка доезжает до экрана.
+// 18+ — карточка размыта, пока не нажмёшь (или не ответишь «мне есть 18, не спрашивать»).
+const tagsHTML = (tags, n = 3) => tags?.length ? `<span class="gtags">${tags.slice(0, n).map(t => `<i>${esc(t)}</i>`).join('')}${tags.length > n ? `<i>+${tags.length - n}</i>` : ''}</span>` : '';
+const nsfwCover = () => `<span class="nsfw-cover"><b>18+</b><span>Нажми, чтобы показать</span></span>`;
 function cardHTML(g, k = 0) {
-  return `<button class="gcard" data-id="${esc(g.id)}" style="animation-delay:${Math.min(k, 12) * 40}ms">
-    <span class="gthumb"><img src="${esc(g.thumb)}" alt="" loading="lazy">
+  const hide = g.nsfw && !API.adult();
+  return `<button class="gcard${hide ? ' hide18' : ''}" data-id="${esc(g.id)}" style="animation-delay:${Math.min(k, 12) * 40}ms">
+    <span class="gthumb" data-live="${esc(g.id)}"><canvas aria-hidden="true"></canvas><span class="g-load">Загружаем сетку…</span>
       <span class="gkind">${esc(API.KINDS[g.kind] || 'Сетка')} · ${num(g.cats)} кат.</span>
-      ${API.isMine(g.id, g.user_id) ? '<span class="gkind gmine">моя</span>' : ''}</span>
+      ${API.isMine(g.id, g.user_id) ? '<span class="gkind gmine">моя</span>' : ''}
+      ${g.nsfw ? '<span class="g18">18+</span>' : ''}${hide ? nsfwCover() : ''}</span>
     <span class="gbody">
       <span class="gtitle">${esc(g.title)}</span>
       <span class="gmeta"><span class="by">${esc(g.author)} · ${ago(g.created_at)}</span>
         <span class="st ${API.isLiked(g.id) ? 'liked' : ''}" data-likes>${icon('heart')}${num(g.likes)}</span>
         <span class="st">${icon('download')}${num(g.downloads)}</span></span>
+      ${tagsHTML(g.tags)}
     </span>
   </button>`;
 }
 const skeletons = n => Array.from({ length: n }, () => '<div class="gcard sk"><div class="skeleton"></div><div class="gbody"><span></span><span></span></div></div>').join('');
+
+// подложка превью сеток: «как в Доте», тёмная или градиент — выбор запоминается
+const PREVIEW_BG = [['dota', 'Как в Dota'], ['dark', 'Тёмный'], ['grad', 'Градиент']];
+const previewBg = () => { try { const v = localStorage.getItem('gs.previewBg'); return PREVIEW_BG.some(b => b[0] === v) ? v : 'dota'; } catch { return 'dota'; } };
+function setPreviewBg(v) {
+  try { localStorage.setItem('gs.previewBg', v); } catch {}
+  for (const el of $$('.gthumb.ready')) el._view?.set({ bg: v });
+  for (const el of $$('[data-preview-bg]')) el._view?.set({ bg: v });
+}
+// живые превью: любая вставленная карточка сама подхватывается, сетка грузится, когда до неё ~300px
+const liveIO = 'IntersectionObserver' in window ? new IntersectionObserver(es => {
+  for (const e of es) if (e.isIntersecting) { liveIO.unobserve(e.target); hydrate(e.target); }
+}, { rootMargin: '300px 0px' }) : null;
+async function hydrate(el) {
+  const id = el.dataset.live, cv = $('canvas', el);
+  try {
+    const cfg = await API.config(id);
+    if (!el.isConnected) return;
+    el._view = GridRender.mount(cv, cfg?.categories || [], { bg: previewBg() });
+  } catch {
+    // сетку скачать не вышло — показываем сохранённую картинку
+    try { const t = await API.thumb(id); if (t) cv.insertAdjacentHTML('afterend', `<img src="${esc(t)}" alt="">`); } catch {}
+  }
+  el.classList.add('ready');
+}
+function watchLive() {
+  for (const el of $$('.gthumb[data-live]:not([data-seen])')) { el.dataset.seen = '1'; liveIO ? liveIO.observe(el) : hydrate(el); }
+}
+new MutationObserver(watchLive).observe(document.body, { childList: true, subtree: true });
+
+// 18+: клик по размытой карточке сначала спрашивает — до того, как сработает открытие окна
+document.addEventListener('click', e => {
+  const card = e.target.closest('.hide18');
+  if (!card) return;
+  e.preventDefault(); e.stopPropagation();
+  askAdult(() => card.classList.remove('hide18'));
+}, true);
+function askAdult(onShow) {
+  const m = openSheet(`<div class="sh-body"><div class="sh-ico sh-18">18+</div><h2>Работа для взрослых</h2>
+    <p>Автор пометил её как 18+. Показать?</p>
+    <div class="sh-actions"><button class="btn primary block" data-adult="once">Показать</button>
+      <button class="btn block" data-adult="always">Мне есть 18 — больше не спрашивать</button></div></div>`);
+  m.root.addEventListener('click', ev => {
+    const b = ev.target.closest('[data-adult]'); if (!b) return;
+    if (b.dataset.adult === 'always') { API.setAdult(true); $$('.hide18').forEach(c => c.classList.remove('hide18')); }
+    m.close(); onShow();
+  });
+}
 
 // ---------- окно сетки ----------
 async function openGrid(id, { onChange } = {}) {
@@ -266,10 +306,11 @@ async function openGrid(id, { onChange } = {}) {
   const author = g.user_id && ACC?.enabled ? `<a href="profile.html?u=${encodeURIComponent(g.user_id)}">${esc(g.author)}</a>` : `<b>${esc(g.author)}</b>`;
   root.innerHTML = `<div class="modal" role="dialog" aria-label="${esc(g.title)}">
     <button class="modal-x" data-icon="x" aria-label="Закрыть"></button>
-    <div class="modal-view"><canvas id="gv"></canvas></div>
+    <div class="modal-view${g.nsfw && !API.adult() ? ' hide18' : ''}" data-preview-bg><canvas id="gv"></canvas>${g.nsfw && !API.adult() ? nsfwCover() : ''}</div>
     <div class="modal-side">
       <div><h2>${esc(g.title)}</h2><div class="by">от ${author} · ${ago(g.created_at)}</div></div>
       ${g.description ? `<div class="desc">${esc(g.description)}</div>` : ''}
+      ${tagsHTML([...(g.nsfw ? ['18+'] : []), ...(g.tags || [])], 9)}
       <div class="stats">
         <div><b data-likes>${num(g.likes)}</b><span>${plural(g.likes, 'лайк', 'лайка', 'лайков')}</span></div>
         <div><b>${num(g.downloads)}</b><span>скачиваний</span></div>
@@ -294,27 +335,15 @@ async function openGrid(id, { onChange } = {}) {
   applyIcons(root);
   $('.modal-x', root).onclick = close;
 
-  // живое превью с настоящими портретами; перерисовка, когда догружаются картинки
-  const cv = $('#gv'), ctx = cv.getContext('2d');
-  let queued = false;
-  const draw = () => {
-    queued = false;
-    if (!alive || !cv.isConnected) return;
-    const dpr = window.devicePixelRatio || 1, w = cv.clientWidth || 800, k = w * dpr / GridRender.GRID.w;
-    cv.width = Math.round(w * dpr); cv.height = Math.round(GridRender.GRID.h * k);
-    ctx.setTransform(k, 0, 0, k, 0, 0);
-    GridRender.draw(ctx, cats, { portraits: true, onLoad: redraw });
-  };
-  const redraw = () => { if (!queued) { queued = true; requestAnimationFrame(draw); } };
-  draw();
-  document.fonts?.ready.then(redraw);
-  new ResizeObserver(redraw).observe(cv);
+  // живое превью с настоящими портретами, на той же подложке, что выбрана в Мастерской
+  const view = $('.modal-view', root);
+  view._view = GridRender.mount($('#gv'), cats, { bg: previewBg() });
 
   const json = () => JSON.stringify({ version: 3, configs: [{ config_name: g.title, categories: cats }] }, null, '\t');
   $('#gEdit').onclick = () => API.hit(g.id);
   $('#gDl').onclick = () => { download('hero_grid_config.json', json()); API.hit(g.id); toast('Файл скачан — положи его в Steam\\userdata\\<ID>\\570\\remote\\cfg', 'ok'); };
   $('#gCopy').onclick = () => { copyText(json(), 'JSON скопирован'); API.hit(g.id); };
-  $('#gLink').onclick = () => copyText(new URL('catalog.html?id=' + g.id, location.href).href, 'Ссылка скопирована');
+  $('#gLink').onclick = () => copyText(new URL('workshop.html?id=' + g.id, location.href).href, 'Ссылка скопирована');
   const like = $('#gLike');
   like.onclick = async () => {
     like.disabled = true;
@@ -332,17 +361,17 @@ async function openGrid(id, { onChange } = {}) {
   const rep = $('#gReport');
   if (rep) rep.onclick = async () => {
     if (API.isReported(g.id)) return;
-    if (!confirm('Пожаловаться на эту сетку? После нескольких жалоб она пропадёт из каталога до проверки.')) return;
+    if (!confirm('Пожаловаться на эту сетку? После нескольких жалоб она пропадёт из Мастерской до проверки.')) return;
     try { await API.report(g.id); rep.textContent = 'Жалоба отправлена'; toast('Спасибо, жалоба отправлена', 'ok'); } catch (e) { toast(e.message, 'err'); }
   };
   const del = $('#gDel');
   if (del) del.onclick = async () => {
-    if (!confirm(`Удалить «${g.title}» из каталога? Это нельзя отменить.`)) return;
+    if (!confirm(`Удалить «${g.title}» из Мастерской? Это нельзя отменить.`)) return;
     try { await API.remove(g.id); close(); toast('Сетка удалена', 'ok'); onChange && onChange(g, true); } catch (e) { toast(e.message, 'err'); }
   };
 }
 function setUrlId(id) {
-  if (PAGE !== 'catalog') return;
+  if (PAGE !== 'workshop') return;
   const u = new URL(location.href);
   id ? u.searchParams.set('id', id) : u.searchParams.delete('id');
   history.replaceState(null, '', u);
@@ -366,7 +395,7 @@ const GUIDES = [
   ['mosaic', 'Мозаика', 'Мозаика из портретов героев', 'Как Дота раскладывает портреты, какую ширину выбрать и зачем исключать героев из палитры.', 4],
   ['steam', 'Steam', 'Брайль-арт для профиля Steam', 'Арт для «Своего информационного поля»: ширина, лимит 8000 символов и почему строки переносятся.', 3],
   ['text', 'Текст', 'Подписи и текст в сетке', 'Как Дота показывает названия категорий и как сделать надписи ровными.', 3],
-  ['share', 'Каталог', 'Профиль, «Мои работы» и каталог', 'Как хранить работы приватно, возвращаться к ним и выкладывать сетки от своего имени.', 3],
+  ['share', 'Мастерская', 'Профиль, «Мои работы» и Мастерская', 'Как хранить работы приватно, возвращаться к ним и выкладывать сетки от своего имени.', 3],
 ];
 const guideCard = ([id, tag, title, desc, min], k) => `<a class="guide-card" href="guides.html#${id}" data-reveal style="--d:${(k % 3) * 0.06}s">
   <span class="gc-tag">${esc(tag)}</span><b>${esc(title)}</b><span>${esc(desc)}</span><small>${icon('clock')}${min} мин чтения</small></a>`;
@@ -400,6 +429,13 @@ function initHome() {
   }
 
   glyphField($('#bgGlyphs'));
+
+  // панели: «прожектор» и светящийся край идут за курсором — пишем только две переменные той панели, что под мышью
+  $('.landing-copy').addEventListener('pointermove', e => {
+    const card = e.target.closest('.fcard, .fwide'); if (!card) return;
+    const r = card.getBoundingClientRect();
+    card.style.setProperty('--x', (e.clientX - r.left) + 'px'); card.style.setProperty('--y', (e.clientY - r.top) + 'px');
+  }, { passive: true });
 
   // экран ноутбука: арт прорисовывается слева направо, счётчик категорий бежит вместе с ним
   const mock = $('#mock');
@@ -476,130 +512,463 @@ function initHome() {
   API.list({ limit: 24 }).then(({ items, total }) => {
     setCatCount(total);
     $('#catNum').textContent = total ? num(total) : '#1';
-    $('.big-num span').textContent = total ? plural(total, 'сетка', 'сетки', 'сеток') + ' в каталоге' : 'стань первым автором';
-    box.innerHTML = items.length ? items.slice(0, 6).map(cardHTML).join('') : `<div class="cards-empty">${MARK}<b>Здесь пока пусто</b><span>Стань первым: нарисуй сетку в редакторе и нажми «В каталог».</span><a class="btn primary sm" href="editor.html">Открыть редактор</a></div>`;
-    // плашка «случайная сетка из каталога» поверх ноутбука
+    $('.big-num span').textContent = total ? plural(total, 'сетка', 'сетки', 'сеток') + ' в Мастерской' : 'стань первым автором';
+    box.innerHTML = items.length ? items.slice(0, 6).map(cardHTML).join('') : `<div class="cards-empty">${MARK}<b>Здесь пока пусто</b><span>Стань первым: нарисуй сетку в редакторе и нажми «В Мастерскую».</span><a class="btn primary sm" href="editor.html">Открыть редактор</a></div>`;
+    // плашка «случайная сетка из Мастерской» поверх ноутбука
     if (items.length) {
       const g = items[Math.floor(Math.random() * items.length)], rg = $('#randomGrid');
-      rg.href = 'catalog.html?id=' + encodeURIComponent(g.id);
-      rg.innerHTML = `<span class="rg-likes">${icon('heart')}${num(g.likes)}</span><b>«${esc(g.title)}» — ${esc(g.author)}</b><span class="rg-note">случайная сетка из каталога</span>`;
+      rg.href = 'workshop.html?id=' + encodeURIComponent(g.id);
+      rg.innerHTML = `<span class="rg-likes">${icon('heart')}${num(g.likes)}</span><b>«${esc(g.title)}» — ${esc(g.author)}</b><span class="rg-note">случайная сетка из Мастерской</span>`;
       rg.hidden = false;
     }
   }).catch(() => { box.closest('.section').hidden = true; $('#catNum').textContent = '∞'; setCatCount(0); });
-  box.onclick = e => { const c = e.target.closest('.gcard[data-id]'); if (c) location.href = 'catalog.html?id=' + encodeURIComponent(c.dataset.id); };
+  box.onclick = e => { const c = e.target.closest('.gcard[data-id]'); if (c) location.href = 'workshop.html?id=' + encodeURIComponent(c.dataset.id); };
 }
 
 // Фон главной: поле ASCII-символов. Яркость клетки — сумма нескольких бегущих волн, у курсора светлее;
-// цвет — градиент темы по диагонали. ~24 кадра в секунду, только пока первый экран виден.
+// цвет — градиент «Огня» по диагонали. Чтобы не тормозить:
+//  * символы не печатаются текстом каждый кадр — они один раз рисуются в атлас и дальше копируются drawImage;
+//  * градиент накладывается одной заливкой поверх всех символов (source-in), а не на каждый символ;
+//  * затухание к краям посчитано заранее по клеткам — пустые клетки не трогаем, CSS-маски на холсте нет;
+//  * ~20 кадров в секунду и только пока первый экран виден.
 function glyphField(cv) {
   if (!cv) return;
   const ctx = cv.getContext('2d'), RAMP = ' .·:-=+*#%@', CW = 15, CH = 24;
   const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
-  let W = 0, H = 0, cols = 0, rows = 0, mx = -1e4, my = -1e4, sx = -1e4, sy = -1e4, fill = null, raf = 0, last = 0, visible = true;
-  const paintStyle = () => {
-    const cs = getComputedStyle(document.documentElement), g = ctx.createLinearGradient(0, 0, W, H);
-    g.addColorStop(0, cs.getPropertyValue('--c1').trim()); g.addColorStop(.55, cs.getPropertyValue('--c2').trim()); g.addColorStop(1, cs.getPropertyValue('--c3').trim());
-    fill = g;
+  let W = 0, H = 0, cols = 0, rows = 0, dpr = 1, mx = -1e4, my = -1e4, sx = -1e4, sy = -1e4, fill = null, raf = 0, last = 0, visible = true;
+  let atlas = null, cells = null;
+  const makeAtlas = () => {
+    atlas = document.createElement('canvas');
+    atlas.width = Math.ceil(CW * dpr) * RAMP.length; atlas.height = Math.ceil(CH * dpr);
+    const a = atlas.getContext('2d');
+    a.scale(dpr, dpr); a.fillStyle = '#fff';
+    a.font = '600 13px "JetBrains Mono", Consolas, monospace'; a.textAlign = 'center'; a.textBaseline = 'middle';
+    for (let k = 1; k < RAMP.length; k++) a.fillText(RAMP[k], (k + 0.5) * Math.ceil(CW * dpr) / dpr, CH / 2);
   };
   const resize = () => {
-    const dpr = Math.min(2, window.devicePixelRatio || 1);
+    dpr = Math.min(1.5, window.devicePixelRatio || 1);
     W = cv.clientWidth; H = cv.clientHeight; cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr);
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     cols = Math.ceil(W / CW); rows = Math.ceil(H / CH);
-    paintStyle();
+    const cs = getComputedStyle(document.documentElement), g = ctx.createLinearGradient(0, 0, W, H);
+    g.addColorStop(0, cs.getPropertyValue('--c1').trim()); g.addColorStop(.55, cs.getPropertyValue('--c2').trim()); g.addColorStop(1, cs.getPropertyValue('--c3').trim());
+    fill = g;
+    makeAtlas();
+    // клетки внутри овала (центр 62% / 42%), с готовыми затуханием и расстоянием до «источника» волны
+    const cx = cols * 0.68, cy = rows * 0.35, list = [];
+    for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
+      const x = (c + 0.5) * CW, y = (r + 0.5) * CH;
+      const e = Math.hypot((x / W - 0.62) / 0.8, (y / H - 0.42) / 0.75);
+      const fade = e < 0.2 ? 1 : e > 0.78 ? 0 : 1 - (e - 0.2) / 0.58;
+      if (fade > 0.03) list.push(c, r, fade, Math.hypot(c - cx, (r - cy) * 1.6) * 0.32);
+    }
+    cells = Float32Array.from(list);
     if (still) draw(0);
   };
   function draw(t) {
+    ctx.globalCompositeOperation = 'source-over';
     ctx.clearRect(0, 0, W, H);
-    ctx.font = '600 13px "JetBrains Mono", Consolas, monospace'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    ctx.fillStyle = fill;
     // курсор догоняется плавно — пятно света не дёргается
-    sx += (mx - sx) * 0.12; sy += (my - sy) * 0.12;
-    const cx = cols * 0.68, cy = rows * 0.35;
-    for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
-      const x = (c + 0.5) * CW, y = (r + 0.5) * CH;
-      let v = Math.sin(c * 0.11 + t * 0.55) + Math.sin(r * 0.19 - t * 0.4) + Math.sin((c + r) * 0.07 + t * 0.3) + Math.sin(Math.hypot(c - cx, (r - cy) * 1.6) * 0.32 - t * 0.9);
-      v = (v + 4) / 8;
-      const d = Math.hypot(x - sx, y - sy), glow = d < 260 ? (1 - d / 260) ** 1.6 : 0;
+    sx += (mx - sx) * 0.15; sy += (my - sy) * 0.15;
+    const aw = Math.ceil(CW * dpr), ah = atlas.height, top = RAMP.length - 1;
+    const colW = new Float32Array(cols), rowW = new Float32Array(rows), diag = new Float32Array(cols + rows);
+    for (let c = 0; c < cols; c++) colW[c] = Math.sin(c * 0.11 + t * 0.55);
+    for (let r = 0; r < rows; r++) rowW[r] = Math.sin(r * 0.19 - t * 0.4);
+    for (let d = 0; d < cols + rows; d++) diag[d] = Math.sin(d * 0.07 + t * 0.3);
+    for (let i = 0; i < cells.length; i += 4) {
+      const c = cells[i], r = cells[i + 1], fade = cells[i + 2];
+      const v = (colW[c] + rowW[r] + diag[c + r] + Math.sin(cells[i + 3] - t * 0.9) + 4) / 8;
+      const x = c * CW, y = r * CH, dx = x + CW / 2 - sx, dy = y + CH / 2 - sy, d2 = dx * dx + dy * dy;
+      const glow = d2 < 67600 ? (1 - Math.sqrt(d2) / 260) ** 1.6 : 0;
       const lvl = Math.min(1, v ** 2.4 + glow * 0.85);
-      const k = Math.round(lvl * (RAMP.length - 1));
+      const k = Math.round(lvl * top);
       if (k < 1) continue;
-      ctx.globalAlpha = Math.min(0.95, 0.1 + lvl * 0.6 + glow * 0.4);
-      ctx.fillText(RAMP[k], x, y);
+      ctx.globalAlpha = Math.min(0.95, 0.1 + lvl * 0.6 + glow * 0.4) * fade;
+      ctx.drawImage(atlas, k * aw, 0, aw, ah, x, y, CW, CH);
     }
     ctx.globalAlpha = 1;
+    // белые символы → цвета градиента одной заливкой
+    ctx.globalCompositeOperation = 'source-in';
+    ctx.fillStyle = fill; ctx.fillRect(0, 0, W, H);
+    ctx.globalCompositeOperation = 'source-over';
   }
   const loop = now => {
     raf = requestAnimationFrame(loop);
-    if (now - last < 42) return;
+    if (now - last < 50) return;
     last = now; draw(now / 1000);
   };
   resize();
-  addEventListener('resize', resize);
-  addEventListener('accentchange', () => { setTimeout(() => { paintStyle(); if (still) draw(0); }, 30); });
+  let rt = 0;
+  addEventListener('resize', () => { clearTimeout(rt); rt = setTimeout(resize, 150); });
+  document.fonts?.ready.then(() => { makeAtlas(); if (still) draw(0); });
   if (still) return;
   addEventListener('pointermove', e => { const r = cv.getBoundingClientRect(); mx = e.clientX - r.left; my = e.clientY - r.top; if (sx < -1e3) { sx = mx; sy = my; } }, { passive: true });
   new IntersectionObserver(es => { visible = es.some(e => e.isIntersecting); cancelAnimationFrame(raf); if (visible && !document.hidden) raf = requestAnimationFrame(loop); }).observe(cv);
   document.addEventListener('visibilitychange', () => { cancelAnimationFrame(raf); if (visible && !document.hidden) raf = requestAnimationFrame(loop); });
 }
 
-// ---------- каталог ----------
-function initCatalog() {
-  $('#demoNote').hidden = API.remote;
+// ---------- Мастерская: сетки и фоны ----------
+// Вкладки «Сетки | Фоны» (?backgrounds в адресе), сортировки, теги, поиск; у фонов ещё пропорции экрана.
+const SORTS = [['popular', 'Популярные'], ['week', 'За неделю'], ['new', 'Новые'], ['mine', 'Мои публикации']];
+const SORT_NOTE = { popular: 'по числу лайков', week: 'лучшие за 7 дней', new: 'сначала новые', mine: 'твои публикации' };
+// «таблетка» под выбранной кнопкой сегмента
+function segInd(box) {
+  const b = $('.on', box), ind = $('.seg-ind', box); if (!b || !ind) return;
+  ind.style.cssText = `width:${b.offsetWidth}px;transform:translateX(${b.offsetLeft}px)`;
+}
+function initWorkshop() {
+  const qs = new URLSearchParams(location.search);
   const PAGE_SIZE = 24;
-  const f = { q: '', kind: 'all', sort: 'new' };
+  const f = { tab: qs.has('backgrounds') || qs.has('bg') ? 'bg' : 'grids', q: '', tag: '', sort: 'popular', aspect: '' };
   let offset = 0, total = 0, seq = 0;
   const cards = $('#cards'), more = $('#more');
+  $('#demoNote').hidden = API.remote;
 
+  // ----- разметка фильтров под вкладку -----
+  const chip = (v, label, on) => `<button class="tchip${on ? ' on' : ''}" data-v="${esc(v)}">${esc(label)}</button>`;
+  function renderControls() {
+    const bg = f.tab === 'bg';
+    document.title = bg ? 'Мастерская — фоны главного меню Dota 2 · Grid Studio' : 'Мастерская — сетки героев Dota 2 · Grid Studio';
+    $('#wsLead').textContent = bg ? 'Фоны главного меню от игроков: картинки и видео. Посмотри, скачай — или выложи свой.' : 'Найди свой вариант. Открой в редакторе и сделай по-своему.';
+    const create = $('#wsCreate');
+    create.innerHTML = `${icon('plus')}${bg ? 'Выложить фон' : 'Создать сетку'}`;
+    create.href = bg ? '#' : 'editor.html';
+    $('#wsSorts').innerHTML = '<i class="seg-ind"></i>' + SORTS.map(([v, l]) => `<button data-v="${v}" class="${f.sort === v ? 'on' : ''}">${l}</button>`).join('');
+    const tags = bg ? API.TAGS.bg : API.TAGS.grid;
+    $('#wsTags').innerHTML = chip('', 'Все теги', !f.tag) + tags.map(t => chip(t, t, f.tag === t)).join('') + chip('18+', '18+', f.tag === '18+');
+    $('#wsAspect').hidden = !bg;
+    $('#wsAspect').innerHTML = `<span>Экран</span>` + chip('', 'Любой', !f.aspect) + API.TAGS.aspects.map(a => chip(a, a, f.aspect === a)).join('');
+    $('#wsBg').hidden = bg;
+    $('#wsBg').innerHTML = '<i class="seg-ind"></i>' + PREVIEW_BG.map(([v, l]) => `<button data-v="${v}" class="${previewBg() === v ? 'on' : ''}">${l}</button>`).join('');
+    $$('#wsTabs button').forEach(b => b.classList.toggle('on', b.dataset.v === f.tab));
+    applyIcons($('.ws-head'));
+    requestAnimationFrame(() => { ['#wsTabs', '#wsSorts', '#wsBg'].forEach(s => segInd($(s))); });
+  }
+  const relayout = () => ['#wsTabs', '#wsSorts', '#wsBg'].forEach(s => segInd($(s)));
+  document.fonts?.ready.then(relayout); addEventListener('resize', relayout);
+
+  // ----- загрузка списка -----
   async function load(reset = true) {
-    const my = ++seq;
-    if (reset) { offset = 0; cards.innerHTML = skeletons(6); }
+    const my = ++seq, bg = f.tab === 'bg';
+    if (reset) { offset = 0; cards.className = bg ? 'cards bcards' : 'cards'; cards.innerHTML = skeletons(6); }
     more.disabled = true;
     try {
-      const r = await API.list({ q: f.q, kind: f.kind === 'mine' ? 'all' : f.kind, onlyMine: f.kind === 'mine', sort: f.sort, offset, limit: PAGE_SIZE });
+      const args = { q: f.q, tag: f.tag, sort: f.sort === 'mine' ? 'new' : f.sort, onlyMine: f.sort === 'mine', offset, limit: PAGE_SIZE };
+      const r = bg ? await API.bg.list({ ...args, aspect: f.aspect }) : await API.list(args);
       if (my !== seq) return;
       total = r.total;
-      if (f.kind === 'all' && !f.q) setCatCount(total);
-      const html = r.items.map((g, k) => cardHTML(g, k)).join('');
-      if (reset) cards.innerHTML = html || emptyHTML();
+      if (!bg && !f.tag && !f.q && f.sort !== 'mine' && f.sort !== 'week') setCatCount(total);
+      const html = r.items.map((g, k) => bg ? bgCardHTML(g, k) : cardHTML(g, k)).join('');
+      if (reset) cards.innerHTML = html || emptyHTML(r.missing);
       else cards.insertAdjacentHTML('beforeend', html);
       offset += r.items.length;
-      $('#count').textContent = `${num(total)} ${plural(total, 'сетка', 'сетки', 'сеток')}`;
+      $('#count').textContent = `${bg ? 'Фонов' : 'Сеток'}: ${num(total)} · ${SORT_NOTE[f.sort]}`;
       more.hidden = offset >= total;
     } catch (e) {
       if (my !== seq) return;
-      cards.innerHTML = `<div class="cards-empty"><b>Каталог не загрузился</b><span>${esc(e.message)}</span><button class="btn sm" onclick="location.reload()">Обновить</button></div>`;
+      cards.innerHTML = `<div class="cards-empty"><b>Мастерская не загрузилась</b><span>${esc(e.message)}</span><button class="btn sm" onclick="location.reload()">Обновить</button></div>`;
     }
     more.disabled = false;
   }
-  const emptyHTML = () => f.q || f.kind !== 'all'
-    ? `<div class="cards-empty"><b>Ничего не нашлось</b><span>${f.kind === 'mine' ? 'Ты ещё ничего не выкладывал из этого браузера или аккаунта.' : 'Попробуй другой запрос или фильтр.'}</span></div>`
-    : `<div class="cards-empty">${MARK}<b>Здесь пока пусто</b><span>Стань первым: нарисуй сетку в редакторе и выложи её сюда.</span><a class="btn primary sm" href="editor.html?publish">Выложить сетку</a></div>`;
+  function emptyHTML(missing) {
+    if (f.tab === 'bg') {
+      if (missing || !API.bg.enabled) return `<div class="cards-empty">${MARK}<b>Фоны скоро появятся</b><span>Раздел уже готов — осталось подключить хранилище. Загляни чуть позже.</span></div>`;
+      if (f.q || f.tag || f.aspect || f.sort === 'mine') return `<div class="cards-empty"><b>Ничего не нашлось</b><span>${f.sort === 'mine' ? 'Ты ещё не выкладывал фоны.' : 'Попробуй другой тег или пропорции.'}</span></div>`;
+      return `<div class="cards-empty">${MARK}<b>Фонов пока нет</b><span>Стань первым: выложи картинку или видео для главного меню.</span><button class="btn primary sm" data-act="upload">Выложить фон</button></div>`;
+    }
+    return f.q || f.tag || f.sort === 'mine' || f.sort === 'week'
+      ? `<div class="cards-empty"><b>Ничего не нашлось</b><span>${f.sort === 'mine' ? 'Ты ещё ничего не выкладывал из этого браузера или аккаунта.' : 'Попробуй другой запрос или тег.'}</span></div>`
+      : `<div class="cards-empty">${MARK}<b>Здесь пока пусто</b><span>Стань первым: нарисуй сетку в редакторе и выложи её сюда.</span><a class="btn primary sm" href="editor.html?publish">Выложить сетку</a></div>`;
+  }
 
+  // ----- переключатели -----
+  function setTab(t) {
+    if (t === f.tab) return;
+    f.tab = t; f.tag = ''; f.aspect = '';
+    const u = new URL(location.href);
+    u.search = t === 'bg' ? '?backgrounds' : '';
+    history.replaceState(null, '', u);
+    renderControls(); load();
+  }
+  $('#wsTabs').onclick = e => { const b = e.target.closest('button'); if (b) setTab(b.dataset.v); };
+  $('#wsSorts').onclick = e => {
+    const b = e.target.closest('button'); if (!b || b.classList.contains('on')) return;
+    f.sort = b.dataset.v; $$('#wsSorts button').forEach(x => x.classList.toggle('on', x === b)); segInd($('#wsSorts')); load();
+  };
+  const chips = (box, key) => box.onclick = e => {
+    const b = e.target.closest('.tchip'); if (!b || b.classList.contains('on')) return;
+    f[key] = b.dataset.v; $$('.tchip', box).forEach(x => x.classList.toggle('on', x === b)); load();
+  };
+  chips($('#wsTags'), 'tag'); chips($('#wsAspect'), 'aspect');
+  $('#wsBg').onclick = e => {
+    const b = e.target.closest('button'); if (!b) return;
+    $$('#wsBg button').forEach(x => x.classList.toggle('on', x === b)); segInd($('#wsBg')); setPreviewBg(b.dataset.v);
+  };
   let qt = 0;
   $('#q').oninput = e => { clearTimeout(qt); qt = setTimeout(() => { f.q = e.target.value; load(); }, 280); };
-  $('#sort').onchange = e => { f.sort = e.target.value; load(); };
-  const chipInd = () => { const b = $('#kinds .chip.on'); $('#chipInd').style.cssText = `width:${b.offsetWidth}px;transform:translateX(${b.offsetLeft}px)`; };
-  chipInd(); document.fonts?.ready.then(chipInd); addEventListener('resize', chipInd);
-  $('#kinds').onclick = e => {
-    const b = e.target.closest('.chip'); if (!b || b.classList.contains('on')) return;
-    $$('.chip', $('#kinds')).forEach(c => c.classList.toggle('on', c === b));
-    chipInd();
-    f.kind = b.dataset.kind; load();
-  };
   more.onclick = () => load(false);
+  $('#wsHow').onclick = () => openHowTo(f.tab);
+  $('#wsCreate').onclick = e => { if (f.tab === 'bg') { e.preventDefault(); openBgUpload(() => { f.sort = 'new'; renderControls(); load(); }); } };
 
-  // карточка → окно; лайк/удаление в окне обновляют карточку
+  // ----- карточки -----
+  const setCount = () => { $('#count').textContent = `${f.tab === 'bg' ? 'Фонов' : 'Сеток'}: ${num(total)} · ${SORT_NOTE[f.sort]}`; };
   const onChange = (g, removed) => {
-    const c = $(`.gcard[data-id="${CSS.escape(g.id)}"]`, cards); if (!c) return;
-    if (removed) { c.remove(); total--; $('#count').textContent = `${num(total)} ${plural(total, 'сетка', 'сетки', 'сеток')}`; if (!$('.gcard', cards)) cards.innerHTML = emptyHTML(); return; }
-    const l = $('[data-likes]', c); l.classList.toggle('liked', API.isLiked(g.id)); l.lastChild.textContent = num(g.likes);
+    const c = $(`[data-id="${CSS.escape(g.id)}"], [data-bg="${CSS.escape(g.id)}"]`, cards); if (!c) return;
+    if (removed) { c.remove(); total--; setCount(); if (!$('.gcard, .bcard', cards)) cards.innerHTML = emptyHTML(); return; }
+    const l = $('[data-likes]', c); if (!l) return;
+    l.classList.toggle('liked', f.tab === 'bg' ? API.bg.isLiked(g.id) : API.isLiked(g.id)); l.lastChild.textContent = num(g.likes);
   };
-  cards.onclick = e => { const c = e.target.closest('.gcard[data-id]'); if (c) openGrid(c.dataset.id, { onChange }); };
+  cards.onclick = e => {
+    if (e.target.closest('[data-act="upload"]')) { openBgUpload(() => load()); return; }
+    const like = e.target.closest('[data-bg-like]');
+    if (like) {
+      e.stopPropagation();
+      const id = like.dataset.bgLike;
+      like.disabled = true;
+      API.bg.like(id).then(r => { like.classList.toggle('liked', r.liked); like.lastChild.textContent = num(r.likes); }).catch(er => toast(er.message, 'err')).finally(() => { like.disabled = false; });
+      return;
+    }
+    const dl = e.target.closest('[data-bg-dl]');
+    if (dl) { e.stopPropagation(); API.bg.hit(dl.dataset.bgDl); return; }
+    const b = e.target.closest('.bcard[data-bg]');
+    if (b) { openBg(b.dataset.bg, { onChange }); return; }
+    const c = e.target.closest('.gcard[data-id]');
+    if (c) openGrid(c.dataset.id, { onChange });
+  };
+  // фоны: видео играет, пока курсор над карточкой; GIF — тоже оживает только при наведении
+  cards.addEventListener('pointerover', e => {
+    const pic = e.target.closest('.bpic'); if (!pic || pic.dataset.on) return;
+    pic.dataset.on = '1';
+    const v = $('video', pic);
+    if (v) { if (!v.src) v.src = v.dataset.src; v.play().then(() => pic.classList.add('playing')).catch(() => {}); }
+    const gif = $('img[data-gif]', pic); if (gif) { gif.src = gif.dataset.gif; }
+    pic.addEventListener('pointerleave', () => {
+      delete pic.dataset.on; pic.classList.remove('playing');
+      if (v) v.pause();
+      if (gif) gif.src = gif.dataset.poster;
+    }, { once: true });
+  });
 
+  renderControls();
   load();
-  const id = new URLSearchParams(location.search).get('id');
+  const id = qs.get('id'), bgId = qs.get('bg');
   if (id) openGrid(id, { onChange });
+  if (bgId) openBg(bgId, { onChange });
+}
+
+// ---------- фоны: карточка, окно, загрузка ----------
+const secs = s => s ? `${(Math.round(s * 10) / 10).toLocaleString('ru')} с` : '';
+const mb = n => `${(n / 1048576).toLocaleString('ru', { maximumFractionDigits: 1 })} МБ`;
+const bgName = b => `${String(b.title || 'background').replace(/[\\/:*?"<>|]+/g, ' ').trim().slice(0, 50) || 'background'}.${String(b.file).split('.').pop()}`;
+const bgDlUrl = b => b.file + '?dl=' + encodeURIComponent(bgName(b));
+function bgCardHTML(b, k = 0) {
+  const hide = b.nsfw && !API.adult(), gif = /\.gif$/i.test(b.file);
+  return `<article class="bcard${hide ? ' hide18' : ''}" data-bg="${esc(b.id)}" style="animation-delay:${Math.min(k, 12) * 40}ms">
+    <div class="bpic">
+      <img src="${esc(b.poster)}" alt="" loading="lazy"${gif ? ` data-gif="${esc(b.file)}" data-poster="${esc(b.poster)}"` : ''}>
+      ${b.kind === 'video' ? `<video muted loop playsinline preload="none" data-src="${esc(b.file)}"></video><span class="bplay">${icon('play')}</span>` : ''}
+      ${b.tags?.length || b.nsfw ? `<span class="btags">${b.nsfw ? '<i class="t18">18+</i>' : ''}${(b.tags || []).slice(0, 2).map(t => `<i>${esc(t)}</i>`).join('')}${b.tags?.length > 2 ? `<i>+${b.tags.length - 2}</i>` : ''}</span>` : ''}
+      <span class="bfacts">${esc(b.aspect === 'other' ? `${b.width}×${b.height}` : b.aspect)}${b.duration ? ' · ' + secs(b.duration) : ''}<span>${icon('download')}${num(b.downloads)}</span></span>
+      ${hide ? nsfwCover() : ''}
+    </div>
+    <div class="bbody">
+      <b class="btitle" title="${esc(b.title)}">${esc(b.title)}</b>
+      <span class="bby">${esc(b.author || 'Игрок')} · ${ago(b.created_at)}</span>
+      <div class="bacts">
+        <button class="blike${API.bg.isLiked(b.id) ? ' liked' : ''}" data-bg-like="${esc(b.id)}" data-likes aria-label="Лайк">${icon('heart')}${num(b.likes)}</button>
+        <a class="btn sm" href="${esc(bgDlUrl(b))}" download data-bg-dl="${esc(b.id)}">${icon('download')}Скачать</a>
+      </div>
+    </div>
+  </article>`;
+}
+function setUrlBg(id) {
+  if (PAGE !== 'workshop') return;
+  const u = new URL(location.href);
+  id ? u.searchParams.set('bg', id) : u.searchParams.delete('bg');
+  history.replaceState(null, '', u);
+}
+async function openBg(id, { onChange } = {}) {
+  const root = $('#modalRoot');
+  root.innerHTML = `<div class="modal"><div class="modal-view"><span class="loading">Загружаю фон…</span></div><div class="modal-side"><span class="loading"> </span></div></div>`;
+  setUrlBg(id);
+  let alive = true;
+  const close = () => { alive = false; root.innerHTML = ''; setUrlBg(null); document.removeEventListener('keydown', onKey); };
+  const onKey = e => { if (e.key === 'Escape') close(); };
+  document.addEventListener('keydown', onKey);
+  root.onclick = e => { if (e.target === root) close(); };
+  let b;
+  try { b = await API.bg.get(id); } catch (e) { if (alive) { close(); toast(e.message, 'err'); } return; }
+  if (!alive) return;
+  const mine = API.bg.isMine(b), hide = b.nsfw && !API.adult();
+  const author = b.user_id && ACC?.enabled ? `<a href="profile.html?u=${encodeURIComponent(b.user_id)}">${esc(b.author)}</a>` : `<b>${esc(b.author)}</b>`;
+  const media = b.kind === 'video'
+    ? `<video src="${esc(b.file)}" poster="${esc(b.poster)}" muted loop playsinline autoplay controls></video>`
+    : `<img src="${esc(b.file)}" alt="${esc(b.title)}">`;
+  root.innerHTML = `<div class="modal bg-modal" role="dialog" aria-label="${esc(b.title)}">
+    <button class="modal-x" data-icon="x" aria-label="Закрыть"></button>
+    <div class="modal-view bg-view${hide ? ' hide18' : ''}">${media}${hide ? nsfwCover() : ''}</div>
+    <div class="modal-side">
+      <div><h2>${esc(b.title)}</h2><div class="by">от ${author} · ${ago(b.created_at)}</div></div>
+      ${tagsHTML([...(b.nsfw ? ['18+'] : []), ...(b.tags || [])], 9)}
+      <div class="stats">
+        <div><b data-likes>${num(b.likes)}</b><span>${plural(b.likes, 'лайк', 'лайка', 'лайков')}</span></div>
+        <div><b>${num(b.downloads)}</b><span>скачиваний</span></div>
+        <div><b>${esc(b.aspect === 'other' ? '—' : b.aspect)}</b><span>экран</span></div>
+      </div>
+      <div class="hint">${b.kind === 'video' ? 'Видео' : /\.gif$/i.test(b.file) ? 'GIF' : 'Картинка'} · ${num(b.width)}×${num(b.height)}${b.duration ? ' · ' + secs(b.duration) : ''} · ${mb(b.size)}</div>
+      <div class="actions">
+        <a class="btn primary" id="bDl" href="${esc(bgDlUrl(b))}" download><span class="ico-box" data-icon="download"></span>Скачать фон</a>
+        <div class="row">
+          <button class="btn ${API.bg.isLiked(b.id) ? 'on' : ''}" id="bLike" data-icon="heart">${API.bg.isLiked(b.id) ? 'Нравится' : 'Лайк'}</button>
+          <button class="btn" id="bHow" data-icon="book">Как поставить</button>
+        </div>
+        <div class="side-links">
+          <button id="bLink">Скопировать ссылку</button>
+          ${mine ? '<button class="danger" id="bDel">Удалить мой фон</button>' : `<button id="bReport">${API.bg.isReported(b.id) ? 'Жалоба отправлена' : 'Пожаловаться'}</button>`}
+        </div>
+      </div>
+    </div>
+  </div>`;
+  applyIcons(root);
+  $('.modal-x', root).onclick = close;
+  $('#bDl').onclick = () => API.bg.hit(b.id);
+  $('#bHow').onclick = () => openHowTo('bg');
+  $('#bLink').onclick = () => copyText(new URL('workshop.html?bg=' + b.id, location.href).href, 'Ссылка скопирована');
+  const like = $('#bLike');
+  like.onclick = async () => {
+    like.disabled = true;
+    try {
+      const r = await API.bg.like(b.id);
+      b.likes = r.likes;
+      like.classList.toggle('on', r.liked); like.lastChild.textContent = r.liked ? 'Нравится' : 'Лайк';
+      $('[data-likes]', root).textContent = num(r.likes);
+      onChange && onChange(b);
+    } catch (e) { toast(e.message, 'err'); }
+    like.disabled = false;
+  };
+  const rep = $('#bReport');
+  if (rep) rep.onclick = async () => {
+    if (API.bg.isReported(b.id)) return;
+    if (!confirm('Пожаловаться на этот фон? После нескольких жалоб он пропадёт из Мастерской до проверки.')) return;
+    try { await API.bg.report(b.id); rep.textContent = 'Жалоба отправлена'; toast('Спасибо, жалоба отправлена', 'ok'); } catch (e) { toast(e.message, 'err'); }
+  };
+  const del = $('#bDel');
+  if (del) del.onclick = async () => {
+    if (!confirm(`Удалить «${b.title}» из Мастерской? Файл сотрётся, это нельзя отменить.`)) return;
+    try { await API.bg.remove(b.id); close(); toast('Фон удалён', 'ok'); onChange && onChange(b, true); } catch (e) { toast(e.message, 'err'); }
+  };
+}
+
+// постер и описание файла фона: размеры, длительность, пропорции — считаем в браузере
+const ASPECTS = [['16:9', 16 / 9], ['16:10', 1.6], ['21:9', 21 / 9], ['4:3', 4 / 3]];
+const aspectOf = (w, h) => { const r = w / h, a = ASPECTS.find(([, v]) => Math.abs(r / v - 1) < 0.04); return a ? a[0] : 'other'; };
+async function bgProbe(file) {
+  const url = URL.createObjectURL(file);
+  try {
+    let src, w, h, duration = 0;
+    if (file.type.startsWith('video/')) {
+      const v = document.createElement('video');
+      v.muted = true; v.playsInline = true; v.preload = 'auto'; v.src = url;
+      await new Promise((ok, no) => { v.onloadeddata = ok; v.onerror = () => no(new Error('Браузер не смог открыть это видео. Подойдут MP4 (H.264) и WebM.')); });
+      w = v.videoWidth; h = v.videoHeight; duration = v.duration || 0;
+      await new Promise(ok => { v.onseeked = ok; v.currentTime = Math.min(1, duration / 3); setTimeout(ok, 1500); });
+      src = v;
+    } else {
+      const im = new Image();
+      await new Promise((ok, no) => { im.onload = ok; im.onerror = () => no(new Error('Картинка не открылась. Подойдут PNG, JPEG, WebP и GIF.')); im.src = url; });
+      w = im.naturalWidth; h = im.naturalHeight; src = im;
+    }
+    const k = Math.min(1, 640 / w), cv = document.createElement('canvas');
+    cv.width = Math.round(w * k); cv.height = Math.round(h * k);
+    cv.getContext('2d').drawImage(src, 0, 0, cv.width, cv.height);
+    let poster = await new Promise(ok => cv.toBlob(ok, 'image/webp', 0.82));
+    if (!poster || poster.type !== 'image/webp') poster = await new Promise(ok => cv.toBlob(ok, 'image/jpeg', 0.85)); // Safari не умеет webp
+    return { w, h, duration, poster, preview: cv.toDataURL('image/jpeg', 0.8), aspect: aspectOf(w, h), kind: file.type.startsWith('video/') ? 'video' : 'image' };
+  } finally { URL.revokeObjectURL(url); }
+}
+function openBgUpload(onDone) {
+  if (!API.bg.canUpload()) {
+    openSheet(`<div class="sh-body"><div class="sh-ico">${icon('upload')}</div><h2>Загрузка фонов скоро</h2><p>Хранилище для фонов ещё подключается. Как только заработает — здесь можно будет выложить свою картинку или видео.</p></div>`);
+    return;
+  }
+  if (!ACC.signedIn()) {
+    const m = openSheet(`<div class="sh-body"><div class="sh-ico">${icon('user')}</div><h2>Войди, чтобы выложить фон</h2>
+      <p>Фоны выкладываются от имени профиля — так их можно удалить с любого устройства, а Мастерская защищена от спама.</p>
+      <div class="sh-actions"><a class="btn primary block" href="profile.html?next=${encodeURIComponent('workshop.html?backgrounds')}">${icon('user')}Войти</a></div></div>`);
+    return m;
+  }
+  const tags = new Set();
+  let file = null, info = null;
+  const m = openSheet(`<div class="sh-body up-body">
+    <h2>Выложить фон</h2>
+    <label class="drop" id="upDrop"><input type="file" id="upFile" accept="image/png,image/jpeg,image/webp,image/gif,video/mp4,video/webm" hidden>
+      <span class="drop-empty">${icon('upload')}<b>Перетащи картинку, GIF или видео</b><span>или нажми, чтобы выбрать · картинки до 10 МБ, видео до 30 МБ</span></span>
+      <img class="drop-prev" id="upPrev" alt="" hidden><span class="drop-facts" id="upFacts" hidden></span></label>
+    <label class="field"><span>Название</span><input class="input" id="upTitle" maxlength="60" placeholder="Например, «Закат над Рошаном»"></label>
+    <div class="field"><span>Теги · до 5</span><div class="tchips" id="upTags">${API.TAGS.bg.map(t => `<button type="button" class="tchip" data-v="${esc(t)}">${esc(t)}</button>`).join('')}</div></div>
+    <label class="check"><input type="checkbox" id="up18"><span><b>18+</b> — откровенное: в Мастерской будет размыто, пока не нажмут</span></label>
+    <div class="up-bar" id="upBar" hidden><i></i></div>
+    <div class="sh-actions"><button class="btn primary block" id="upGo" disabled>${icon('upload')}Опубликовать</button></div>
+    <p class="hint">Выкладывай только то, что можно показывать: за чужие работы без разрешения и запрещённый контент фон удалят.</p>
+  </div>`);
+  const go = $('#upGo', m.root), drop = $('#upDrop', m.root);
+  async function pick(f) {
+    if (!f) return;
+    const isVideo = /^video\/(mp4|webm)$/.test(f.type), isImage = /^image\/(png|jpeg|webp|gif)$/.test(f.type);
+    if (!isVideo && !isImage) { toast('Подходят PNG, JPEG, WebP, GIF, MP4 и WebM', 'err'); return; }
+    if (f.size > (isVideo ? 30 : 10) * 1048576) { toast(isVideo ? 'Видео — до 30 МБ. Сожми его или укороти.' : 'Картинка — до 10 МБ.', 'err'); return; }
+    go.disabled = true; drop.classList.add('busy');
+    try {
+      info = await bgProbe(f); file = f;
+      $('#upPrev', m.root).src = info.preview; $('#upPrev', m.root).hidden = false;
+      $('#upFacts', m.root).hidden = false;
+      $('#upFacts', m.root).textContent = `${info.w}×${info.h} · ${info.aspect === 'other' ? 'свои пропорции' : info.aspect}${info.duration ? ' · ' + secs(info.duration) : ''} · ${mb(f.size)}`;
+      drop.classList.add('has');
+      const t = $('#upTitle', m.root); if (!t.value) t.value = f.name.replace(/\.[^.]+$/, '').replace(/[_-]+/g, ' ').slice(0, 60);
+      go.disabled = false;
+    } catch (e) { toast(e.message, 'err'); }
+    drop.classList.remove('busy');
+  }
+  $('#upFile', m.root).onchange = e => pick(e.target.files[0]);
+  drop.ondragover = e => { e.preventDefault(); drop.classList.add('over'); };
+  drop.ondragleave = () => drop.classList.remove('over');
+  drop.ondrop = e => { e.preventDefault(); drop.classList.remove('over'); pick(e.dataTransfer.files[0]); };
+  $('#upTags', m.root).onclick = e => {
+    const b = e.target.closest('.tchip'); if (!b) return;
+    if (tags.has(b.dataset.v)) tags.delete(b.dataset.v);
+    else if (tags.size < 5) tags.add(b.dataset.v);
+    else { toast('Не больше 5 тегов', 'err'); return; }
+    b.classList.toggle('on', tags.has(b.dataset.v));
+  };
+  go.onclick = async () => {
+    const title = $('#upTitle', m.root).value.trim();
+    if (!title) { $('#upTitle', m.root).focus(); toast('Дай фону название', 'err'); return; }
+    go.disabled = true;
+    const bar = $('#upBar', m.root); bar.hidden = false;
+    try {
+      await API.bg.upload({ file, poster: info.poster, meta: { title, tags: [...tags], nsfw: $('#up18', m.root).checked, aspect: info.aspect, width: info.w, height: info.h, duration: info.duration } },
+        p => { $('i', bar).style.width = Math.round(p * 100) + '%'; });
+      m.close(); toast(`«${title}» в Мастерской`, 'ok');
+      onDone && onDone();
+    } catch (e) { toast(e.message, 'err'); go.disabled = false; bar.hidden = true; }
+  };
+  return m;
+}
+
+// «Как установить»: сетка — куда положить файл; фон — что сейчас умеет Мастерская
+function openHowTo(tab) {
+  const steam = 'Steam\\userdata\\<твой ID>\\570\\remote\\cfg';
+  openSheet(tab === 'bg'
+    ? `<div class="sh-body"><div class="sh-ico">${icon('image')}</div><h2>Как поставить фон</h2>
+      <p>Каждый фон скачивается обычным файлом — картинкой или видео в исходном качестве. Его можно поставить на рабочий стол, в профиль Steam или собрать из него фон главного меню.</p>
+      <p>Своего фона главного меню в настройках Доты нет: его ставят модом. Сборщик такого мода прямо на сайте — следующий шаг Мастерской, следи за новостями.</p>
+      <div class="sh-actions">${SITE.telegram ? `<a class="btn block" href="${esc(SITE.telegram)}" target="_blank" rel="noopener">${icon('send')}Новости Grid Studio</a>` : ''}</div></div>`
+    : `<div class="sh-body"><div class="sh-ico">${icon('grid')}</div><h2>Как установить сетку</h2>
+      <ol class="sh-steps"><li>Открой сетку и нажми <b>«Скачать»</b> — придёт файл <code>hero_grid_config.json</code>.</li>
+        <li>Закрой Доту и положи файл в папку <code>${esc(steam)}</code> (с заменой).</li>
+        <li>Запусти игру: «Герои» → сортировка → выбери сетку по названию.</li></ol>
+      <p class="hint">Файл заменит все твои сетки. Чтобы добавить чужую к своим — открой её в редакторе, затем свой JSON, и сделай экспорт.</p>
+      <div class="sh-actions"><a class="btn block" href="guides.html#start">${icon('book')}Подробный гайд с картинками</a></div></div>`);
 }
 
 // ---------- гайды ----------
@@ -637,7 +1006,7 @@ function renderSignIn(box, next) {
   const PROV = { discord: ['discord', 'Discord'], github: ['github', 'GitHub'] };
   box.innerHTML = `<div class="auth-card">${LOGO}
     <h1>Вход в Grid Studio</h1>
-    <p>Сохраняй работы в профиль и возвращайся к ним с любого устройства. Выкладывай сетки в каталог от своего имени.</p>
+    <p>Сохраняй работы в профиль и возвращайся к ним с любого устройства. Выкладывай сетки в Мастерскую от своего имени.</p>
     ${ACC.providers.length ? `<div class="auth-prov">${ACC.providers.map(p => `<button class="btn block" data-prov="${p}">${icon(PROV[p]?.[0] || 'user')}Войти через ${PROV[p]?.[1] || p}</button>`).join('')}</div><div class="auth-or"><span>или по почте</span></div>` : ''}
     <form class="auth-form" id="authForm">
       <label class="auth-field">${icon('mail')}<input class="input" id="authEmail" type="email" required placeholder="почта@пример.ru" autocomplete="email"></label>
@@ -679,14 +1048,14 @@ function profileHead(p, { me, grids = [], works = null }) {
   return `<section class="pf-head">
     <div class="pf-ava-wrap">${avatarHTML(p.avatar, p.nick, 'pf-ava')}${me ? `<button class="pf-ava-edit" id="pfAva" title="Сменить аватар" aria-label="Сменить аватар">${icon('image')}</button>` : ''}</div>
     <div class="pf-info">
-      ${me ? `<input class="pf-nick" id="pfNick" value="${esc(p.nick)}" maxlength="32" spellcheck="false" title="Ник — его видят в каталоге">` : `<h1 class="pf-nick">${esc(p.nick || 'Игрок')}</h1>`}
+      ${me ? `<input class="pf-nick" id="pfNick" value="${esc(p.nick)}" maxlength="32" spellcheck="false" title="Ник — его видят в Мастерской">` : `<h1 class="pf-nick">${esc(p.nick || 'Игрок')}</h1>`}
       ${me && ACC.ext() ? `<textarea class="pf-bio" id="pfBio" maxlength="200" rows="1" placeholder="Пара слов о себе: какие сетки делаешь, за кого играешь…">${esc(p.bio || '')}</textarea>` : p.bio ? `<p class="pf-bio">${esc(p.bio)}</p>` : ''}
       <span class="pf-meta">${me ? `${icon('lock')}${esc(ACC.user()?.email || '')} — видишь только ты` : ''} ${p.created_at ? `с ${new Date(p.created_at).toLocaleDateString('ru', { month: 'long', year: 'numeric' })}` : ''} ${steam}</span>
     </div>
     <div class="pf-side">
       <div class="pf-stats">
         ${works ? `<div><b>${num(works.length)}</b><span>${plural(works.length, 'работа', 'работы', 'работ')}</span></div>` : ''}
-        <div><b>${num(grids.length)}</b><span>в каталоге</span></div>
+        <div><b>${num(grids.length)}</b><span>в Мастерской</span></div>
         <div><b>${num(likes)}</b><span>${plural(likes, 'лайк', 'лайка', 'лайков')}</span></div>
         <div><b>${num(dls)}</b><span>скачиваний</span></div>
       </div>
@@ -802,9 +1171,9 @@ async function renderMyProfile(box) {
     if (tab === 'works') list.innerHTML = works.length ? works.map(workCard).join('')
       : `<div class="cards-empty">${MARK}<b>Пока нет сохранённых работ</b><span>В редакторе открой меню у названия сетки → «Сохранить в мои работы». Работы видишь только ты.</span><a class="btn primary sm" href="editor.html">Открыть редактор</a></div>`;
     else if (tab === 'pub') list.innerHTML = pub.length ? pub.map(cardHTML).join('')
-      : `<div class="cards-empty"><b>Ничего не опубликовано</b><span>Сетки, которые ты выложишь в каталог, войдя в профиль, появятся здесь.</span></div>`;
+      : `<div class="cards-empty"><b>Ничего не опубликовано</b><span>Сетки, которые ты выложишь в Мастерскую, войдя в профиль, появятся здесь.</span></div>`;
     else list.innerHTML = !liked ? skeletons(3) : liked.length ? liked.map(cardHTML).join('')
-      : `<div class="cards-empty"><b>Пока пусто</b><span>Ставь лайки сеткам в каталоге — они соберутся здесь.</span><a class="btn sm" href="catalog.html">В каталог</a></div>`;
+      : `<div class="cards-empty"><b>Пока пусто</b><span>Ставь лайки сеткам в Мастерской — они соберутся здесь.</span><a class="btn sm" href="workshop.html">В Мастерскую</a></div>`;
     applyIcons(list);
   };
   $('#pfTabs').onclick = async e => {
@@ -842,7 +1211,7 @@ async function renderMyProfile(box) {
 }
 const workCard = (w, k) => `<a class="gcard wcard" href="editor.html?project=${encodeURIComponent(w.id)}" style="animation-delay:${Math.min(k, 12) * 40}ms">
   <span class="gthumb">${w.thumb ? `<img src="${esc(w.thumb)}" alt="" loading="lazy">` : ''}
-    <span class="gkind">${w.grid_id ? `${icon('globe')}В каталоге` : `${icon('lock')}Приватная`} · ${num(w.cats)} кат.</span>
+    <span class="gkind">${w.grid_id ? `${icon('globe')}В Мастерской` : `${icon('lock')}Приватная`} · ${num(w.cats)} кат.</span>
     <span class="w-acts">
       <button data-wact="ren" data-id="${esc(w.id)}" title="Переименовать" aria-label="Переименовать">${icon('edit')}</button>
       <button data-wact="dl" data-id="${esc(w.id)}" title="Скачать hero_grid_config.json" aria-label="Скачать">${icon('download')}</button>
@@ -858,11 +1227,11 @@ async function renderPublicProfile(box, id) {
     if (!p) throw new Error('Такого профиля нет.');
     document.title = `${p.nick} · Grid Studio`;
     box.innerHTML = `${profileHead(p, { me: false, grids })}
-      <div class="cards" id="pfList">${grids.length ? grids.map(cardHTML).join('') : `<div class="cards-empty"><b>Сеток пока нет</b><span>Автор ещё ничего не выложил в каталог.</span></div>`}</div>`;
+      <div class="cards" id="pfList">${grids.length ? grids.map(cardHTML).join('') : `<div class="cards-empty"><b>Сеток пока нет</b><span>Автор ещё ничего не выложил в Мастерскую.</span></div>`}</div>`;
     applyIcons(box);
     $('#pfShare').onclick = e => copyText(e.currentTarget.dataset.copy, 'Ссылка на профиль скопирована');
     $('#pfList').onclick = e => { const c = e.target.closest('.gcard[data-id]'); if (c) openGrid(c.dataset.id); };
-  } catch (e) { box.innerHTML = `<div class="auth-card"><h1>Профиль не найден</h1><p>${esc(e.message)}</p><a class="btn" href="catalog.html">В каталог</a></div>`; }
+  } catch (e) { box.innerHTML = `<div class="auth-card"><h1>Профиль не найден</h1><p>${esc(e.message)}</p><a class="btn" href="workshop.html">В Мастерскую</a></div>`; }
 }
 
 // ---------- запуск ----------
@@ -878,11 +1247,11 @@ function reveal(root = document) {
   els.forEach(el => io.observe(el));
 }
 if (PAGE === 'home') initHome();
-if (PAGE === 'catalog') initCatalog();
+if (PAGE === 'workshop') initWorkshop();
 if (PAGE === 'guides') initGuides();
 if (PAGE === 'profile') initProfile();
 reveal();
 // профиль подтягивается в фоне — меню обновится само
 if (ACC?.enabled && PAGE !== 'profile') ACC.ready();
-// число сеток в меню на страницах, где каталог сам его не грузит
+// число сеток в меню на страницах, где Мастерская сама его не грузит
 if (PAGE === 'guides' || PAGE === 'game' || PAGE === 'profile') API.list({ limit: 1 }).then(r => setCatCount(r.total)).catch(() => {});
