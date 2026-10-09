@@ -6,7 +6,7 @@ window.GRID_CATALOG = {
   key: 'sb_publishable_FYYG4_07-LRg7UqpQeSg_A_TLsx1t25',   // Project Settings → API Keys → publishable (НЕ secret!)
   // Аккаунты («Войти», «Мои работы», публикация от своего имени). Включай после настройки
   // Supabase по README, раздел «Аккаунты»: SQL из supabase/schema.sql и адреса сайта в Auth → URL Configuration.
-  accounts: false,
+  accounts: true,
   // Вход через Discord / GitHub — только если провайдер включён в Supabase → Authentication → Providers.
   // Вход по ссылке на почту работает всегда.
   providers: { discord: false, github: false },
