@@ -999,7 +999,7 @@ async function openBg(id, { onChange } = {}) {
   const mine = API.bg.isMine(b), hide = b.nsfw && !API.adult(), adm = isAdmin();
   const author = b.user_id && ACC?.enabled ? `<a href="profile.html?u=${encodeURIComponent(b.user_id)}">${esc(b.author)}</a>` : `<b>${esc(b.author)}</b>`;
   const media = b.kind === 'video'
-    ? `<video src="${esc(b.file)}" poster="${esc(b.poster)}" muted loop playsinline autoplay controls></video>`
+    ? `<video src="${esc(b.file)}" poster="${esc(b.poster)}" muted loop playsinline autoplay disablepictureinpicture controlslist="nodownload nofullscreen noplaybackrate"></video>`
     : `<img src="${esc(b.file)}" alt="${esc(b.title)}">`;
   root.innerHTML = `<div class="modal bg-modal" role="dialog" aria-label="${esc(b.title)}">
     <button class="modal-x" data-icon="x" aria-label="Закрыть"></button>
@@ -1020,7 +1020,7 @@ async function openBg(id, { onChange } = {}) {
           <a class="btn" id="bDl" href="${esc(bgDlUrl(b))}" download data-icon="file">Файл</a>
           <button class="btn ${API.bg.isLiked(b.id) ? 'on' : ''}" id="bLike" data-icon="heart">${API.bg.isLiked(b.id) ? 'Нравится' : 'Лайк'}</button>
         </div>
-        <button class="btn ghost sm" id="bHow" data-icon="book">Как установить</button>
+        <button class="btn sm block" id="bHow" data-icon="book">Как установить</button>
         <div class="hint">«Поставить в Dota» откроет сборщик: превью меню и твоей сетки поверх фона, размытие, затемнение — и файл <code>pak02_dir.vpk</code> для игры. «Файл» — исходная картинка или видео.</div>
         <div class="side-links">
           <button id="bLink">Скопировать ссылку</button>
