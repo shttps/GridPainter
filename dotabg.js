@@ -236,25 +236,43 @@ window.DotaBG = (() => {
     if (b[0] === 0x1a && b[1] === 0x45 && b[2] === 0xdf && b[3] === 0xa3 || s.slice(4, 8) === 'ftyp') return 'video';
     throw new Error('Не похоже на картинку или видео. Подходят PNG, JPEG, WebP, GIF, MP4 и WebM.');
   }
-  // картинка на весь кадр без полос — края обрезаются, как object-fit: cover
-  function cover(ctx, src, sw, sh, W, H) {
-    const k = Math.max(W / sw, H / sh), w = sw * k, h = sh * k;
+  // Кадр фона: как картинка ляжет на экран. fit — 'cover' (заполнить, края обрежутся) или 'contain' (целиком,
+  // по бокам чёрное); blur 0…1 — размытие до 24 px на 1080 строк (одинаково на любом экране), dim 0…1 — чёрная
+  // вуаль до 80 %. Размытую картинку чуть увеличиваем, чтобы размытие не тянуло чёрное с краёв.
+  // paint(ctx, x, y, w, h) рисует исходник — картинку, кадр видео или VideoSample. Тем же рисуется превью сборщика.
+  const LOOK = { blur: 24, dim: 0.8 };
+  function drawFrame(ctx, paint, sw, sh, W, H, { fit = 'cover', blur = 0, dim = 0 } = {}) {
+    const sigma = Math.min(1, Math.max(0, blur)) * LOOK.blur * H / 1080;
+    const k = (fit === 'contain' ? Math.min(W / sw, H / sh) : Math.max(W / sw, H / sh) * (1 + 5 * sigma / H));
+    const w = sw * k, h = sh * k;
+    ctx.save();
     ctx.fillStyle = '#000'; ctx.fillRect(0, 0, W, H);
-    ctx.drawImage(src, (W - w) / 2, (H - h) / 2, w, h);
+    if (sigma > 0.3) ctx.filter = `blur(${sigma.toFixed(1)}px)`;
+    paint(ctx, (W - w) / 2, (H - h) / 2, w, h);
+    ctx.restore();
+    if (dim > 0) { ctx.fillStyle = `rgba(0,0,0,${(Math.min(1, dim) * LOOK.dim).toFixed(3)})`; ctx.fillRect(0, 0, W, H); }
   }
-  async function fromVideo(MB, blob, W, H, codec, onProgress, job) {
+  async function fromVideo(MB, blob, W, H, codec, look, from, onProgress, job) {
     const input = new MB.Input({ formats: MB.ALL_FORMATS, source: new MB.BlobSource(blob) });
     const track = await input.getPrimaryVideoTrack();
     if (!track) throw new Error('В файле нет видео.');
-    const duration = await input.computeDuration(), end = Math.min(duration || LIMIT.seconds, LIMIT.seconds);
+    const duration = await input.computeDuration() || LIMIT.seconds;
+    const start = Math.max(0, Math.min(+from || 0, duration - 1)), end = Math.min(duration, start + LIMIT.seconds);
     const fps = (await track.computePacketStats(90).catch(() => null))?.averagePacketRate || 30;
-    let bitrate = Math.min(LIMIT.bitrate, LIMIT.target * 8 / Math.max(1, end));
+    let bitrate = Math.min(LIMIT.bitrate, LIMIT.target * 8 / Math.max(1, end - start));
+    // каждый кадр рисуется заново — с кадрированием, размытием и затемнением, как в превью
+    const cv = document.createElement('canvas'); cv.width = W; cv.height = H;
+    const ctx = cv.getContext('2d');
+    const process = sample => {
+      drawFrame(ctx, (c, x, y, w, h) => sample.draw(c, x, y, w, h), sample.displayWidth, sample.displayHeight, W, H, look);
+      return cv;
+    };
     // шум и зерно кодировщик ужимает хуже, чем обещает битрейт: перебор — собираем ещё раз, последний раз строго
     for (let attempt = 0; ; attempt++) {
       const output = new MB.Output({ format: new MB.WebMOutputFormat(), target: new MB.BufferTarget() });
       const conv = await MB.Conversion.init({
-        input, output, audio: { discard: true }, trim: { start: 0, end },
-        video: { codec, width: W, height: H, fit: 'cover', forceTranscode: true, keyFrameInterval: 10, hardwareAcceleration: 'prefer-software',
+        input, output, audio: { discard: true }, trim: { start, end },
+        video: { codec, process, processedWidth: W, processedHeight: H, forceTranscode: true, keyFrameInterval: 10, hardwareAcceleration: 'prefer-software',
           ...(fps > 31 ? { frameRate: 30 } : {}), quality: new MB.Quality({ bitrate: Math.round(bitrate), bitrateMode: attempt >= 2 ? 'constant' : 'variable' }) },
       });
       if (!conv.isValid) throw new Error('Браузер не смог прочитать это видео. Попробуй MP4 (H.264) или WebM.');
@@ -268,7 +286,7 @@ window.DotaBG = (() => {
   }
   // картинка — неподвижное видео: кадр в секунду, полминуты (одинаковые кадры почти ничего не весят);
   // GIF — его кадры с их длительностью, по кругу, пока не наберётся хотя бы 6 секунд
-  async function fromImage(MB, blob, gif, W, H, codec, onProgress) {
+  async function fromImage(MB, blob, gif, W, H, codec, look, onProgress) {
     const cv = document.createElement('canvas'); cv.width = W; cv.height = H;
     const ctx = cv.getContext('2d');
     const frames = [];
@@ -293,7 +311,7 @@ window.DotaBG = (() => {
     await output.start();
     for (let t = 0, k = 0; t < total - 1e-6; k++) {
       const f = frames[k % frames.length], d = Math.min(f.d, total - t);
-      cover(ctx, f.bmp, f.bmp.width, f.bmp.height, W, H);
+      drawFrame(ctx, (c, x, y, w, h) => c.drawImage(f.bmp, x, y, w, h), f.bmp.width, f.bmp.height, W, H, look);
       await src.add(t, d);
       t += d; onProgress(t / total);
     }
@@ -302,9 +320,10 @@ window.DotaBG = (() => {
     return new Uint8Array(output.target.buffer);
   }
 
-  // blob — картинка, GIF или видео; screen — '16:9' | '16:10' | '21:9' | '4:3'; clean — убрать колонку новостей.
+  // blob — картинка, GIF или видео; screen — '16:9' | '16:10' | '21:9' | '4:3'; clean — убрать колонку новостей;
+  // look — { fit, blur, dim } (см. drawFrame); start — с какой секунды видео брать отрезок до 30 с.
   // onProgress(0…1, подпись). Вернёт { blob: pak02_dir.vpk, video: байт видео }. job.cancel() — прервать.
-  function build(blob, { screen = '16:9', clean = false, onProgress = () => {} } = {}) {
+  function build(blob, { screen = '16:9', clean = false, look = {}, start = 0, onProgress = () => {} } = {}) {
     const job = { cancel: () => {} };
     job.done = (async () => {
       const [W, H] = SCREENS[screen] || SCREENS['16:9'];
@@ -314,7 +333,7 @@ window.DotaBG = (() => {
       const codec = await pickCodec(MB, W, H);
       const step = p => onProgress(0.02 + p * 0.95, kind === 'video' ? 'Пережимаю видео…' : 'Собираю видео из картинки…');
       step(0);
-      const video = kind === 'video' ? await fromVideo(MB, blob, W, H, codec, step, job) : await fromImage(MB, blob, kind === 'gif', W, H, codec, step);
+      const video = kind === 'video' ? await fromVideo(MB, blob, W, H, codec, look, start, step, job) : await fromImage(MB, blob, kind === 'gif', W, H, codec, look, step);
       onProgress(0.98, 'Собираю пак…');
       const files = [
         panorama('panorama/layout/dashboard.vxml_c', withOurBackground(dashboard), true),
@@ -335,5 +354,5 @@ window.DotaBG = (() => {
     return Object.entries(SCREENS).reduce((a, [k, [w, h]]) => Math.abs(w / h - r) < Math.abs(a[1] - r) ? [k, w / h] : a, ['16:9', 99])[0];
   }
 
-  return { build, info, guessScreen, SCREENS: Object.keys(SCREENS), _test: { crc32, md5, resource, vpk, withOurBackground, withoutNews } };
+  return { build, info, guessScreen, drawFrame, sniff, SCREENS: Object.keys(SCREENS), SIZES: SCREENS, LIMIT, _test: { crc32, md5, resource, vpk, withOurBackground, withoutNews } };
 })();

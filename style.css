@@ -510,6 +510,9 @@ body.was-previewing .dock { animation: riseIn .45s var(--spring) both; }
 
 .brand-pill { animation: dropIn .5s var(--ease) both; }
 .seg-switch { animation: dropInC .5s var(--ease) .06s both; }
+.game-bg { position: absolute; left: 50%; top: 64px; z-index: 30; transform: translateX(-50%); display: none; }
+.game-bg:hover { transform: translateX(-50%) translateY(-2px); }
+body.previewing .game-bg { display: inline-flex; animation: dropInC .4s var(--ease) both; }
 .top-actions { animation: dropIn .5s var(--ease) .1s both; }
 .layers { animation: slideInL .5s var(--ease) .14s both; }
 .inspector { animation: slideIn .5s var(--ease) .16s both; }

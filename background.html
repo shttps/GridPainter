@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Фон меню Dota 2 — свой фон на главный экран · Grid Studio</title>
+<meta name="description" content="Свой фон главного меню Dota 2 из картинки, GIF или видео: превью меню и сетки героев поверх фона, размытие, затемнение, отрезок видео. Собирается прямо в браузере.">
+<meta name="theme-color" content="#0f0d0c">
+<meta property="og:title" content="Фон меню Dota 2 · Grid Studio">
+<meta property="og:description" content="Картинка, GIF или видео на главный экран Доты — с превью меню и твоей сетки героев поверх фона.">
+<meta property="og:image" content="https://shttps.github.io/GridPainter/docs/menu-bg.webp">
+<link rel="icon" href="logo.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="site.css?v=37">
+</head>
+<body data-page="background">
+
+<!-- слева превью: экран Доты с фоном и меню или сеткой героев поверх; справа настройки и сборка -->
+<main class="bgb">
+  <section class="bgb-stage">
+    <div class="bgb-top">
+      <div class="seg sm" id="bgbTabs" role="tablist" aria-label="Что показать в превью"><i class="seg-ind"></i><button data-v="menu" class="on">Меню</button><button data-v="grid">Сетка героев</button></div>
+      <span class="bgb-src" id="bgbSrc"></span>
+    </div>
+    <div class="bgb-screen" id="bgbScreen">
+      <canvas id="bgbCanvas" aria-label="Превью фона"></canvas>
+      <!-- схема главного меню Доты поверх фона: верхняя полоса, друзья слева, новости справа, «Играть» -->
+      <div class="dm" id="bgbMenu" aria-hidden="true">
+        <div class="dm-top"><i class="dm-logo"></i><span class="on">ГЕРОИ</span><span>АРСЕНАЛ</span><span>ПРОСМОТР</span><span>ИГРОТЕКА</span><b></b><i class="dm-ico"></i><i class="dm-ico"></i><i class="dm-ava"></i></div>
+        <div class="dm-friends"><div class="dm-me"><i></i><span><b></b><s></s></span></div><p></p><div class="dm-f"><i></i><s></s></div><div class="dm-f"><i></i><s></s></div><div class="dm-f"><i></i><s></s></div><div class="dm-f off"><i></i><s></s></div><div class="dm-f off"><i></i><s></s></div></div>
+        <div class="dm-news" id="bgbNews"><div class="dm-card big"><span>СОБЫТИЕ</span></div><div class="dm-card"><span>НОВОСТИ</span></div></div>
+        <div class="dm-chat"></div>
+        <div class="dm-play">ИГРАТЬ</div>
+      </div>
+      <label class="bgb-drop" id="bgbDrop">
+        <input type="file" id="bgbFile" accept="image/png,image/jpeg,image/webp,image/gif,video/mp4,video/webm" hidden>
+        <span class="bgb-drop-in"><span data-icon="plus"></span><b>Перетащи сюда картинку, GIF или видео</b><small>или нажми, чтобы выбрать файл</small></span>
+        <span class="bgb-where">Где взять: <a href="workshop.html?backgrounds">Готовые в Мастерской</a><a href="https://motionbgs.com/" target="_blank" rel="noopener">MotionBGs</a><a href="https://moewalls.com/" target="_blank" rel="noopener">MoeWalls</a><a href="https://pixabay.com/videos/" target="_blank" rel="noopener">Pixabay</a></span>
+      </label>
+      <div class="bgb-loading" id="bgbLoading" hidden><div class="up-bar"><i></i></div><span>Загружаю фон…</span></div>
+    </div>
+    <div class="bgb-trim" id="bgbTrim" hidden>
+      <button class="icon-btn" id="bgbPlay" aria-label="Пауза" data-icon="play"></button>
+      <input type="range" id="bgbStart" min="0" max="0" step="0.1" value="0" aria-label="Начало отрезка">
+      <span class="bgb-time" id="bgbTime">0:00–0:30</span>
+    </div>
+    <p class="bgb-cap" id="bgbCap">Главное меню Доты с выбранными пропорциями экрана — схема, как ляжет фон.</p>
+  </section>
+
+  <aside class="bgb-panel">
+    <h1>Фон меню</h1>
+    <p class="bgb-lead">Картинка, GIF или видео на главный экран Доты. В игре фон виден и под сеткой героев — смотри вкладку «Сетка героев».</p>
+
+    <div class="bgb-f"><span>Файл</span>
+      <button class="btn block" id="bgbPick" data-icon="upload">Выбрать файл</button>
+      <small class="hint" id="bgbFileNote">PNG, JPEG, WebP, GIF, MP4, WebM. Из видео берётся отрезок до 30 секунд, звук убирается.</small>
+    </div>
+    <div class="bgb-f"><span>Экран <em id="bgbScreenNote"></em></span><div class="seg sm" id="bgbScreens"><i class="seg-ind"></i></div></div>
+    <div class="bgb-f"><span>Картинка <em id="bgbFitNote">края обрежутся, без чёрных полос</em></span>
+      <div class="seg sm" id="bgbFit"><i class="seg-ind"></i><button data-v="cover" class="on">Заполнить</button><button data-v="contain">Целиком</button></div></div>
+    <div class="bgb-row">
+      <label class="bgb-f"><span>Размытие <em id="bgbBlurV">нет</em></span><input type="range" id="bgbBlur" min="0" max="1" step="0.05" value="0"></label>
+      <label class="bgb-f"><span>Затемнение <em id="bgbDimV">нет</em></span><input type="range" id="bgbDim" min="0" max="1" step="0.05" value="0"></label>
+    </div>
+    <label class="check"><input type="checkbox" id="bgbClean"><span><b>Убрать новости справа</b> — колонка Valve на главной не закроет фон</span></label>
+    <div class="bgb-f bgb-gridpick"><span>Сетка в превью</span>
+      <div class="seg sm" id="bgbGrid"><i class="seg-ind"></i><button data-v="editor">Из редактора</button><button data-v="workshop">Из Мастерской</button><button data-v="none">Без сетки</button></div>
+      <small class="hint" id="bgbGridNote"></small>
+    </div>
+
+    <div class="bgb-go">
+      <div class="db-prog" id="bgbProg" hidden><div class="up-bar"><i></i></div><span></span></div>
+      <button class="btn primary block" id="bgbBuild" data-icon="download" disabled>Собрать фон</button>
+      <div class="bgb-links"><button id="bgbPublish" data-icon="upload">Опубликовать в Мастерскую</button><button id="bgbHow" data-icon="book">Как установить</button></div>
+      <small class="hint" data-menu-date hidden></small>
+    </div>
+  </aside>
+</main>
+
+<div class="modal-root" id="modalRoot"></div>
+<div class="toasts" id="toasts"></div>
+<script src="heroes.js?v=37"></script>
+<script src="config.js?v=37"></script>
+<script src="auth.js?v=37"></script>
+<script src="gridrender.js?v=37"></script>
+<script src="catalog-api.js?v=37"></script>
+<script src="dotabg.js?v=37"></script>
+<script src="site.js?v=37"></script>
+<script src="background.js?v=37"></script>
+</body>
+</html>

@@ -60,6 +60,31 @@ window.GridRender = (() => {
     return best;
   }
 
+  // «Мой фон» — кадр последнего собранного здесь фона главного меню (background.html), в localStorage.
+  // В Доте сетка героев лежит поверх фона меню: экран «Герои» своего фона не имеет, игра только затемняет фон.
+  // Экран 16:9 в единицах сетки — как превью «В игре» в редакторе: x −237…1430, y −150…788.
+  const MINE_KEY = 'gs.mybg', SCREEN = { x: -237, y: -150, w: 1667, h: 938 }, MINE_DIM = 0.45;
+  let mineImg = null, mineAt = -1;
+  function mine() {
+    let m = null; try { m = JSON.parse(localStorage.getItem(MINE_KEY)); } catch {}
+    if (!m?.img) { mineImg = null; return null; }
+    if (m.at !== mineAt) { mineAt = m.at; mineImg = new Image(); mineImg.src = m.img; }
+    return { ...m, image: mineImg };
+  }
+  function setMine(dataUrl, meta = {}) {
+    try { localStorage.setItem(MINE_KEY, JSON.stringify({ img: dataUrl, ...meta, at: Date.now() })); } catch { return false; }
+    mine(); return true;
+  }
+  // фон на весь экран (cover) и затемнение, как на экране «Герои»; F — прямоугольник экрана в единицах сетки
+  function drawMine(c, F = SCREEN) {
+    const im = mine()?.image;
+    if (!im || !im.complete || !im.naturalWidth) return false;
+    const k = Math.max(F.w / im.naturalWidth, F.h / im.naturalHeight), w = im.naturalWidth * k, h = im.naturalHeight * k;
+    c.drawImage(im, F.x + (F.w - w) / 2, F.y + (F.h - h) / 2, w, h);
+    c.fillStyle = `rgba(0,0,0,${MINE_DIM})`; c.fillRect(F.x, F.y, F.w, F.h);
+    return true;
+  }
+
   // подложки превью: «как в Доте» — тёмная бирюза нынешнего экрана «Герои» (светлее к центру, синее книзу, темнее по краям),
   // «классика» — коричневый фон старого клиента, тёмная и градиент «Огня»
   const BGS = {
@@ -87,6 +112,8 @@ window.GridRender = (() => {
       g.addColorStop(0, 'rgba(40,38,36,.35)'); g.addColorStop(1, 'rgba(0,0,0,0)');
       c.fillStyle = g; c.fillRect(0, 0, GRID.w, GRID.h);
     },
+    mine: c => { if (!drawMine(c)) BGS.dota(c); },
+    none: () => {},
     grad: c => {
       const g = c.createLinearGradient(0, 0, GRID.w, GRID.h);
       g.addColorStop(0, '#3a1010'); g.addColorStop(.5, '#2a1309'); g.addColorStop(1, '#2b2109');
@@ -160,9 +187,11 @@ window.GridRender = (() => {
     const later = () => { clearTimeout(lt); lt = setTimeout(redraw, 120); };
     paint();
     document.fonts?.ready.then(redraw);
+    // «Мой фон» грузится из data-URL не мгновенно — перерисоваться, когда готов
+    if (o.bg === 'mine') mine()?.image.decode?.().then(redraw).catch(() => {});
     let lastW = cv.clientWidth;
     new ResizeObserver(() => { if (cv.clientWidth !== lastW) { lastW = cv.clientWidth; redraw(); } }).observe(cv);
-    return { set(next) { o = { ...o, ...next }; redraw(); }, redraw };
+    return { set(next) { o = { ...o, ...next }; redraw(); if (o.bg === 'mine') mine()?.image.decode?.().then(redraw).catch(() => {}); }, redraw };
   }
 
   // Что за сетка: ASCII/текст, мозаика из героев или вперемешку
@@ -176,5 +205,5 @@ window.GridRender = (() => {
     return { cats: cats.length, hero, label, ids, kind };
   }
 
-  return { draw, mount, thumb, stats, GRID, BGS: Object.keys(BGS) };
+  return { draw, mount, thumb, stats, GRID, BGS: Object.keys(BGS), mine, setMine, drawMine, SCREEN };
 })();

@@ -114,6 +114,7 @@ const S = Object.assign({
   areaW: 1204, areaH: 612,
   cellW: 10, cellH: 10,
   showGrid: true, snap: true,
+  gameBg: 'dota',      // под сеткой в превью «В игре»: 'dota' — фон Доты, 'mine' — свой фон меню (GridRender.mine)
 }, load('gp2.settings', {}));
 // старый размер по умолчанию → настоящий размер сетки в Доте (DOTAHeroGridNew 1204 × 678 минус подвал 66)
 if (S.areaW === 1200 && S.areaH === 600) { S.areaW = 1204; S.areaH = 612; }
@@ -309,12 +310,16 @@ function drawDotaScreen(c) {
   c.beginPath(); c.rect(F.x, F.y, F.w, F.h); c.clip();
   c.textBaseline = 'middle';
 
-  // фон страницы: тёплый коричневый, светлее под меню, к низу темнее
-  c.fillStyle = GAME.bg; c.fillRect(F.x, F.y, F.w, F.h);
-  let g = c.createRadialGradient(W / 2, -60, 0, W / 2, -60, F.w * .7);
-  g.addColorStop(0, 'rgba(64,46,28,.32)'); g.addColorStop(1, 'rgba(64,46,28,0)');
-  c.fillStyle = g; c.fillRect(F.x, F.y, F.w, F.h);
-  c.fillStyle = vgrad(H, F.y + F.h, ['#1b1715', '#150d09', '#0d0805', '#050302']); c.fillRect(F.x, H, F.w, F.y + F.h - H);
+  // фон страницы: у экрана «Герои» своего фона нет — сквозь него виден фон главного меню, затемнённый игрой.
+  // «Мой фон» — кадр фона, собранного на странице «Фон меню»; иначе тёплый коричневый, светлее под меню, к низу темнее
+  let g;
+  if (!(S.gameBg === 'mine' && GridRender.drawMine(c, F))) {
+    c.fillStyle = GAME.bg; c.fillRect(F.x, F.y, F.w, F.h);
+    g = c.createRadialGradient(W / 2, -60, 0, W / 2, -60, F.w * .7);
+    g.addColorStop(0, 'rgba(64,46,28,.32)'); g.addColorStop(1, 'rgba(64,46,28,0)');
+    c.fillStyle = g; c.fillRect(F.x, F.y, F.w, F.h);
+    c.fillStyle = vgrad(H, F.y + F.h, ['#1b1715', '#150d09', '#0d0805', '#050302']); c.fillRect(F.x, H, F.w, F.y + F.h - H);
+  }
 
   // верхнее меню
   const ty = F.y, th = 52;
@@ -2089,6 +2094,23 @@ $('#configName').oninput = e => { S.configName = e.target.value; persist(); };
 const openJson = async () => importJsonFiles(await pickJsonFiles());
 $('#esOpen').onclick = openJson;
 $('#btnImport').onclick = openJson;
+// фон под сеткой в превью: «как в Dota» ⇄ «Мой фон»; своего ещё нет — предлагаем собрать
+function syncGameBg() {
+  const m = GridRender.mine();
+  if (!m) S.gameBg = 'dota';
+  $('#gameBg span').textContent = S.gameBg === 'mine' ? `Фон: ${m.title ? '«' + (m.title.length > 24 ? m.title.slice(0, 22) + '…' : m.title) + '»' : 'мой'}` : 'Фон: как в Dota';
+  if (S.gameBg === 'mine') m.image.decode?.().then(requestRender).catch(() => {});
+}
+$('#gameBg').onclick = () => {
+  if (!GridRender.mine()) {
+    openModal(`${modalHead('Свой фон под сеткой')}
+      <div class="modal-body"><div class="hint">В Доте сетка героев лежит поверх фона главного меню. Собери свой фон на странице «Фон меню» — и он появится здесь под сеткой, как в игре. Сетка сохранится сама.</div></div>
+      <div class="modal-foot"><span class="info"></span><button class="btn" data-close>Не сейчас</button><a class="btn primary" href="background.html" data-icon="image">Открыть «Фон меню»</a></div>`);
+    return;
+  }
+  S.gameBg = S.gameBg === 'mine' ? 'dota' : 'mine'; persist(); syncGameBg(); requestRender();
+};
+syncGameBg();
 $('#btnExport').onclick = openExportModal;
 $('#btnPublish').onclick = openPublishModal;
 $('#btnUndo').onclick = undo; $('#btnRedo').onclick = redo;

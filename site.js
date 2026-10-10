@@ -61,6 +61,7 @@ const ICONS = {
   compass: '<circle cx="12" cy="12" r="8.5"/><path d="M15.5 8.5l-2 5-5 2 2-5z"/>',
   play: 'M8 5.5v13l10.5-6.5z',
   clock: '<circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/>',
+  pause: 'M8.5 5.5v13M15.5 5.5v13',
   alert: '<circle cx="12" cy="12" r="8.5"/><path d="M12 7.5v5.5M12 16.4v.1"/>',
   discord: 'M8.5 16.5c-2 .5-4-.5-4.5-1 0-4 1-7.5 2.5-9.5 1.5-.8 3-1.2 4-1.3l.5 1.3a14 14 0 013.5 0l.5-1.3c1 .1 2.5.5 4 1.3 1.5 2 2.5 5.5 2.5 9.5-.5.5-2.5 1.5-4.5 1l-1-1.8M7 15.5c3.3 1.5 6.7 1.5 10 0M9.5 12.5a.5.5 0 100-1 .5.5 0 000 1zM14.5 12.5a.5.5 0 100-1 .5.5 0 000 1z',
 };
@@ -121,7 +122,7 @@ const gameDay = (d = new Date()) => Math.round((new Date(d.getFullYear(), d.getM
 const safeNext = s => /^(index|workshop|editor|guides|game|profile)\.html(\?[\w=&%.-]*)?$/.test(s || '') ? s : '';
 
 // ---------- меню сверху ----------
-const NAV = [['workshop', 'workshop.html', 'compass', 'Мастерская'], ['guides', 'guides.html', 'book', 'Гайды'], ['game', 'game.html', 'dice', 'Угадайка']];
+const NAV = [['workshop', 'workshop.html', 'compass', 'Мастерская'], ['background', 'background.html', 'image', 'Фон меню'], ['guides', 'guides.html', 'book', 'Гайды'], ['game', 'game.html', 'dice', 'Угадайка']];
 function renderNav() {
   const bar = document.createElement('header');
   bar.className = 'navbar'; bar.id = 'navbar';
@@ -261,7 +262,7 @@ function cardHTML(g, k = 0) {
 const skeletons = n => Array.from({ length: n }, () => '<div class="gcard sk"><div class="skeleton"></div><div class="ginfo"><span></span><span></span></div></div>').join('');
 
 // подложка превью сеток: «как в Доте», «классика» (старый коричневый клиент), тёмная или градиент — выбор запоминается
-const PREVIEW_BG = [['dota', 'Как в Dota'], ['classic', 'Классика'], ['dark', 'Тёмный'], ['grad', 'Градиент']];
+const PREVIEW_BG = [['dota', 'Как в Dota'], ['classic', 'Классика'], ['dark', 'Тёмный'], ['grad', 'Градиент'], ...(GridRender.mine() ? [['mine', 'Мой фон']] : [])];
 const previewBg = () => { try { const v = localStorage.getItem('gs.previewBg'); return PREVIEW_BG.some(b => b[0] === v) ? v : 'dota'; } catch { return 'dota'; } };
 function setPreviewBg(v) {
   try { localStorage.setItem('gs.previewBg', v); } catch {}
@@ -308,14 +309,8 @@ document.addEventListener('click', async e => {
   } catch (er) { toast(er.message, 'err'); }
   b.disabled = false;
 }, true);
-// «В Dota» прямо с карточки фона: сразу сборщик, без окна фона
-document.addEventListener('click', e => {
-  const b = e.target.closest('[data-bg-dota]');
-  if (!b || b.closest('.hide18')) return;
-  e.preventDefault(); e.stopPropagation();
-  const bg = BG_SEEN.get(b.dataset.bgDota);
-  if (bg) openDotaBuild(bg);
-}, true);
+// «В Dota» на карточке фона — просто ссылка в сборщик: окно фона при этом не открываем
+document.addEventListener('click', e => { if (e.target.closest('[data-bg-dota]') && !e.target.closest('.hide18')) e.stopPropagation(); }, true);
 // карточка — <article>, поэтому Enter открывает её вручную
 document.addEventListener('keydown', e => {
   if (e.key === 'Enter' && e.target.matches?.('.gcard[data-id], .bcard[data-bg]')) e.target.click();
@@ -963,11 +958,8 @@ const secs = s => s ? `${(Math.round(s * 10) / 10).toLocaleString('ru')} с` : '
 const mb = n => `${(n / 1048576).toLocaleString('ru', { maximumFractionDigits: 1 })} МБ`;
 const bgName = b => `${String(b.title || 'background').replace(/[\\/:*?"<>|]+/g, ' ').trim().slice(0, 50) || 'background'}.${String(b.file).split('.').pop()}`;
 const bgDlUrl = b => API.bg.downloadUrl(b, bgName(b));
-// карточки помнят свои фоны — кнопке «В Dota» на карточке не нужно перечитывать фон из базы
-const BG_SEEN = new Map();
 function bgCardHTML(b, k = 0) {
   const hide = b.nsfw && !API.adult(), gif = /\.gif$/i.test(b.file);
-  BG_SEEN.set(b.id, b);
   return `<article class="bcard${hide ? ' hide18' : ''}" data-bg="${esc(b.id)}" style="animation-delay:${Math.min(k, 12) * 40}ms">
     <div class="bpic">
       <img src="${esc(b.poster)}" alt="" loading="lazy"${gif ? ` data-gif="${esc(b.file)}" data-poster="${esc(b.poster)}"` : ''}>
@@ -981,7 +973,7 @@ function bgCardHTML(b, k = 0) {
       <span class="bby">${authorAva(b.user_id, b.author || 'Игрок')}<span>${esc(b.author || 'Игрок')} · ${ago(b.created_at)}</span></span>
       <div class="bacts">
         <button class="blike${API.bg.isLiked(b.id) ? ' liked' : ''}" data-bg-like="${esc(b.id)}" data-likes aria-label="Лайк">${icon('heart')}${num(b.likes)}</button>
-        <button class="btn sm" data-bg-dota="${esc(b.id)}" title="Собрать фон для главного меню Доты">${icon('download')}В Dota</button>
+        <a class="btn sm" href="background.html?bg=${encodeURIComponent(b.id)}" data-bg-dota title="Поставить на главный экран Доты: превью с сеткой и сборка">${icon('download')}В Dota</a>
       </div>
     </div>
   </article>`;
@@ -1023,13 +1015,13 @@ async function openBg(id, { onChange } = {}) {
       </div>
       <div class="hint">${b.kind === 'video' ? 'Видео' : /\.gif$/i.test(b.file) ? 'GIF' : 'Картинка'} · ${num(b.width)}×${num(b.height)}${b.duration ? ' · ' + secs(b.duration) : ''} · ${mb(b.size)}</div>
       <div class="actions">
-        <button class="btn primary" id="bDota"><span class="ico-box" data-icon="download"></span>Фон для Dota</button>
+        <a class="btn primary" id="bDota" href="background.html?bg=${encodeURIComponent(b.id)}"><span class="ico-box" data-icon="download"></span>Поставить в Dota</a>
         <div class="row">
           <a class="btn" id="bDl" href="${esc(bgDlUrl(b))}" download data-icon="file">Файл</a>
           <button class="btn ${API.bg.isLiked(b.id) ? 'on' : ''}" id="bLike" data-icon="heart">${API.bg.isLiked(b.id) ? 'Нравится' : 'Лайк'}</button>
         </div>
         <button class="btn ghost sm" id="bHow" data-icon="book">Как установить</button>
-        <div class="hint">«Фон для Dota» соберёт файл <code>pak02_dir.vpk</code> — фон встанет на главный экран игры. «Файл» — исходная картинка или видео.</div>
+        <div class="hint">«Поставить в Dota» откроет сборщик: превью меню и твоей сетки поверх фона, размытие, затемнение — и файл <code>pak02_dir.vpk</code> для игры. «Файл» — исходная картинка или видео.</div>
         <div class="side-links">
           <button id="bLink">Скопировать ссылку</button>
           ${mine ? '<button class="danger" id="bDel">Удалить мой фон</button>' : adm ? '' : `<button id="bReport">${API.bg.isReported(b.id) ? 'Жалоба отправлена' : 'Пожаловаться'}</button>`}
@@ -1040,7 +1032,6 @@ async function openBg(id, { onChange } = {}) {
   applyIcons(root);
   $('.modal-x', root).onclick = close;
   $('#bDl').onclick = () => API.bg.hit(b.id);
-  $('#bDota').onclick = () => openDotaBuild(b);
   $('#bHow').onclick = () => openHowTo('bg');
   $('#bLink').onclick = () => copyText(new URL('workshop.html?bg=' + b.id, location.href).href, 'Ссылка скопирована');
   const like = $('#bLike');
@@ -1095,7 +1086,7 @@ async function bgProbe(file) {
     return { w, h, duration, poster, preview: cv.toDataURL('image/jpeg', 0.8), aspect: aspectOf(w, h), kind: file.type.startsWith('video/') ? 'video' : 'image' };
   } finally { URL.revokeObjectURL(url); }
 }
-function openBgUpload(onDone) {
+function openBgUpload(onDone, initial = null) {
   if (!API.bg.canUpload()) {
     openSheet(`<div class="sh-body"><div class="sh-ico">${icon('upload')}</div><h2>Загрузка фонов скоро</h2><p>Хранилище для фонов ещё подключается. Как только заработает — здесь можно будет выложить свою картинку или видео.</p></div>`);
     return;
@@ -1139,6 +1130,7 @@ function openBgUpload(onDone) {
     drop.classList.remove('busy');
   }
   $('#upFile', m.root).onchange = e => pick(e.target.files[0]);
+  if (initial) pick(initial);
   drop.ondragover = e => { e.preventDefault(); drop.classList.add('over'); };
   drop.ondragleave = () => drop.classList.remove('over');
   drop.ondrop = e => { e.preventDefault(); drop.classList.remove('over'); pick(e.dataTransfer.files[0]); };
@@ -1170,8 +1162,7 @@ function openHowTo(tab) {
   if (tab === 'bg') {
     const m = openSheet(`<div class="sh-body db-body"><div class="sh-ico">${icon('download')}</div><h2>Как установить фон</h2>
       ${bgSteps()}
-      <div class="sh-actions"><button class="btn block" id="dbOwn">${icon('image')}Собрать фон из своего файла</button></div></div>`);
-    $('#dbOwn', m.root).onclick = () => openDotaBuild(null);
+      ${PAGE === 'background' ? '' : `<div class="sh-actions"><a class="btn block" href="background.html">${icon('image')}Собрать фон из своего файла</a></div>`}</div>`);
     fillMenuDate(m.root);
     return;
   }
@@ -1207,88 +1198,6 @@ function saveBlob(name, blob) {
   a.href = URL.createObjectURL(blob); a.download = name;
   document.body.append(a); a.click(); a.remove();
   setTimeout(() => URL.revokeObjectURL(a.href), 60000);
-}
-// b — фон из Мастерской; null — свой файл с компьютера
-function openDotaBuild(b) {
-  if (!window.DotaBG) { toast('Сборщик фонов не загрузился — обнови страницу', 'err'); return; }
-  const pref = (() => { try { return JSON.parse(localStorage.getItem('gs.dotabg')) || {}; } catch { return {}; } })();
-  let file = null, screen = DotaBG.SCREENS.includes(pref.screen) ? pref.screen : DotaBG.guessScreen(), busy = false;
-  const kindOf = x => x.kind === 'video' ? 'Видео' : /\.gif$/i.test(x.file) ? 'GIF' : 'Картинка';
-  const m = openSheet(`<div class="sh-body up-body db-body">
-    <h2>Фон для Dota 2</h2>
-    <p class="db-lead">${b ? `«${esc(b.title)}» встанет` : 'Картинка, GIF или видео встанет'} на главный экран Доты. Собираем файл <code>pak02_dir.vpk</code> прямо в браузере — никуда не загружается.</p>
-    ${b ? `<div class="drop has db-prev"><img class="drop-prev" src="${esc(b.poster)}" alt=""><span class="drop-facts">${kindOf(b)}${b.duration ? ' · ' + secs(Math.min(b.duration, 30)) : ''}</span></div>`
-      : `<label class="drop" id="dbDrop"><input type="file" id="dbFile" accept="image/png,image/jpeg,image/webp,image/gif,video/mp4,video/webm" hidden>
-      <span class="drop-empty">${icon('upload')}<b>Перетащи картинку, GIF или видео</b><span>или нажми, чтобы выбрать · из видео берутся первые 30 секунд, звук убирается</span></span>
-      <img class="drop-prev" id="dbPrev" alt="" hidden><span class="drop-facts" id="dbFacts" hidden></span></label>`}
-    <div class="field"><span>Экран</span><div class="seg sm db-screens" id="dbScreen"><i class="seg-ind"></i>${DotaBG.SCREENS.map(v => `<button type="button" data-v="${v}" class="${v === screen ? 'on' : ''}">${v}</button>`).join('')}</div></div>
-    <label class="check"><input type="checkbox" id="dbClean"${pref.clean ? ' checked' : ''}><span><b>Убрать новости справа</b> — колонка Valve на главной не будет закрывать фон</span></label>
-    <div class="db-prog" id="dbProg" hidden><div class="up-bar"><i></i></div><span></span></div>
-    <div class="sh-actions"><button class="btn primary block" id="dbGo"${b ? '' : ' disabled'}>${icon('download')}Собрать и скачать</button></div>
-    <p class="hint db-left">Видео пережимается в WebM без звука, до 30 секунд — так его понимает Dota. Нужен свежий Chrome, Edge или Firefox. <span data-menu-date hidden></span></p>
-  </div>`);
-  const R = m.root, go = $('#dbGo', R), seg = $('#dbScreen', R);
-  fillMenuDate(R);
-  requestAnimationFrame(() => segInd(seg));
-  seg.onclick = e => {
-    const x = e.target.closest('button'); if (!x || busy) return;
-    screen = x.dataset.v; $$('button', seg).forEach(y => y.classList.toggle('on', y === x)); segInd(seg);
-  };
-  const drop = $('#dbDrop', R);
-  if (drop) {
-    const pick = f => {
-      if (!f || busy) return;
-      if (!/^(image\/(png|jpeg|webp|gif)|video\/(mp4|webm|quicktime))$/.test(f.type)) { toast('Подходят PNG, JPEG, WebP, GIF, MP4 и WebM', 'err'); return; }
-      if (f.size > 500 * 1048576) { toast('Файл больше 500 МБ — укороти видео', 'err'); return; }
-      file = f;
-      const prev = $('#dbPrev', R), facts = $('#dbFacts', R);
-      prev.hidden = true;
-      if (f.type.startsWith('image/')) { prev.src = URL.createObjectURL(f); prev.hidden = false; }
-      else bgProbe(f).then(i => { prev.src = i.preview; prev.hidden = false; }).catch(() => {});
-      facts.textContent = `${f.name.length > 28 ? f.name.slice(0, 26) + '…' : f.name} · ${mb(f.size)}`; facts.hidden = false;
-      drop.classList.add('has'); go.disabled = false;
-    };
-    $('#dbFile', R).onchange = e => pick(e.target.files[0]);
-    drop.ondragover = e => { e.preventDefault(); drop.classList.add('over'); };
-    drop.ondragleave = () => drop.classList.remove('over');
-    drop.ondrop = e => { e.preventDefault(); drop.classList.remove('over'); pick(e.dataTransfer.files[0]); };
-  }
-  go.onclick = async () => {
-    if (busy) return;
-    const clean = $('#dbClean', R).checked;
-    try { localStorage.setItem('gs.dotabg', JSON.stringify({ screen, clean })); } catch {}
-    busy = true; go.disabled = true; R.classList.add('busy');
-    const prog = $('#dbProg', R), bar = $('i', prog), say = $('span', prog);
-    prog.hidden = false;
-    const show = (p, text) => { bar.style.width = Math.round(p * 100) + '%'; if (text) say.textContent = text; };
-    let job = null;
-    try {
-      let src = file;
-      if (b) {
-        show(0, 'Скачиваю фон…');
-        const r = await fetch(b.file);
-        if (!r.ok) throw new Error('Не удалось скачать фон из Мастерской');
-        src = await r.blob();
-      }
-      if (!R.isConnected) return;
-      // окно закрыли посреди сборки — останавливаем кодировщик
-      job = DotaBG.build(src, { screen, clean, onProgress: (p, text) => { if (!R.isConnected) job?.cancel(); else show(p, text); } });
-      const res = await job.done;
-      if (!R.isConnected) return;
-      saveBlob('pak02_dir.vpk', res.blob);
-      if (b) API.bg.hit(b.id);
-      // дальше — куда класть файл
-      R.innerHTML = `<button class="modal-x" data-icon="x" aria-label="Закрыть"></button><div class="sh-body db-body">
-        <div class="sh-ico">${icon('check')}</div><h2>Файл скачан</h2>
-        <p class="db-lead"><code>pak02_dir.vpk</code> · ${mb(res.blob.size)}. Осталось положить его в папку Доты:</p>
-        ${bgSteps()}</div>`;
-      applyIcons(R); fillMenuDate(R);
-    } catch (e) {
-      if (!R.isConnected) return;
-      toast(e.message || 'Не получилось собрать фон', 'err');
-      prog.hidden = true; busy = false; go.disabled = false; R.classList.remove('busy');
-    }
-  };
 }
 
 // ---------- гайды ----------
