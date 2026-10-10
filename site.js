@@ -978,6 +978,14 @@ function bgCardHTML(b, k = 0) {
     </div>
   </article>`;
 }
+// лайк на карточке фона вне Мастерской (профиль): true — клик обработан
+function bgLikeClick(e) {
+  const like = e.target.closest('[data-bg-like]'); if (!like) return false;
+  e.preventDefault(); e.stopPropagation();
+  like.disabled = true;
+  API.bg.like(like.dataset.bgLike).then(r => { like.classList.toggle('liked', r.liked); like.lastChild.textContent = num(r.likes); }).catch(er => toast(er.message, 'err')).finally(() => { like.disabled = false; });
+  return true;
+}
 function setUrlBg(id) {
   if (PAGE !== 'workshop') return;
   const u = new URL(location.href);
@@ -1496,7 +1504,7 @@ function cropImage(m, img, { title, text, round = false, aspect = 1, outW, outH 
 
 async function renderMyProfile(box) {
   let p = ACC.profile() || await ACC.loadProfile();
-  let works = [], pub = [], liked = null, queue = null, tab = 'works';
+  let works = [], pub = [], pubBg = [], liked = null, queue = null, home = null, tab = 'works';
   const adm = isAdmin();
   const head = () => {
     $('#pfHeadBox').innerHTML = profileHead(p, { me: true, grids: pub, works });
@@ -1508,7 +1516,7 @@ async function renderMyProfile(box) {
       <button class="chip on" data-tab="works">${icon('lock')}Мои работы <b id="pfWorksN"></b></button>
       <button class="chip" data-tab="pub">${icon('globe')}Опубликованные <b id="pfPubN"></b></button>
       <button class="chip" data-tab="liked">${icon('heart')}Понравившиеся <b id="pfLikedN"></b></button>
-      ${adm ? `<button class="chip" data-tab="mod">${icon('star')}Модерация <b id="pfModN"></b></button>` : ''}
+      ${adm ? `<button class="chip" data-tab="mod">${icon('star')}Модерация <b id="pfModN"></b></button><button class="chip" data-tab="home">${icon('home')}Главная <b id="pfHomeN"></b></button>` : ''}
     </div>
     <div class="cards" id="pfList">${skeletons(3)}</div>`;
   head();
@@ -1535,14 +1543,28 @@ async function renderMyProfile(box) {
 
   const ind = () => { const b = $('#pfTabs .chip.on'); $('#pfInd').style.cssText = `width:${b.offsetWidth}px;transform:translateX(${b.offsetLeft}px)`; };
   const draw = () => {
-    $('#pfWorksN').textContent = works.length; $('#pfPubN').textContent = pub.length; $('#pfLikedN').textContent = liked ? liked.length : API.likedIds().length;
+    $('#pfWorksN').textContent = works.length; $('#pfPubN').textContent = pub.length + pubBg.length; $('#pfLikedN').textContent = liked ? liked.length : API.likedIds().length;
     const list = $('#pfList');
     if (tab === 'works') list.innerHTML = works.length ? works.map(workCard).join('')
       : `<div class="cards-empty">${MARK}<b>Пока нет сохранённых работ</b><span>В редакторе открой меню у названия сетки → «Сохранить в мои работы». Работы видишь только ты.</span><a class="btn primary sm" href="editor.html">Открыть редактор</a></div>`;
-    else if (tab === 'pub') list.innerHTML = pub.length ? pub.map(cardHTML).join('')
-      : `<div class="cards-empty"><b>Ничего не опубликовано</b><span>Сетки, которые ты выложишь в Мастерскую, войдя в профиль, появятся здесь.</span></div>`;
+    else if (tab === 'pub') list.innerHTML = pub.length + pubBg.length ? pub.map(cardHTML).join('') + pubBg.map((x, i) => bgCardHTML(x, i)).join('')
+      : `<div class="cards-empty"><b>Ничего не опубликовано</b><span>Сетки и фоны, которые ты выложишь в Мастерскую, войдя в профиль, появятся здесь.</span></div>`;
     else if (tab === 'liked') list.innerHTML = !liked ? skeletons(3) : liked.length ? liked.map(cardHTML).join('')
       : `<div class="cards-empty"><b>Пока пусто</b><span>Ставь лайки сеткам в Мастерской — они соберутся здесь.</span><a class="btn sm" href="workshop.html">В Мастерскую</a></div>`;
+    else if (tab === 'home') {
+      // админ: нажатие на фон ставит его на главную или убирает; на главной случайный из отмеченных
+      if (!home) list.innerHTML = skeletons(3);
+      else {
+        const items = [...home.items].sort((a, b) => home.ids.has(b.id) - home.ids.has(a.id));
+        list.innerHTML = `<p class="hint home-hint">Нажми на фон, чтобы поставить его на главную или убрать. Можно отметить несколько — при каждом заходе сайт покажет случайный из них. Сейчас на главной: <b>${home.ids.size}</b>. Фоны 18+ на главную не попадают.</p>`
+          + (items.length ? items.map((x, i) => bgCardHTML(x, i)).join('') : `<div class="cards-empty"><b>В Мастерской пока нет фонов</b></div>`);
+        $$('.bcard', list).forEach((c, i) => {
+          c.classList.toggle('is-feat', home.ids.has(items[i].id));
+          $('.bpic', c).insertAdjacentHTML('beforeend', `<span class="adm-flag feat">${home.ids.has(items[i].id) ? 'на главной · убрать' : '+ на главную'}</span>`);
+        });
+      }
+      $('#pfHomeN').textContent = home ? home.ids.size : '';
+    }
     else if (!queue) list.innerHTML = skeletons(3);
     else {
       const items = [...queue.grids.map(x => ['grid', x]), ...queue.backgrounds.map(x => ['bg', x])];
@@ -1557,6 +1579,14 @@ async function renderMyProfile(box) {
     if (adm) $('#pfModN').textContent = queue ? queue.grids.length + queue.backgrounds.length : '';
     applyIcons(list);
   };
+  const loadHome = async () => {
+    try {
+      const [f, all] = await Promise.all([API.bg.featured(100), API.bg.list({ sort: 'new', limit: 60 })]);
+      const items = all.items.filter(x => !x.nsfw), have = new Set(items.map(x => x.id));
+      home = { ids: new Set(f.map(x => x.id)), items: [...items, ...f.filter(x => !have.has(x.id))] };
+    } catch (e) { home = { ids: new Set(), items: [] }; toast(e.message, 'err'); }
+    draw();
+  };
   const loadQueue = async () => {
     try { queue = await API.admin.queue(); } catch (e) { queue = { grids: [], backgrounds: [] }; toast(e.message, 'err'); }
     draw();
@@ -1566,6 +1596,7 @@ async function renderMyProfile(box) {
     tab = b.dataset.tab; $$('#pfTabs .chip').forEach(c => c.classList.toggle('on', c === b)); ind(); draw();
     if (tab === 'liked' && !liked) { try { liked = await API.byIds(API.likedIds()); } catch { liked = []; } if (tab === 'liked') draw(); }
     if (tab === 'mod') loadQueue();
+    if (tab === 'home' && !home) loadHome();
   };
   ind(); document.fonts?.ready.then(ind);
   $('#pfList').onclick = async e => {
@@ -1587,6 +1618,20 @@ async function renderMyProfile(box) {
       } catch (er) { toast(er.message, 'err'); }
       return;
     }
+    if (tab === 'home') {
+      const b = e.target.closest('.bcard[data-bg]'); if (!b) return;
+      e.preventDefault();
+      if (b.dataset.busy) return;
+      const id = b.dataset.bg, on = !home.ids.has(id);
+      b.dataset.busy = '1';
+      try {
+        await API.admin.feature(id, on);
+        on ? home.ids.add(id) : home.ids.delete(id);
+        const y = scrollY; draw(); scrollTo(0, y);
+        toast(on ? 'Фон будет на главной сайта' : 'Фон убран с главной', 'ok');
+      } catch (er) { toast(er.message, 'err'); delete b.dataset.busy; }
+      return;
+    }
     if (tab === 'mod') {
       // в модерации после любого действия просто перечитываем список
       const g = e.target.closest('.gcard[data-id]'), b = e.target.closest('.bcard[data-bg]');
@@ -1595,11 +1640,15 @@ async function renderMyProfile(box) {
       else if (g) openGrid(g.dataset.id, { onChange });
       return;
     }
+    if (tab === 'pub' && bgLikeClick(e)) return;
+    const bgc = e.target.closest('.bcard[data-bg]');
+    if (bgc && tab === 'pub') { e.preventDefault(); openBg(bgc.dataset.bg, { onChange: (b, removed) => { if (removed) { pubBg = pubBg.filter(x => x.id !== b.id); draw(); } } }); return; }
     const c = e.target.closest('.gcard[data-id]');
     if (c && tab !== 'works') openGrid(c.dataset.id, { onChange: (g, removed) => { if (removed) { pub = pub.filter(x => x.id !== g.id); draw(); head(); } } });
   };
   try {
     [works, pub] = await Promise.all([ACC.projects.list(), ACC.userGrids(ACC.user().id)]);
+    pubBg = (await API.bg.list({ userId: ACC.user().id, sort: 'new', limit: 60 }).catch(() => ({ items: [] }))).items;
     head(); draw();
     // число на вкладке «Модерация» видно сразу, не дожидаясь клика
     if (adm) API.admin.queue().then(q => { queue = q; if (tab === 'mod') draw(); else $('#pfModN').textContent = q.grids.length + q.backgrounds.length; }).catch(() => {});
@@ -1619,14 +1668,18 @@ const workCard = (w, k) => `<a class="gcard wcard" href="editor.html?project=${e
 async function renderPublicProfile(box, id) {
   box.innerHTML = `<div class="loading">Загружаю профиль…</div>`;
   try {
-    const [p, grids] = await Promise.all([ACC.getProfile(id), ACC.userGrids(id)]);
+    const [p, grids, bgs] = await Promise.all([ACC.getProfile(id), ACC.userGrids(id), API.bg.list({ userId: id, sort: 'new', limit: 60 }).then(r => r.items, () => [])]);
     if (!p) throw new Error('Такого профиля нет.');
     document.title = `${p.nick} · Grid Studio`;
     box.innerHTML = `${profileHead(p, { me: false, grids })}
-      <div class="cards" id="pfList">${grids.length ? grids.map(cardHTML).join('') : `<div class="cards-empty"><b>Сеток пока нет</b><span>Автор ещё ничего не выложил в Мастерскую.</span></div>`}</div>`;
+      <div class="cards" id="pfList">${grids.length + bgs.length ? grids.map(cardHTML).join('') + bgs.map((x, i) => bgCardHTML(x, i)).join('') : `<div class="cards-empty"><b>Пока ничего нет</b><span>Автор ещё ничего не выложил в Мастерскую.</span></div>`}</div>`;
     applyIcons(box);
     $('#pfShare').onclick = e => copyText(e.currentTarget.dataset.copy, 'Ссылка на профиль скопирована');
-    $('#pfList').onclick = e => { const c = e.target.closest('.gcard[data-id]'); if (c) openGrid(c.dataset.id); };
+    $('#pfList').onclick = e => {
+      if (bgLikeClick(e)) return;
+      const b = e.target.closest('.bcard[data-bg]'); if (b) { e.preventDefault(); openBg(b.dataset.bg); return; }
+      const c = e.target.closest('.gcard[data-id]'); if (c) openGrid(c.dataset.id);
+    };
     for (const b of $$('[data-clear]', box)) b.onclick = async () => {
       const what = b.dataset.clear === 'banner' ? 'баннер' : 'аватар';
       if (!confirm(`Убрать ${what} у «${p.nick}»?`)) return;

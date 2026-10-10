@@ -272,13 +272,14 @@ window.CatalogAPI = (() => {
     // смотреть можно, когда есть база; выкладывать — ещё и с аккаунтами
     enabled: remote,
     canUpload: () => remote && !!window.Accounts?.enabled,
-    async list({ q = '', tag = '', aspect = '', sort = 'popular', offset = 0, limit = 24, onlyMine = false } = {}) {
+    async list({ q = '', tag = '', aspect = '', sort = 'popular', offset = 0, limit = 24, onlyMine = false, userId = '' } = {}) {
       if (!remote) return { items: [], total: 0 };
       q = clean(q);
       const p = new URLSearchParams({ select: BG_COLS, hidden: 'is.false' });
       if (tag === '18+') p.set('nsfw', 'is.true');
       else if (tag) p.set('tags', 'cs.' + tagList(tag));
       if (aspect) p.set('aspect', 'eq.' + aspect);
+      if (userId) p.set('user_id', 'eq.' + userId);
       if (sort === 'week') p.set('created_at', 'gte.' + WEEK());
       if (q) p.set('or', `(title.ilike.*${q}*,author.ilike.*${q}*)`);
       if (onlyMine) {

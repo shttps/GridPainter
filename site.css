@@ -1065,3 +1065,9 @@ body.bgb-busy .bgb-panel .seg, body.bgb-busy .bgb-panel input, body.bgb-busy #bg
   .bgb { grid-template-columns: 1fr; width: calc(100% - 32px); }
   .bgb-panel { position: static; max-height: none; }
 }
+.home-hint { grid-column: 1 / -1; margin: 0 0 4px; }
+.home-hint b { color: var(--ink); }
+.adm-flag.feat { background: oklch(0.2 0.01 40 / .78); color: var(--ink-2); }
+.bcard.is-feat { border-color: var(--accent-line); box-shadow: 0 0 0 1px var(--accent-line); }
+.bcard.is-feat .adm-flag.feat { background: var(--grad); color: var(--accent-ink); }
+
