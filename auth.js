@@ -14,10 +14,11 @@ window.Accounts = (() => {
   const save = (k, v) => { try { v == null ? localStorage.removeItem(k) : localStorage.setItem(k, JSON.stringify(v)); } catch {} };
   let session = enabled ? load('gs.session', null) : null;  // { access_token, refresh_token, expires_at, user: { id, email } }
   let profile = enabled ? load('gs.profile', null) : null;  // { id, nick, avatar }
+  let admin = enabled && !!session && load('gs.admin', false);  // есть в таблице admins (см. конец schema.sql)
   let lastError = '';
   const listeners = new Set();
   const emit = () => { for (const f of listeners) try { f(); } catch (e) { console.error(e); } };
-  const setSession = s => { session = s; save('gs.session', s); if (!s) { profile = null; save('gs.profile', null); } emit(); };
+  const setSession = s => { session = s; save('gs.session', s); if (!s) { profile = null; admin = false; save('gs.profile', null); save('gs.admin', null); } emit(); };
 
   const ERRORS = {
     over_email_send_rate_limit: 'Слишком много писем подряд. Подожди минуту и попробуй снова.',
@@ -25,6 +26,7 @@ window.Accounts = (() => {
     otp_expired: 'Ссылка или код устарели. Запроси новое письмо.',
     validation_failed: 'Проверь адрес почты.',
     provider_disabled: 'Этот способ входа ещё не включён.',
+    not_admin: 'Это может только админ.',
     too_many_projects: 'В профиле уже 200 работ — удали старые, чтобы сохранить новую.',
     projects_size: 'Работа слишком большая для сохранения в профиль.',
     profiles_nick: 'Ник — до 32 символов.',
@@ -99,19 +101,25 @@ window.Accounts = (() => {
   }
 
   // ---------- профиль ----------
-  // bio и steam появляются после обновления базы (SQL из README); до этого профиль работает без них
-  let ext = load('gs.profileExt', true);
+  // bio и steam появляются после обновления базы (SQL из README); до этого профиль работает без них.
+  // Не запоминаем «колонок нет» навсегда: иначе после обновления базы у старых посетителей
+  // так и не появлялись «о себе», Steam и загрузка своей аватарки
+  let ext = true;
+  try { localStorage.removeItem('gs.profileExt'); } catch {}
   const pcols = () => 'id,nick,avatar,created_at' + (ext ? ',bio,steam' : '');
   async function prest(path, opts) {
     try { return await rest(path.replace('{cols}', pcols()), opts); }
-    catch (e) { if (ext && /bio|steam/.test(e.message)) { ext = false; save('gs.profileExt', false); return rest(path.replace('{cols}', pcols()), opts); } throw e; }
+    catch (e) { if (ext && /bio|steam/.test(e.message)) { ext = false; return rest(path.replace('{cols}', pcols()), opts); } throw e; }
   }
+  // админ ли аккаунт; таблицы admins ещё нет (не выполнен свежий schema.sql) — значит, нет
+  const isAdminId = async id => { try { return !!(await rest(`/admins?select=user_id&user_id=eq.${encodeURIComponent(id)}`)).length; } catch { return false; } };
   async function loadProfile() {
     const u = session?.user; if (!u) return null;
     let p = (await prest(`/profiles?select={cols}&id=eq.${u.id}`))[0];
     // профиль создаёт триггер при регистрации; если его нет (аккаунт старше таблицы) — создаём сами
     if (!p) p = (await prest('/profiles?select={cols}', { method: 'POST', headers: { Prefer: 'return=representation' },
       body: { id: u.id, nick: (u.meta.name || 'Игрок ' + u.id.replace(/-/g, '').slice(0, 4).toUpperCase()).slice(0, 32), avatar: /^https:\/\//.test(u.meta.avatar) ? u.meta.avatar.slice(0, 500) : '' } }))[0];
+    admin = await isAdminId(u.id); save('gs.admin', admin);
     profile = p; save('gs.profile', p); emit();
     return p;
   }
@@ -120,7 +128,24 @@ window.Accounts = (() => {
     profile = p; save('gs.profile', p); emit();
     return p;
   }
-  const getProfile = async id => (await prest(`/profiles?select={cols}&id=eq.${encodeURIComponent(id)}`))[0] || null;
+  async function getProfile(id) {
+    const [p, adm] = await Promise.all([prest(`/profiles?select={cols}&id=eq.${encodeURIComponent(id)}`), isAdminId(id)]);
+    return p[0] ? { ...p[0], admin: adm } : null;
+  }
+  // ник и аватар авторов для карточек Мастерской: одним запросом на пачку, с кэшем на страницу
+  const people = new Map();
+  async function authors(ids) {
+    const need = [...new Set(ids)].filter(id => /^[0-9a-f-]{36}$/i.test(id) && !people.has(id)).slice(0, 100);
+    if (need.length) {
+      const req = rest(`/profiles?select=id,nick,avatar&id=in.(${need.join(',')})`)
+        .then(rows => { const m = new Map(rows.map(r => [r.id, r])); return id => m.get(id) || null; })
+        .catch(() => () => null);
+      for (const id of need) people.set(id, req.then(get => get(id)));
+    }
+    const out = new Map();
+    await Promise.all(ids.map(async id => { const p = await people.get(id); if (p) out.set(id, p); }));
+    return out;
+  }
 
   // ---------- мои работы (приватные) ----------
   const PROJECT_COLS = 'id,title,thumb,cats,grid_id,created_at,updated_at';
@@ -141,7 +166,7 @@ window.Accounts = (() => {
   // tags/nsfw появляются после свежего schema.sql — без них просто без тегов
   const GRID_COLS = 'id,title,author,description,kind,cats,heroes,likes,downloads,created_at,user_id';
   const userGrids = async uid => {
-    const q = c => rest(`/grids?select=${c}&user_id=eq.${encodeURIComponent(uid)}&order=created_at.desc`);
+    const q = c => rest(`/grids?select=${c}&user_id=eq.${encodeURIComponent(uid)}&hidden=is.false&order=created_at.desc`);
     try { return await q(GRID_COLS + ',tags,nsfw'); } catch (e) { if (!/tags|nsfw/.test(e.message)) throw e; return q(GRID_COLS); }
   };
 
@@ -162,10 +187,10 @@ window.Accounts = (() => {
 
   return {
     enabled, providers,
-    signedIn: () => !!session?.user, user: () => session?.user || null, profile: () => profile,
+    signedIn: () => !!session?.user, user: () => session?.user || null, profile: () => profile, isAdmin: () => !!session && admin,
     error: () => { const e = lastError; lastError = ''; return e; },
     onChange: f => { listeners.add(f); return () => listeners.delete(f); },
-    ready, token, sendLink, verifyCode, oauth, signOut, loadProfile, updateProfile, getProfile, projects, userGrids,
+    ready, token, sendLink, verifyCode, oauth, signOut, loadProfile, updateProfile, getProfile, authors, projects, userGrids,
     ext: () => ext,
   };
 })();

@@ -440,7 +440,9 @@ body[data-page="workshop"]::before { content: ""; position: absolute; z-index: -
 .bfacts .i { width: 12px; height: 12px; }
 .bbody { display: flex; flex-direction: column; gap: 2px; padding: 11px 4px 0; }
 .btitle { font-size: 17px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.bby { color: var(--muted); font-size: 12.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.bby { display: flex; align-items: center; gap: 6px; min-width: 0; color: var(--muted); font-size: 12.5px; white-space: nowrap; }
+.bby > span:last-child { overflow: hidden; text-overflow: ellipsis; }
+.bby .gava { width: 18px; height: 18px; font-size: 9px; }
 .bacts { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 8px; }
 .blike { display: inline-flex; align-items: center; gap: 6px; height: 34px; padding: 0 10px; border: 0; border-radius: 9px; background: none; color: var(--muted); font: 600 13px var(--mono); cursor: pointer; transition: color .15s, background .15s; }
 .blike:hover { color: var(--ink); background: oklch(1 0 0 / .05); }
@@ -486,7 +488,8 @@ body[data-page="workshop"]::before { content: ""; position: absolute; z-index: -
 .modal-side > :nth-child(4) { animation-delay: .12s; }
 .modal-side > :nth-child(5) { animation-delay: .16s; }
 .modal-side h2 { margin: 0; font-size: 22px; letter-spacing: -.02em; line-height: 1.2; font-weight: 650; word-break: break-word; }
-.modal-side .by { color: var(--muted); font-size: 13.5px; }
+.modal-side .by { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; color: var(--muted); font-size: 13.5px; }
+.modal-side .by .gava { margin-right: 4px; }
 .modal-side .by b { color: var(--ink-2); font-weight: 500; }
 .modal-side .desc { color: var(--ink-2); font-size: 14px; white-space: pre-wrap; word-break: break-word; }
 .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
@@ -871,3 +874,30 @@ textarea.pf-bio:focus { outline: 0; border-color: var(--accent); background: var
   .pf-nick { font-size: 26px; }
   .article p, .article li { font-size: 15.5px; }
 }
+
+/* ---------- админ: значок, плашка в окне сетки/фона, метки в «Модерации» ---------- */
+.adm-tag { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px 2px 6px; border-radius: 7px; background: var(--accent-soft); color: var(--accent-hi); font: 650 11.5px var(--font); letter-spacing: .02em; }
+.adm-tag .i { width: 13px; height: 13px; }
+.pf-meta .adm-tag { margin-right: 4px; }
+.adm-box { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; padding: 10px 12px; border-radius: 12px; background: var(--bg-2); border: 1px dashed var(--accent-line); }
+.adm-box.off { border-color: color-mix(in oklab, var(--danger) 60%, transparent); }
+.adm-state { color: var(--ink-2); font-size: 13px; }
+.adm-box.off .adm-state { color: var(--danger); }
+.adm-acts { display: flex; gap: 6px; width: 100%; }
+.adm-acts .btn { flex: 1; }
+.adm-acts .btn .i { width: 15px; height: 15px; }
+.btn.danger:hover { color: var(--danger); }
+.adm-flag { position: absolute; z-index: 3; right: 8px; bottom: 8px; padding: 3px 8px; border-radius: 7px; background: rgba(10, 8, 6, .8); color: oklch(0.92 0.005 60); font: 600 11px var(--mono); }
+.adm-flag.off { background: var(--danger); color: #fff; }
+.bpic .adm-flag { top: 10px; right: 10px; bottom: auto; }
+
+/* ---------- кадрирование своей аватарки ---------- */
+.pf-ava-wrap .pf-ava { cursor: pointer; }
+.ava-crop { gap: 12px; }
+.crop-cv { width: min(280px, 100%); aspect-ratio: 1; border-radius: 18px; background: #000; cursor: grab; touch-action: none; }
+.crop-cv:active { cursor: grabbing; }
+.crop-zoom { display: flex; align-items: center; gap: 10px; width: min(280px, 100%); color: var(--muted); }
+.crop-zoom .i { width: 16px; height: 16px; flex: none; }
+.crop-zoom input { flex: 1; accent-color: var(--accent); }
+.crop-acts { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; width: 100%; margin-top: 4px; }
+.crop-acts .i { width: 16px; height: 16px; }

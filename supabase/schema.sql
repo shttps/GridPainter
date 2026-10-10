@@ -193,13 +193,14 @@ begin
   end if;
 end $$;
 
--- ---------- удаление своей сетки ----------
+-- ---------- удаление своей сетки (админ — любой, см. раздел «Админы» в конце) ----------
 create or replace function public.grid_delete(p_id uuid, p_key uuid) returns boolean
 language plpgsql security definer set search_path = public as $$
 begin
   delete from grids g where g.id = p_id and (
     (auth.uid() is not null and g.user_id = auth.uid())
-    or exists (select 1 from grid_owners o where o.grid_id = g.id and o.key = p_key));
+    or exists (select 1 from grid_owners o where o.grid_id = g.id and o.key = p_key)
+    or public.is_admin());
   return found;
 end $$;
 
@@ -419,12 +420,12 @@ begin
   return v_id;
 end $$;
 
--- удаление своего фона: запись уходит сразу, файлы браузер стирает из своей папки по возвращённым путям
+-- удаление своего фона (админ — любого): запись уходит сразу, файлы браузер стирает из бакета по возвращённым путям
 create or replace function public.delete_background(p_id uuid) returns json
 language plpgsql security definer set search_path = public as $$
 declare v_file text; v_poster text;
 begin
-  delete from backgrounds where id = p_id and user_id = auth.uid() returning file, poster into v_file, v_poster;
+  delete from backgrounds where id = p_id and (user_id = auth.uid() or public.is_admin()) returning file, poster into v_file, v_poster;
   if not found then return null; end if;
   return json_build_object('file', v_file, 'poster', v_poster);
 end $$;
@@ -463,3 +464,62 @@ revoke all on function public.publish_background(text, text[], boolean, text, in
 grant execute on function public.publish_background(text, text[], boolean, text, int, int, real, text, text),
   public.delete_background(uuid) to authenticated;
 grant execute on function public.bg_like(uuid, uuid), public.bg_hit(uuid), public.bg_report(uuid, uuid) to anon, authenticated;
+
+-- =====================================================================
+-- Админы: видят скрытое жалобами, возвращают и прячут сетки и фоны, удаляют чужие.
+-- С сайта стать админом нельзя — список правится только здесь, в SQL Editor:
+--   insert into public.admins (user_id) select id from auth.users where email = 'почта@пример.ru' on conflict do nothing;
+-- Аккаунт с этой почтой должен хоть раз войти на сайт, иначе его ещё нет в auth.users.
+-- Снять админа: delete from public.admins where user_id = (select id from auth.users where email = 'почта@пример.ru');
+-- =====================================================================
+
+create table if not exists public.admins (
+  user_id    uuid primary key references auth.users(id) on delete cascade,
+  created_at timestamptz not null default now()
+);
+alter table public.admins enable row level security;
+-- кто админ — видно всем (значок в профиле), менять нельзя никому, кроме SQL Editor
+drop policy if exists "admins are public" on public.admins;
+create policy "admins are public" on public.admins for select to anon, authenticated using (true);
+grant select on public.admins to anon, authenticated;
+revoke insert, update, delete on public.admins from anon, authenticated;
+
+create or replace function public.is_admin() returns boolean
+language sql stable security definer set search_path = public as $$
+  select exists (select 1 from admins where user_id = auth.uid())
+$$;
+revoke all on function public.is_admin() from public;
+grant execute on function public.is_admin() to anon, authenticated;
+
+-- админ видит и скрытое (обычные списки на сайте сами просят hidden = false);
+-- (select …) — чтобы проверка шла один раз на запрос, а не на каждую строку
+drop policy if exists "admins see hidden grids" on public.grids;
+create policy "admins see hidden grids" on public.grids for select to authenticated using ((select public.is_admin()));
+drop policy if exists "admins see hidden backgrounds" on public.backgrounds;
+create policy "admins see hidden backgrounds" on public.backgrounds for select to authenticated using ((select public.is_admin()));
+
+-- файлы чужих фонов: админ стирает их после delete_background
+drop policy if exists "backgrounds: admins see all files" on storage.objects;
+create policy "backgrounds: admins see all files" on storage.objects for select to authenticated
+  using (bucket_id = 'backgrounds' and (select public.is_admin()));
+drop policy if exists "backgrounds: admins delete any file" on storage.objects;
+create policy "backgrounds: admins delete any file" on storage.objects for delete to authenticated
+  using (bucket_id = 'backgrounds' and (select public.is_admin()));
+
+-- скрыть или вернуть: p_kind — 'grid' | 'bg'; возврат обнуляет счётчик жалоб
+-- (кто уже жаловался, второй раз не сможет — новые жалобы считаются с нуля)
+create or replace function public.admin_moderate(p_kind text, p_id uuid, p_hidden boolean) returns boolean
+language plpgsql security definer set search_path = public as $$
+begin
+  if not public.is_admin() then raise exception 'not_admin'; end if;
+  if p_kind = 'grid' then
+    update grids set hidden = p_hidden, reports = case when p_hidden then reports else 0 end where id = p_id;
+  elsif p_kind = 'bg' then
+    update backgrounds set hidden = p_hidden, reports = case when p_hidden then reports else 0 end where id = p_id;
+  else
+    raise exception 'bad_kind';
+  end if;
+  return found;
+end $$;
+revoke all on function public.admin_moderate(text, uuid, boolean) from public, anon;
+grant execute on function public.admin_moderate(text, uuid, boolean) to authenticated;

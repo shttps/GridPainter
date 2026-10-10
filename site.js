@@ -98,6 +98,19 @@ function avatarHTML(url, nick, cls = 'ava') {
   const letter = esc([...String(nick || '?').trim()][0] || '?').toUpperCase();
   return url ? `<span class="${cls}"><img src="${esc(url)}" alt="${letter}" referrerpolicy="no-referrer" onerror="this.parentNode.textContent=this.alt"></span>` : `<span class="${cls}">${letter}</span>`;
 }
+// аватары авторов на карточках и в окнах: разметка с data-uid, картинки подтягиваются пачкой (fillAvatars)
+const authorAva = (uid, nick) => uid && ACC?.enabled ? avatarHTML('', nick, 'ava gava').replace('<span class="ava gava"', `<span class="ava gava" data-uid="${esc(uid)}"`) : avatarHTML('', nick, 'ava gava');
+async function fillAvatars() {
+  if (!ACC?.enabled) return;
+  const els = $$('[data-uid]:not([data-av])'); if (!els.length) return;
+  for (const el of els) el.dataset.av = '1';
+  const map = await ACC.authors(els.map(el => el.dataset.uid));
+  for (const el of els) {
+    const a = map.get(el.dataset.uid)?.avatar;
+    if (a && el.isConnected) el.innerHTML = `<img src="${esc(a)}" alt="${esc(el.textContent)}" referrerpolicy="no-referrer" onerror="this.parentNode.textContent=this.alt">`;
+  }
+}
+const isAdmin = () => !!ACC?.enabled && ACC.isAdmin();
 // «Угадайка»: номер дня — сколько дней прошло с запуска игры (по местному времени), с единицы
 const GAME_START = new Date(2026, 9, 9);
 const gameDay = (d = new Date()) => Math.round((new Date(d.getFullYear(), d.getMonth(), d.getDate()) - GAME_START) / 864e5) + 1;
@@ -234,7 +247,7 @@ function cardHTML(g, k = 0) {
       ${g.nsfw ? '<span class="g18">18+</span>' : ''}${hide ? nsfwCover() : ''}</span>
     <div class="ginfo">
       <div class="gmain"><b class="gtitle" title="${esc(g.title)}">${esc(g.title)}</b>
-        <span class="gby">${avatarHTML('', g.author, 'ava gava')}${esc(g.author)}<i>· ${ago(g.created_at)}</i></span></div>
+        <span class="gby">${authorAva(g.user_id, g.author)}${esc(g.author)}<i>· ${ago(g.created_at)}</i></span></div>
       <div class="gacts"><span class="gdl" title="Скачали: ${num(g.downloads)}">${icon('download')}${num(g.downloads)}</span>
         <button class="glike${API.isLiked(g.id) ? ' liked' : ''}" data-grid-like="${esc(g.id)}" data-likes aria-label="Лайк">${icon('heart')}${num(g.likes)}</button></div>
     </div>
@@ -270,7 +283,7 @@ async function hydrate(el) {
 function watchLive() {
   for (const el of $$('.gthumb[data-live]:not([data-seen])')) { el.dataset.seen = '1'; liveIO ? liveIO.observe(el) : hydrate(el); }
 }
-new MutationObserver(watchLive).observe(document.body, { childList: true, subtree: true });
+new MutationObserver(() => { watchLive(); fillAvatars(); }).observe(document.body, { childList: true, subtree: true });
 
 // 18+: клик по размытой карточке сначала спрашивает — до того, как сработает открытие окна
 document.addEventListener('click', e => {
@@ -322,14 +335,15 @@ async function openGrid(id, { onChange } = {}) {
   try { g = await API.get(id); } catch (e) { if (alive) { close(); toast(e.message, 'err'); } return; }
   if (!alive) return;
   const cats = g.config?.categories || [];
-  const mine = API.isMine(g.id, g.user_id);
+  const mine = API.isMine(g.id, g.user_id), adm = isAdmin();
   // у сеток из аккаунта автор — ссылка на его профиль
   const author = g.user_id && ACC?.enabled ? `<a href="profile.html?u=${encodeURIComponent(g.user_id)}">${esc(g.author)}</a>` : `<b>${esc(g.author)}</b>`;
   root.innerHTML = `<div class="modal" role="dialog" aria-label="${esc(g.title)}">
     <button class="modal-x" data-icon="x" aria-label="Закрыть"></button>
     <div class="modal-view${g.nsfw && !API.adult() ? ' hide18' : ''}" data-preview-bg><canvas id="gv"></canvas>${g.nsfw && !API.adult() ? nsfwCover() : ''}</div>
     <div class="modal-side">
-      <div><h2>${esc(g.title)}</h2><div class="by">от ${author} · ${ago(g.created_at)}</div></div>
+      <div><h2>${esc(g.title)}</h2><div class="by">${authorAva(g.user_id, g.author)}от ${author} · ${ago(g.created_at)}</div></div>
+      ${adm ? adminBox(g, mine) : ''}
       ${g.description ? `<div class="desc">${esc(g.description)}</div>` : ''}
       ${tagsHTML([...(g.nsfw ? ['18+'] : []), ...(g.tags || [])], 9)}
       <div class="stats">
@@ -348,7 +362,7 @@ async function openGrid(id, { onChange } = {}) {
         <div class="hint">Скачанный <code>hero_grid_config.json</code> заменит все твои сетки. Чтобы добавить эту к своим — открой её в редакторе, нажми «Открыть JSON» со своим файлом и сделай экспорт.</div>
         <div class="side-links">
           <button id="gLink">Скопировать ссылку</button>
-          ${mine ? '<button class="danger" id="gDel">Удалить мою сетку</button>' : `<button id="gReport">${API.isReported(g.id) ? 'Жалоба отправлена' : 'Пожаловаться'}</button>`}
+          ${mine ? '<button class="danger" id="gDel">Удалить мою сетку</button>' : adm ? '' : `<button id="gReport">${API.isReported(g.id) ? 'Жалоба отправлена' : 'Пожаловаться'}</button>`}
         </div>
       </div>
     </div>
@@ -385,10 +399,32 @@ async function openGrid(id, { onChange } = {}) {
     if (!confirm('Пожаловаться на эту сетку? После нескольких жалоб она пропадёт из Мастерской до проверки.')) return;
     try { await API.report(g.id); rep.textContent = 'Жалоба отправлена'; toast('Спасибо, жалоба отправлена', 'ok'); } catch (e) { toast(e.message, 'err'); }
   };
-  const del = $('#gDel');
-  if (del) del.onclick = async () => {
+  for (const del of $$('#gDel, #aDel', root)) del.onclick = async () => {
     if (!confirm(`Удалить «${g.title}» из Мастерской? Это нельзя отменить.`)) return;
     try { await API.remove(g.id); close(); toast('Сетка удалена', 'ok'); onChange && onChange(g, true); } catch (e) { toast(e.message, 'err'); }
+  };
+  bindAdmin(root, 'grid', g, close, onChange);
+}
+// админу в окне сетки или фона: сколько жалоб, скрыто ли, и кнопки «Скрыть / Вернуть», «Удалить»
+function adminBox(x, mine) {
+  const r = +x.reports || 0;
+  return `<div class="adm-box${x.hidden ? ' off' : ''}">
+    <span class="adm-tag">${icon('star')}Админ</span>
+    <span class="adm-state">${x.hidden ? 'Скрыто из Мастерской' : 'Видно всем'}${r ? ` · ${r} ${plural(r, 'жалоба', 'жалобы', 'жалоб')}` : ''}</span>
+    <span class="adm-acts"><button class="btn sm" id="aHide">${x.hidden ? `${icon('eye')}Вернуть` : `${icon('lock')}Скрыть`}</button>
+      ${mine ? '' : `<button class="btn sm ghost danger" id="aDel">${icon('trash')}Удалить</button>`}</span>
+  </div>`;
+}
+function bindAdmin(root, kind, x, close, onChange) {
+  const b = $('#aHide', root); if (!b) return;
+  b.onclick = async () => {
+    b.disabled = true;
+    try {
+      await API.admin.moderate(kind, x.id, !x.hidden);
+      x.hidden = !x.hidden; if (!x.hidden) x.reports = 0;
+      close(); toast(x.hidden ? 'Скрыто из Мастерской' : 'Снова видно всем', 'ok');
+      onChange && onChange(x, x.hidden);
+    } catch (e) { toast(e.message, 'err'); b.disabled = false; }
   };
 }
 function setUrlId(id) {
@@ -820,7 +856,7 @@ function bgCardHTML(b, k = 0) {
     </div>
     <div class="bbody">
       <b class="btitle" title="${esc(b.title)}">${esc(b.title)}</b>
-      <span class="bby">${esc(b.author || 'Игрок')} · ${ago(b.created_at)}</span>
+      <span class="bby">${authorAva(b.user_id, b.author || 'Игрок')}<span>${esc(b.author || 'Игрок')} · ${ago(b.created_at)}</span></span>
       <div class="bacts">
         <button class="blike${API.bg.isLiked(b.id) ? ' liked' : ''}" data-bg-like="${esc(b.id)}" data-likes aria-label="Лайк">${icon('heart')}${num(b.likes)}</button>
         <a class="btn sm" href="${esc(bgDlUrl(b))}" download data-bg-dl="${esc(b.id)}">${icon('download')}Скачать</a>
@@ -846,7 +882,7 @@ async function openBg(id, { onChange } = {}) {
   let b;
   try { b = await API.bg.get(id); } catch (e) { if (alive) { close(); toast(e.message, 'err'); } return; }
   if (!alive) return;
-  const mine = API.bg.isMine(b), hide = b.nsfw && !API.adult();
+  const mine = API.bg.isMine(b), hide = b.nsfw && !API.adult(), adm = isAdmin();
   const author = b.user_id && ACC?.enabled ? `<a href="profile.html?u=${encodeURIComponent(b.user_id)}">${esc(b.author)}</a>` : `<b>${esc(b.author)}</b>`;
   const media = b.kind === 'video'
     ? `<video src="${esc(b.file)}" poster="${esc(b.poster)}" muted loop playsinline autoplay controls></video>`
@@ -855,7 +891,8 @@ async function openBg(id, { onChange } = {}) {
     <button class="modal-x" data-icon="x" aria-label="Закрыть"></button>
     <div class="modal-view bg-view${hide ? ' hide18' : ''}">${media}${hide ? nsfwCover() : ''}</div>
     <div class="modal-side">
-      <div><h2>${esc(b.title)}</h2><div class="by">от ${author} · ${ago(b.created_at)}</div></div>
+      <div><h2>${esc(b.title)}</h2><div class="by">${authorAva(b.user_id, b.author)}от ${author} · ${ago(b.created_at)}</div></div>
+      ${adm ? adminBox(b, mine) : ''}
       ${tagsHTML([...(b.nsfw ? ['18+'] : []), ...(b.tags || [])], 9)}
       <div class="stats">
         <div><b data-likes>${num(b.likes)}</b><span>${plural(b.likes, 'лайк', 'лайка', 'лайков')}</span></div>
@@ -871,7 +908,7 @@ async function openBg(id, { onChange } = {}) {
         </div>
         <div class="side-links">
           <button id="bLink">Скопировать ссылку</button>
-          ${mine ? '<button class="danger" id="bDel">Удалить мой фон</button>' : `<button id="bReport">${API.bg.isReported(b.id) ? 'Жалоба отправлена' : 'Пожаловаться'}</button>`}
+          ${mine ? '<button class="danger" id="bDel">Удалить мой фон</button>' : adm ? '' : `<button id="bReport">${API.bg.isReported(b.id) ? 'Жалоба отправлена' : 'Пожаловаться'}</button>`}
         </div>
       </div>
     </div>
@@ -899,11 +936,11 @@ async function openBg(id, { onChange } = {}) {
     if (!confirm('Пожаловаться на этот фон? После нескольких жалоб он пропадёт из Мастерской до проверки.')) return;
     try { await API.bg.report(b.id); rep.textContent = 'Жалоба отправлена'; toast('Спасибо, жалоба отправлена', 'ok'); } catch (e) { toast(e.message, 'err'); }
   };
-  const del = $('#bDel');
-  if (del) del.onclick = async () => {
+  for (const del of $$('#bDel, #aDel', root)) del.onclick = async () => {
     if (!confirm(`Удалить «${b.title}» из Мастерской? Файл сотрётся, это нельзя отменить.`)) return;
     try { await API.bg.remove(b.id); close(); toast('Фон удалён', 'ok'); onChange && onChange(b, true); } catch (e) { toast(e.message, 'err'); }
   };
+  bindAdmin(root, 'bg', b, close, onChange);
 }
 
 // постер и описание файла фона: размеры, длительность, пропорции — считаем в браузере
@@ -1091,13 +1128,14 @@ function renderSent(box, email, next) {
 // шапка профиля: аватар, ник, «о себе», Steam, цифры
 function profileHead(p, { me, grids = [], works = null }) {
   const likes = grids.reduce((a, g) => a + (+g.likes || 0), 0), dls = grids.reduce((a, g) => a + (+g.downloads || 0), 0);
+  const adm = me ? ACC.isAdmin() : p.admin;
   const steam = p.steam ? `<a class="pf-steam" href="${esc(p.steam)}" target="_blank" rel="noopener">${icon('ext')}Профиль Steam</a>` : '';
   return `<section class="pf-head">
-    <div class="pf-ava-wrap">${avatarHTML(p.avatar, p.nick, 'pf-ava')}${me ? `<button class="pf-ava-edit" id="pfAva" title="Сменить аватар" aria-label="Сменить аватар">${icon('image')}</button>` : ''}</div>
+    <div class="pf-ava-wrap">${avatarHTML(p.avatar, p.nick, 'pf-ava')}${me ? `<button class="pf-ava-edit" id="pfAva" title="Сменить аватар" aria-label="Сменить аватар">${icon('edit')}</button>` : ''}</div>
     <div class="pf-info">
       ${me ? `<input class="pf-nick" id="pfNick" value="${esc(p.nick)}" maxlength="32" spellcheck="false" title="Ник — его видят в Мастерской">` : `<h1 class="pf-nick">${esc(p.nick || 'Игрок')}</h1>`}
       ${me && ACC.ext() ? `<textarea class="pf-bio" id="pfBio" maxlength="200" rows="1" placeholder="Пара слов о себе: какие сетки делаешь, за кого играешь…">${esc(p.bio || '')}</textarea>` : p.bio ? `<p class="pf-bio">${esc(p.bio)}</p>` : ''}
-      <span class="pf-meta">${me ? `${icon('lock')}${esc(ACC.user()?.email || '')} — видишь только ты` : ''} ${p.created_at ? `с ${new Date(p.created_at).toLocaleDateString('ru', { month: 'long', year: 'numeric' })}` : ''} ${steam}</span>
+      <span class="pf-meta">${adm ? `<span class="adm-tag">${icon('star')}Админ</span>` : ''}${me ? `${icon('lock')}${esc(ACC.user()?.email || '')} — видишь только ты` : ''} ${p.created_at ? `с ${new Date(p.created_at).toLocaleDateString('ru', { month: 'long', year: 'numeric' })}` : ''} ${steam}</span>
     </div>
     <div class="pf-side">
       <div class="pf-stats">
@@ -1124,7 +1162,7 @@ function workToConfig(w) {
   return JSON.stringify({ version: 3, configs: [{ config_name: d.settings?.configName || w.title, categories }] }, null, '\t');
 }
 
-// аватар: своя картинка (квадрат 160 px, webp), портрет героя или картинка из Discord/GitHub
+// аватар: своя картинка (кадрируешь сам, квадрат 160 px, webp), портрет героя или картинка из Discord/GitHub
 function openAvatarSheet(p, onDone) {
   const heroes = (window.HEROES || []).slice().sort((a, b) => a.n.localeCompare(b.n));
   const prov = ACC.user()?.meta?.avatar;
@@ -1132,7 +1170,7 @@ function openAvatarSheet(p, onDone) {
     ${avatarHTML(p.avatar, p.nick, 'sh-ava')}
     <h2>Аватар</h2>
     <div class="sh-actions">
-      ${ACC.ext() ? `<button class="btn primary block" data-av="upload">${icon('upload')}Загрузить картинку<span class="sh-note">png, jpg, webp</span></button>` : ''}
+      ${ACC.ext() ? `<button class="btn primary block" data-av="upload">${icon('upload')}Загрузить свою картинку<span class="sh-note">png, jpg, webp, gif</span></button>` : ''}
       ${prov ? `<button class="btn block" data-av="prov">${icon('user')}Как в Discord / GitHub</button>` : ''}
       ${p.avatar ? `<button class="btn block ghost" data-av="clear">${icon('trash')}Убрать аватар</button>` : ''}
     </div>
@@ -1156,23 +1194,72 @@ function openAvatarSheet(p, onDone) {
   });
   $('#avFile', m.root).onchange = async e => {
     const f = e.target.files[0]; if (!f) return;
+    const src = URL.createObjectURL(f);
     try {
-      const img = await new Promise((res, rej) => { const im = new Image(); im.onload = () => res(im); im.onerror = () => rej(new Error('Не удалось открыть картинку')); im.src = URL.createObjectURL(f); });
-      // квадрат из середины, 160 × 160
-      const S = 160, side = Math.min(img.naturalWidth, img.naturalHeight), cv = document.createElement('canvas');
-      cv.width = cv.height = S;
-      const c = cv.getContext('2d'); c.imageSmoothingQuality = 'high';
-      c.drawImage(img, (img.naturalWidth - side) / 2, (img.naturalHeight - side) / 2, side, side, 0, 0, S, S);
-      let url = cv.toDataURL('image/webp', 0.86);
-      if (!url.startsWith('data:image/webp')) url = cv.toDataURL('image/jpeg', 0.86);
-      await set(url);
+      const img = await new Promise((res, rej) => { const im = new Image(); im.onload = () => res(im); im.onerror = () => rej(new Error('Не удалось открыть картинку')); im.src = src; });
+      cropAvatar(m, img, set, () => openAvatarSheet(p, onDone));
     } catch (er) { toast(er.message, 'err'); }
+  };
+}
+// кадрирование: тянешь картинку и приближаешь (ползунок или колёсико), в аватар уходит то, что в круге
+function cropAvatar(m, img, save, back) {
+  const body = $('.sh-body', m.root);
+  body.className = 'sh-body ava-crop';
+  body.innerHTML = `<h2>Выбери кадр</h2><p>Двигай картинку и приближай — в аватар попадёт то, что внутри круга.</p>
+    <canvas class="crop-cv" width="560" height="560" aria-label="Кадр аватара"></canvas>
+    <label class="crop-zoom" title="Приблизить">${icon('search')}<input type="range" min="1" max="5" step="0.01" value="1" aria-label="Приближение"></label>
+    <div class="crop-acts"><button class="btn" data-crop="back">Назад</button><button class="btn primary" data-crop="ok">${icon('check')}Готово</button></div>`;
+  const cv = $('.crop-cv', body), c = cv.getContext('2d'), zoom = $('.crop-zoom input', body);
+  const W = img.naturalWidth, H = img.naturalHeight, S = cv.width, fit = S / Math.min(W, H);
+  let z = 1, cx = W / 2, cy = H / 2;
+  // видимый квадрат в пикселях картинки; картинка всегда закрывает кадр целиком
+  const view = () => {
+    const side = S / (fit * z);
+    cx = Math.min(Math.max(cx, side / 2), W - side / 2); cy = Math.min(Math.max(cy, side / 2), H - side / 2);
+    return [cx - side / 2, cy - side / 2, side];
+  };
+  const paint = () => {
+    const [x, y, side] = view();
+    c.imageSmoothingQuality = 'high';
+    c.clearRect(0, 0, S, S); c.drawImage(img, x, y, side, side, 0, 0, S, S);
+    c.fillStyle = 'rgba(8, 6, 6, .62)'; c.beginPath(); c.rect(0, 0, S, S); c.arc(S / 2, S / 2, S / 2 - 3, 0, Math.PI * 2); c.fill('evenodd');
+    c.strokeStyle = 'rgba(255, 255, 255, .5)'; c.lineWidth = 3; c.beginPath(); c.arc(S / 2, S / 2, S / 2 - 3, 0, Math.PI * 2); c.stroke();
+  };
+  const setZoom = v => { z = Math.min(5, Math.max(1, v)); zoom.value = z; paint(); };
+  zoom.oninput = () => setZoom(+zoom.value);
+  cv.addEventListener('wheel', e => { e.preventDefault(); setZoom(z * Math.exp(-e.deltaY * 0.0015)); }, { passive: false });
+  let drag = null;
+  cv.onpointerdown = e => { drag = { x: e.clientX, y: e.clientY }; cv.setPointerCapture(e.pointerId); };
+  cv.onpointermove = e => {
+    if (!drag) return;
+    const k = S / cv.clientWidth / (fit * z);
+    cx -= (e.clientX - drag.x) * k; cy -= (e.clientY - drag.y) * k;
+    drag = { x: e.clientX, y: e.clientY }; paint();
+  };
+  cv.onpointerup = cv.onpointercancel = () => { drag = null; };
+  paint();
+  body.onclick = async e => {
+    const a = e.target.closest('[data-crop]')?.dataset.crop;
+    if (a === 'back') { URL.revokeObjectURL(img.src); back(); return; }
+    if (a !== 'ok') return;
+    const [x, y, side] = view(), out = document.createElement('canvas');
+    out.width = out.height = 160;
+    const o = out.getContext('2d'); o.imageSmoothingQuality = 'high';
+    o.drawImage(img, x, y, side, side, 0, 0, 160, 160);
+    // база принимает до ~90 КБ; webp обычно 5–15 КБ, Safari без webp — jpeg
+    let url = out.toDataURL('image/webp', 0.88);
+    if (!url.startsWith('data:image/webp')) url = out.toDataURL('image/jpeg', 0.88);
+    if (url.length > 88000) url = out.toDataURL('image/jpeg', 0.7);
+    const ok = e.target.closest('button'); ok.disabled = true;
+    await save(url);   // при ошибке save сам покажет её — даём нажать ещё раз
+    ok.disabled = false;
   };
 }
 
 async function renderMyProfile(box) {
   let p = ACC.profile() || await ACC.loadProfile();
-  let works = [], pub = [], liked = null, tab = 'works';
+  let works = [], pub = [], liked = null, queue = null, tab = 'works';
+  const adm = isAdmin();
   const head = () => {
     $('#pfHeadBox').innerHTML = profileHead(p, { me: true, grids: pub, works });
     applyIcons($('#pfHeadBox'));
@@ -1183,6 +1270,7 @@ async function renderMyProfile(box) {
       <button class="chip on" data-tab="works">${icon('lock')}Мои работы <b id="pfWorksN"></b></button>
       <button class="chip" data-tab="pub">${icon('globe')}Опубликованные <b id="pfPubN"></b></button>
       <button class="chip" data-tab="liked">${icon('heart')}Понравившиеся <b id="pfLikedN"></b></button>
+      ${adm ? `<button class="chip" data-tab="mod">${icon('star')}Модерация <b id="pfModN"></b></button>` : ''}
     </div>
     <div class="cards" id="pfList">${skeletons(3)}</div>`;
   head();
@@ -1200,7 +1288,7 @@ async function renderMyProfile(box) {
       fit(); bio.oninput = fit;
       bio.onchange = async () => { try { p = await ACC.updateProfile({ bio: bio.value.trim().slice(0, 200) }); toast('Сохранено', 'ok'); } catch (e) { toast(e.message, 'err'); } };
     }
-    $('#pfAva').onclick = () => openAvatarSheet(p, np => { p = np; head(); });
+    $('#pfAva').onclick = $('.pf-ava-wrap .pf-ava').onclick = () => openAvatarSheet(p, np => { p = np; head(); });
     $('#pfOut').onclick = async () => { await ACC.signOut(); location.href = 'index.html'; };
     $('#pfShare').onclick = e => copyText(e.currentTarget.dataset.copy, 'Ссылка на профиль скопирована');
     const st = $('#pfSteam');
@@ -1219,14 +1307,31 @@ async function renderMyProfile(box) {
       : `<div class="cards-empty">${MARK}<b>Пока нет сохранённых работ</b><span>В редакторе открой меню у названия сетки → «Сохранить в мои работы». Работы видишь только ты.</span><a class="btn primary sm" href="editor.html">Открыть редактор</a></div>`;
     else if (tab === 'pub') list.innerHTML = pub.length ? pub.map(cardHTML).join('')
       : `<div class="cards-empty"><b>Ничего не опубликовано</b><span>Сетки, которые ты выложишь в Мастерскую, войдя в профиль, появятся здесь.</span></div>`;
-    else list.innerHTML = !liked ? skeletons(3) : liked.length ? liked.map(cardHTML).join('')
+    else if (tab === 'liked') list.innerHTML = !liked ? skeletons(3) : liked.length ? liked.map(cardHTML).join('')
       : `<div class="cards-empty"><b>Пока пусто</b><span>Ставь лайки сеткам в Мастерской — они соберутся здесь.</span><a class="btn sm" href="workshop.html">В Мастерскую</a></div>`;
+    else if (!queue) list.innerHTML = skeletons(3);
+    else {
+      const items = [...queue.grids.map(x => ['grid', x]), ...queue.backgrounds.map(x => ['bg', x])];
+      list.innerHTML = items.length ? items.map(([k, x], i) => k === 'grid' ? cardHTML(x, i) : bgCardHTML(x, i)).join('')
+        : `<div class="cards-empty">${MARK}<b>Жалоб нет</b><span>Здесь появятся сетки и фоны, на которые жаловались, и всё, что скрыто. 5 жалоб прячут работу сами.</span></div>`;
+      // поверх превью: скрыто ли и сколько жалоб
+      items.forEach(([, x], i) => {
+        const r = +x.reports || 0, pic = $('.gthumb, .bpic', list.children[i]);
+        pic?.insertAdjacentHTML('beforeend', `<span class="adm-flag${x.hidden ? ' off' : ''}">${x.hidden ? 'скрыто' : 'видно'}${r ? ` · ${r} ${plural(r, 'жалоба', 'жалобы', 'жалоб')}` : ''}</span>`);
+      });
+    }
+    if (adm) $('#pfModN').textContent = queue ? queue.grids.length + queue.backgrounds.length : '';
     applyIcons(list);
+  };
+  const loadQueue = async () => {
+    try { queue = await API.admin.queue(); } catch (e) { queue = { grids: [], backgrounds: [] }; toast(e.message, 'err'); }
+    draw();
   };
   $('#pfTabs').onclick = async e => {
     const b = e.target.closest('.chip'); if (!b) return;
     tab = b.dataset.tab; $$('#pfTabs .chip').forEach(c => c.classList.toggle('on', c === b)); ind(); draw();
     if (tab === 'liked' && !liked) { try { liked = await API.byIds(API.likedIds()); } catch { liked = []; } if (tab === 'liked') draw(); }
+    if (tab === 'mod') loadQueue();
   };
   ind(); document.fonts?.ready.then(ind);
   $('#pfList').onclick = async e => {
@@ -1248,12 +1353,22 @@ async function renderMyProfile(box) {
       } catch (er) { toast(er.message, 'err'); }
       return;
     }
+    if (tab === 'mod') {
+      // в модерации после любого действия просто перечитываем список
+      const g = e.target.closest('.gcard[data-id]'), b = e.target.closest('.bcard[data-bg]');
+      const onChange = () => loadQueue();
+      if (b && !e.target.closest('[data-bg-dl]')) { e.preventDefault(); openBg(b.dataset.bg, { onChange }); }
+      else if (g) openGrid(g.dataset.id, { onChange });
+      return;
+    }
     const c = e.target.closest('.gcard[data-id]');
     if (c && tab !== 'works') openGrid(c.dataset.id, { onChange: (g, removed) => { if (removed) { pub = pub.filter(x => x.id !== g.id); draw(); head(); } } });
   };
   try {
     [works, pub] = await Promise.all([ACC.projects.list(), ACC.userGrids(ACC.user().id)]);
     head(); draw();
+    // число на вкладке «Модерация» видно сразу, не дожидаясь клика
+    if (adm) API.admin.queue().then(q => { queue = q; if (tab === 'mod') draw(); else $('#pfModN').textContent = q.grids.length + q.backgrounds.length; }).catch(() => {});
   } catch (e) { $('#pfList').innerHTML = `<div class="cards-empty"><b>Не удалось загрузить работы</b><span>${esc(e.message)}</span></div>`; }
 }
 const workCard = (w, k) => `<a class="gcard wcard" href="editor.html?project=${encodeURIComponent(w.id)}" style="animation-delay:${Math.min(k, 12) * 40}ms">

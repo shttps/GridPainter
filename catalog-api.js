@@ -41,6 +41,7 @@ window.CatalogAPI = (() => {
     bad_file: 'Этот файл не подходит: нужны PNG, JPEG, WebP, GIF, MP4 или WebM.',
     not_signed_in: 'Войди в профиль, чтобы выкладывать фоны.',
     not_yours: 'Удалить можно только свой фон.',
+    not_admin: 'Это может только админ.',
   };
   function niceError(msg) {
     for (const k in ERRORS) if (String(msg).includes(k)) return ERRORS[k];
@@ -109,7 +110,8 @@ window.CatalogAPI = (() => {
     const build = () => {
       // в базе ещё нет тегов — ни одна сетка им не соответствует
       if (tag && !tagCols) return null;
-      const p = new URLSearchParams({ select: cols() });
+      // админ по правилам базы видит и скрытое жалобами — в обычных списках оно не нужно
+      const p = new URLSearchParams({ select: cols(), hidden: 'is.false' });
       if (tagCols && tag === '18+') p.set('nsfw', 'is.true');
       else if (tagCols && tag) p.set('tags', 'cs.' + tagList(tag));
       if (sort === 'week') p.set('created_at', 'gte.' + WEEK());
@@ -140,7 +142,7 @@ window.CatalogAPI = (() => {
       if (!g) throw new Error('Сетка не найдена — возможно, её удалили.');
       return g;
     }
-    const r = await tolerant(() => rest(`/grids?select=${cols()},config&id=eq.${encodeURIComponent(id)}`));
+    const r = await tolerant(() => rest(`/grids?select=${cols()},reports,hidden,config&id=eq.${encodeURIComponent(id)}`));
     if (!r.data?.length) throw new Error('Сетка не найдена — возможно, её удалили.');
     configs.set(id, Promise.resolve(r.data[0].config));
     return r.data[0];
@@ -174,7 +176,7 @@ window.CatalogAPI = (() => {
     ids = ids.filter(id => /^[0-9a-f-]{36}$/i.test(id)).slice(0, 100);
     if (!ids.length) return [];
     if (!remote) return localAll().filter(g => ids.includes(g.id) && !g.hidden).map(pick);
-    return (await tolerant(() => rest(`/grids?select=${cols()}&id=in.(${ids.join(',')})&order=created_at.desc`))).data;
+    return (await tolerant(() => rest(`/grids?select=${cols()}&id=in.(${ids.join(',')})&hidden=is.false&order=created_at.desc`))).data;
   }
 
   async function publish({ title, author, description, config, thumb, tags = [], nsfw = false }) {
@@ -273,7 +275,7 @@ window.CatalogAPI = (() => {
     async list({ q = '', tag = '', aspect = '', sort = 'popular', offset = 0, limit = 24, onlyMine = false } = {}) {
       if (!remote) return { items: [], total: 0 };
       q = clean(q);
-      const p = new URLSearchParams({ select: BG_COLS });
+      const p = new URLSearchParams({ select: BG_COLS, hidden: 'is.false' });
       if (tag === '18+') p.set('nsfw', 'is.true');
       else if (tag) p.set('tags', 'cs.' + tagList(tag));
       if (aspect) p.set('aspect', 'eq.' + aspect);
@@ -296,7 +298,7 @@ window.CatalogAPI = (() => {
       }
     },
     async get(id) {
-      const r = await rest(`/backgrounds?select=${BG_COLS}&id=eq.${encodeURIComponent(id)}`);
+      const r = await rest(`/backgrounds?select=${BG_COLS},reports,hidden&id=eq.${encodeURIComponent(id)}`);
       if (!r.data?.length) throw new Error('Фон не найден — возможно, его удалили.');
       return withUrls(r.data[0]);
     },
@@ -345,6 +347,21 @@ window.CatalogAPI = (() => {
     isMine: b => !!b.user_id && b.user_id === window.Accounts?.user()?.id,
   };
 
+  // ---------- модерация (только админы: права проверяет база) ----------
+  const admin = {
+    // всё, на что жаловались, и всё скрытое: сначала скрытое, потом по числу жалоб
+    async queue() {
+      const q = '&or=(reports.gt.0,hidden.is.true)&order=hidden.desc,reports.desc,created_at.desc&limit=100';
+      const [g, b] = await Promise.all([
+        tolerant(() => rest(`/grids?select=${cols()},reports,hidden${q}`)),
+        rest(`/backgrounds?select=${BG_COLS},reports,hidden${q}`).catch(() => ({ data: [] })),
+      ]);
+      return { grids: g.data, backgrounds: b.data.map(withUrls) };
+    },
+    // kind: 'grid' | 'bg'; hidden: true — спрятать, false — вернуть в Мастерскую
+    moderate: (kind, id, hidden) => rpc('admin_moderate', { p_kind: kind, p_id: id, p_hidden: !!hidden }),
+  };
+
   // теги: автор выбирает до 5 при публикации; «18+» — отдельная пометка
   const TAGS = {
     grid: ['Аниме', 'Милота', 'Рамки', 'С упором на героя', 'Мемы', 'Dead inside', 'Надписи', 'Игры'],
@@ -357,7 +374,7 @@ window.CatalogAPI = (() => {
     isMine: (id, userId) => mine.has(id) || (!!userId && userId === window.Accounts?.user()?.id), isLiked: id => liked.has(id), isReported: id => reported.has(id), mineCount: () => mine.size,
     author: () => load('gs.author', ''), setAuthor: a => save('gs.author', a),
     KINDS: { ascii: 'ASCII', mosaic: 'Мозаика', mixed: 'Смешанная' },
-    TAGS, bg,
+    TAGS, bg, admin,
     // 18+: размытые карточки открываются по клику; «мне есть 18» запоминается
     adult: () => load('gs.adult', false), setAdult: v => save('gs.adult', !!v),
   };
