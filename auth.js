@@ -34,6 +34,7 @@ window.Accounts = (() => {
     profiles_bio: '«О себе» — до 200 символов.',
     profiles_steam: 'Ссылка на Steam должна начинаться с https://steamcommunity.com/',
     profiles_banner: 'Баннер должен быть загружен через сайт.',
+    profiles_tg: 'Ник в Telegram — 5–32 символа: латиница, цифры и _, начинается с буквы.',
     JWT: 'Сессия истекла — войди ещё раз.',
   };
   const nice = (msg, code) => {
@@ -105,15 +106,16 @@ window.Accounts = (() => {
   // bio и steam появляются после обновления базы (SQL из README); до этого профиль работает без них.
   // Не запоминаем «колонок нет» навсегда: иначе после обновления базы у старых посетителей
   // так и не появлялись «о себе», Steam и загрузка своей аватарки
-  let ext = true, bext = true;   // bext — есть колонка banner и бакет profiles (schema.sql 2.4)
+  let ext = true, bext = true, text = true;   // bext — колонка banner и бакет profiles (2.4), text — колонка tg (2.5)
   try { localStorage.removeItem('gs.profileExt'); } catch {}
-  const pcols = () => 'id,nick,avatar,created_at' + (ext ? ',bio,steam' : '') + (bext ? ',banner' : '');
+  const pcols = () => 'id,nick,avatar,created_at' + (ext ? ',bio,steam' : '') + (bext ? ',banner' : '') + (text ? ',tg' : '');
   async function prest(path, opts) {
     for (let i = 0; ; i++) {
       try { return await rest(path.replace('{cols}', pcols()), opts); }
       catch (e) {
-        if (i < 2 && bext && /banner/.test(e.message)) { bext = false; continue; }
-        if (i < 2 && ext && /bio|steam/.test(e.message)) { ext = false; continue; }
+        if (i < 3 && text && /(^|\W)tg(\W|$)/.test(e.message)) { text = false; continue; }
+        if (i < 3 && bext && /banner/.test(e.message)) { bext = false; continue; }
+        if (i < 3 && ext && /bio|steam/.test(e.message)) { ext = false; continue; }
         throw e;
       }
     }
@@ -245,6 +247,6 @@ window.Accounts = (() => {
     onChange: f => { listeners.add(f); return () => listeners.delete(f); },
     ready, token, sendLink, verifyCode, oauth, signOut, loadProfile, updateProfile, getProfile, authors, projects, userGrids,
     setMedia, adminClear,
-    ext: () => ext, media: () => bext,
+    ext: () => ext, media: () => bext, tg: () => text,
   };
 })();

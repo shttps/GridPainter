@@ -12,9 +12,16 @@
 <link rel="icon" href="logo.svg" type="image/svg+xml">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap">
-<link rel="stylesheet" href="site.css?v=30">
+<link rel="stylesheet" href="site.css?v=35">
 </head>
 <body data-page="workshop">
+<!-- фон как на главной: сполохи темы и поле ASCII-символов (рисует site.js), внизу гаснет в цвет страницы -->
+<div class="hero-bg ws-bg" aria-hidden="true">
+  <div class="aurora au-1"></div><div class="aurora au-2"></div>
+  <canvas class="bg-glyphs" id="wsGlyphs"></canvas>
+  <div class="bg-grain"></div>
+  <div class="bg-vignette"></div>
+</div>
 
 <div class="wrap">
   <div class="ws-head">
@@ -58,11 +65,11 @@
 
 <div class="modal-root" id="modalRoot"></div>
 <div class="toasts" id="toasts"></div>
-<script src="heroes.js?v=30"></script>
-<script src="config.js?v=30"></script>
-<script src="auth.js?v=30"></script>
-<script src="gridrender.js?v=30"></script>
-<script src="catalog-api.js?v=30"></script>
-<script src="site.js?v=30"></script>
+<script src="heroes.js?v=35"></script>
+<script src="config.js?v=35"></script>
+<script src="auth.js?v=35"></script>
+<script src="gridrender.js?v=35"></script>
+<script src="catalog-api.js?v=35"></script>
+<script src="site.js?v=35"></script>
 </body>
 </html>

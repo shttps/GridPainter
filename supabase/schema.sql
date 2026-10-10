@@ -579,3 +579,11 @@ begin
 end $$;
 revoke all on function public.admin_clear_media(uuid, text) from public, anon;
 grant execute on function public.admin_clear_media(uuid, text) to authenticated;
+
+-- =====================================================================
+-- Профили: Telegram (2.5). Храним только ник без @ — ссылку https://t.me/<ник> собирает сайт.
+-- =====================================================================
+alter table public.profiles add column if not exists tg text not null default '';
+alter table public.profiles drop constraint if exists profiles_tg;
+alter table public.profiles add constraint profiles_tg check (tg = '' or tg ~ '^[A-Za-z][A-Za-z0-9_]{3,31}$');
+grant update (nick, avatar, bio, steam, banner, tg) on public.profiles to authenticated;

@@ -49,6 +49,8 @@ const ICONS = {
   book: 'M4 5.5A1.5 1.5 0 015.5 4H11v15.5H5.5A1.5 1.5 0 014 18zM20 5.5A1.5 1.5 0 0018.5 4H13v15.5h5.5A1.5 1.5 0 0020 18z',
   dice: '<rect x="4" y="4" width="16" height="16" rx="3.5"/><circle cx="9" cy="9" r="1.1" fill="currentColor"/><circle cx="15" cy="15" r="1.1" fill="currentColor"/><circle cx="15" cy="9" r="1.1" fill="currentColor"/><circle cx="9" cy="15" r="1.1" fill="currentColor"/>',
   send: 'M20.5 3.5L3.5 10.5l6.5 2.5 2.5 6.5zM10 13l5-5',
+  steam: '<circle cx="12" cy="12" r="8.5"/><circle cx="15" cy="9.5" r="2.4"/><circle cx="9.2" cy="15.6" r="1.7"/><path d="M3.9 13.4l3.9 1.6M13.3 11.4l-2.6 3.1"/>',
+  telegram: 'M20.5 4.5L3.5 11l5.5 2 2 6 3-4 4.5 3.5zM9 13l7-5.5',
   megaphone: 'M4 10v4h3l7 4.5v-13L7 10zM17.5 9a4 4 0 010 6M7 14l1.5 5.5h2.5L10 15.5',
   logout: 'M14 4h4.5A1.5 1.5 0 0120 5.5v13a1.5 1.5 0 01-1.5 1.5H14M9.5 8L5.5 12l4 4M5.5 12H15',
   lock: '<rect x="5" y="10.5" width="14" height="9.5" rx="2"/><path d="M8 10.5V8a4 4 0 018 0v2.5"/>',
@@ -459,18 +461,64 @@ const guideCard = ([id, tag, title, desc, min], k) => `<a class="guide-card" hre
   <span class="gc-tag">${esc(tag)}</span><b>${esc(title)}</b><span>${esc(desc)}</span><small>${icon('clock')}${min} мин чтения</small></a>`;
 
 // ---------- главная ----------
-const BRAILLE = `⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢠⣶⣶⣶⣆⣀⣤⣄⠀⠀⠀⠀⠀
-⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢀⣀⣤⣤⣶⣶⣞⢿⢿⣿⣿⡿⣯⡉⠉⠁⠀⠀⠀⠀
-⠀⠀⣠⣴⣦⣤⠈⠲⣀⣀⠀⢁⡶⠿⠛⠉⢻⣏⡙⣿⣿⣿⣾⣿⣷⣄⠀⠀⠀⠀
-⣀⡤⠎⠉⠁⠀⠈⠁⣶⡶⠚⠋⠉⠀⠘⣲⣬⣵⣶⣿⠿⠿⠿⠿⠿⢿⣿⣄⠀⠀
-⠉⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣏⣻⣞⠋⠛⢿⡇⠀⠀⠈⠻⢿⢻⣷⣤
-⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠈⣽⠽⠷⣾⠶⠒⣒⡀⠀⠀⣠⣤⣍⣛`;
+// Брайль-арт для панели «Профиль Steam» (сделан из docs/art-white-src.webp тем же способом, что в редакторе:
+// тёмное — точка, дизеринг). Рисуем его точками на холсте, а не текстом: ширина символов Брайля
+// разная в разных шрифтах, и текстом арт разъезжался и обрезался.
+const BRAILLE = `⠀⠀⠀⠀⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⡄⢀⡃⡄⠐⠀⠀⠀⠀⠀⡅⠐⡄⠀⠢⠀⠀⠀⠀⠀⠀⠐⠀⠀⠀⠀⡂⠀⢱⡑⡈⢢⢃⢇⢟⡄⠀⠠⢐⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⢰⠁⠀⠠⠀⠀⠀⡀⠀⠀⠀⢀⠁⠀⡂⠀⠌⡘⠀⣸⠀⡇⢘⠀⠀⠀⠀⠀⡇⠀⡅⠀⠸⠀⠀⠀⠀⠀⠀⠈⠀⠀⠀⠀⢸⠀⠀⣇⢕⡈⢜⢜⢭⣻⡀⢈⢢⠀⠀⡀⠀⠀⠀
+⠀⠀⠠⢸⠀⠀⠀⠀⠀⠀⠄⠐⠀⠀⡂⠀⠰⠀⠰⢐⠀⢠⡇⢰⠁⡔⠀⠀⠀⠀⠂⣗⠀⣗⠀⠁⡅⠀⠀⠀⠀⠀⠀⠄⠀⠀⠀⠀⣇⠀⢸⡢⡲⡈⢮⡚⣞⣇⠀⢢⠁⠀⠂⠀⠀⠀
+⠀⠀⠀⣟⠀⠀⠨⠀⠀⢈⢄⠁⠀⢐⠀⠀⡊⣀⣀⣊⣀⣬⡥⡼⠤⡇⠀⠀⠀⢰⢀⣗⠀⣳⠀⢀⡇⠀⠀⢀⠀⠀⠀⠄⠀⠀⠅⠀⢻⡄⠐⡧⡣⡣⡕⣝⢮⣿⠀⠡⠊⠀⢡⠀⠀⠀
+⠀⠀⠠⣗⠀⠀⢸⠀⠀⠐⡤⠐⢐⠚⠉⢹⠉⠉⢨⠂⡐⠨⠀⠎⢀⠃⡅⠀⠀⡜⢰⠩⠐⠾⠄⣀⡏⠀⠀⢰⠀⠀⠀⢅⠀⠀⡣⠀⢺⣧⠀⢳⢕⡕⣕⢗⢗⡿⡇⠨⢘⠀⢨⠀⠀⠀
+⠀⠀⡸⡳⠀⠀⠰⠀⠀⠀⡧⠀⡢⠁⠠⠏⠀⡈⠎⠠⠀⠐⠈⠄⠀⠂⡅⠀⠠⠃⠔⠈⠄⣹⠀⠬⡏⠐⠢⢘⠀⠀⢠⢑⠀⠀⡯⠀⢸⢾⡀⢸⢇⢏⡮⣫⣳⡻⣿⡀⠱⠀⢘⠄⠀⠂
+⠀⠀⢺⠁⠄⠀⠀⡃⠀⠀⢻⠀⠅⠀⠈⠂⠀⠂⠂⠒⠖⠄⠀⡁⠐⢐⠀⠀⠈⢀⠁⠨⠀⠪⠀⢜⠂⠨⠀⠄⠀⠀⢸⢰⠁⠀⣏⠀⣸⣝⡇⠨⣯⡳⣝⣞⣞⣾⣽⣧⢘⠀⠨⡃⠀⠄
+⠀⠀⢽⠈⡂⠀⠀⣇⢀⠤⢴⣶⣶⣿⣿⣿⣿⣿⣿⣷⣄⠀⠀⠀⠐⠐⠀⠀⠀⡐⠀⠈⠐⡒⠈⠀⠀⠇⠠⠁⠀⠰⡌⢸⠀⢀⡇⠀⣞⡎⣿⠀⣿⣝⢷⣻⢾⣷⣷⣿⡦⠂⠨⡧⠀⠂
+⠀⠀⢹⡇⠨⠀⠀⢸⠀⡀⠈⢿⣿⣿⣿⣿⣿⣿⡟⠀⠁⠀⠈⠀⠈⠐⠀⠀⠀⠀⣴⣿⣿⣿⣿⣿⣿⣶⠌⠐⠀⣇⠇⡞⠀⢸⠄⠀⣷⢝⣺⠀⣗⣗⢯⢯⣟⡾⣯⣿⣿⣅⠨⣺⠀⢁
+⠠⠀⢸⡇⣦⠅⠀⠈⣇⢡⠀⡀⢙⡿⠿⢿⣿⡍⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣿⣿⣿⣿⡻⠟⠐⡇⢀⠇⢰⡳⠠⡇⢀⢙⠆⢸⢯⡪⣾⠀⡷⣕⢯⢗⡯⣿⢽⣾⣻⣿⡰⢵⠀⢂
+⠐⠀⢸⠂⣿⡝⡀⠀⢿⡀⢇⢂⠈⠛⠛⠋⠉⠉⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠐⠿⣿⣿⣿⡂⠀⣼⡁⡸⠀⣞⠆⡼⠃⡸⠠⠀⢾⡳⡹⡼⢰⡫⡮⣫⢗⢯⢯⢿⡽⣿⣽⣿⣽⠀⡂
+⠡⠀⢸⢠⢿⡇⢧⠀⠘⣧⠸⡌⠆⠄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠈⠉⢀⢜⡿⢀⡇⣸⡇⣰⠫⢀⠣⠀⠰⠸⣝⢭⣓⢼⢝⢮⡳⡽⣹⢽⣝⣯⣿⣽⣯⣿⣧⡀
+⡑⠀⠨⠸⣽⢿⠸⡄⠀⠹⡆⢳⡘⣆⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢀⣮⢟⠂⡞⢀⡾⢠⡟⢀⢺⠀⠌⠈⣆⢫⣗⣕⢯⢝⡵⣝⣞⢽⢵⣳⣳⣟⣾⣿⣿⣿⡧
+⡸⠀⠀⢯⣟⡏⡆⢷⠀⠈⢞⡌⢧⠹⡗⢦⣀⠀⠀⠀⠀⠀⠀⠀⠂⠀⠀⠀⠀⠀⠀⣀⡴⡿⢇⠃⡜⠀⠠⠁⠉⠃⠮⡐⡄⠁⠀⢹⡄⢷⣕⢯⡳⡽⣺⣪⢯⣗⣗⡷⣯⣷⣿⣷⣿⣿
+⡸⠀⠀⣿⢽⠂⢿⢸⡆⠀⠐⠹⡘⣷⡹⠀⠌⠓⠦⣄⠀⠀⠀⠀⠀⠀⢀⣀⠤⠒⠉⠡⡑⠀⢸⠸⡀⠀⡈⠀⠀⠈⠀⠈⢦⠐⠀⠈⣷⡘⣗⡯⡯⡯⡷⣽⣳⣳⣻⣞⣷⢿⣾⣿⡿⣿`;
+const BRAILLE_BITS = [[0, 0, 1], [0, 1, 2], [0, 2, 4], [1, 0, 8], [1, 1, 16], [1, 2, 32], [0, 3, 64], [1, 3, 128]];
+function brailleCanvas(cv, text) {
+  const lines = text.split('\n').map(l => [...l]), rows = lines.length, cols = Math.max(...lines.map(l => l.length));
+  const dots = [];
+  lines.forEach((l, r) => l.forEach((ch, c) => { const b = ch.codePointAt(0) - 0x2800; for (const [dx, dy, bit] of BRAILLE_BITS) if (b & bit) dots.push(c * 2 + dx, r * 4 + dy); }));
+  let color = 'oklch(0.86 0.02 250)', upto = rows * 4;
+  const paint = () => {
+    const W = cv.clientWidth, H = cv.clientHeight; if (!W || !H) return;
+    const dpr = Math.min(2, devicePixelRatio || 1);
+    cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr);
+    const c = cv.getContext('2d'); c.setTransform(dpr, 0, 0, dpr, 0, 0);
+    // шаг точки — чтобы арт целиком влез с небольшими полями
+    const p = Math.min((W - 14) / (cols * 2), (H - 10) / (rows * 4)), ox = (W - p * cols * 2) / 2, oy = (H - p * rows * 4) / 2, rad = p * 0.36;
+    c.fillStyle = color; c.beginPath();
+    for (let i = 0; i < dots.length; i += 2) {
+      if (dots[i + 1] >= upto) continue;
+      const x = ox + (dots[i] + 0.5) * p, y = oy + (dots[i + 1] + 0.5) * p;
+      c.moveTo(x + rad, y); c.arc(x, y, rad, 0, Math.PI * 2);
+    }
+    c.fill();
+  };
+  // арт «печатается» сверху вниз, когда панель доезжает до экрана
+  const reveal = () => {
+    if (matchMedia('(prefers-reduced-motion: reduce)').matches) { paint(); return; }
+    const t0 = performance.now(), total = rows * 4;
+    const step = now => { upto = Math.min(total, Math.ceil((now - t0) / 700 * total)); paint(); if (upto < total) requestAnimationFrame(step); };
+    requestAnimationFrame(step);
+  };
+  reveal();
+  new ResizeObserver(paint).observe(cv);
+  const card = cv.closest('.fcard');
+  card?.addEventListener('pointerenter', () => { color = 'oklch(0.93 0.03 70)'; paint(); });
+  card?.addEventListener('pointerleave', () => { color = 'oklch(0.86 0.02 250)'; paint(); });
+}
 function initHome() {
   const heroes = window.HEROES || [], still = matchMedia('(prefers-reduced-motion: reduce)').matches;
 
   // карточки разделов: портреты героев, Брайль
   $('#fcFacesGrid').innerHTML = shuffled(heroes, 5).slice(0, 10).map(h => heroImgTag(h, false)).join('');
-  $('#fcBraille').textContent = BRAILLE;
+  brailleCanvas($('#fcBraille'), BRAILLE);
 
   // «Угадайка»: номер дня и, если сегодня уже играли, — результат
   const day = gameDay(), today = (() => { try { return JSON.parse(localStorage.getItem('gs.game.daily')); } catch { return null; } })();
@@ -599,13 +647,6 @@ function initHome() {
     }
   }).catch(() => { box.closest('.section').hidden = true; $('#catNum').textContent = '∞'; setCatCount(0); });
 
-  // панель «Фоны меню»: постер одного из популярных фонов вместо заглушки
-  API.bg.list({ limit: 8 }).then(({ items }) => {
-    const pool = items.filter(b => !b.nsfw); if (!pool.length) return;
-    const b = pool[Math.floor(Math.random() * pool.length)], art = $('.wc-bg');
-    art.insertAdjacentHTML('beforeend', `<img src="${esc(b.poster)}" alt="" loading="lazy">`);
-    $('img', art).onload = () => art.classList.add('has-img');
-  }).catch(() => {});
   box.onclick = e => { const c = e.target.closest('.gcard[data-id]'); if (c) location.href = 'workshop.html?id=' + encodeURIComponent(c.dataset.id); };
 }
 
@@ -615,7 +656,9 @@ function initHome() {
 //  * градиент накладывается одной заливкой поверх всех символов (source-in), а не на каждый символ;
 //  * затухание к краям посчитано заранее по клеткам — пустые клетки не трогаем, CSS-маски на холсте нет;
 //  * ~20 кадров в секунду и только пока первый экран виден.
-function glyphField(cv) {
+// opts: центр овала с символами (ox, oy) и его радиусы (rx, ry) в долях холста, откуда бегут волны (cx, cy),
+// alpha — насколько приглушить (в Мастерской символы за карточками бледнее, чем на главной)
+function glyphField(cv, { ox = 0.62, oy = 0.42, rx = 0.8, ry = 0.75, cx: wx = 0.68, cy: wy = 0.35, alpha = 1 } = {}) {
   if (!cv) return;
   const ctx = cv.getContext('2d'), RAMP = ' .·:-=+*#%@', CW = 15, CH = 24;
   const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -639,10 +682,10 @@ function glyphField(cv) {
     fill = g;
     makeAtlas();
     // клетки внутри овала (центр 62% / 42%), с готовыми затуханием и расстоянием до «источника» волны
-    const cx = cols * 0.68, cy = rows * 0.35, list = [];
+    const cx = cols * wx, cy = rows * wy, list = [];
     for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
       const x = (c + 0.5) * CW, y = (r + 0.5) * CH;
-      const e = Math.hypot((x / W - 0.62) / 0.8, (y / H - 0.42) / 0.75);
+      const e = Math.hypot((x / W - ox) / rx, (y / H - oy) / ry);
       const fade = e < 0.2 ? 1 : e > 0.78 ? 0 : 1 - (e - 0.2) / 0.58;
       if (fade > 0.03) list.push(c, r, fade, Math.hypot(c - cx, (r - cy) * 1.6) * 0.32);
     }
@@ -667,7 +710,7 @@ function glyphField(cv) {
       const lvl = Math.min(1, v ** 2.4 + glow * 0.85);
       const k = Math.round(lvl * top);
       if (k < 1) continue;
-      ctx.globalAlpha = Math.min(0.95, 0.1 + lvl * 0.6 + glow * 0.4) * fade;
+      ctx.globalAlpha = Math.min(0.95, 0.1 + lvl * 0.6 + glow * 0.4) * fade * alpha;
       ctx.drawImage(atlas, k * aw, 0, aw, ah, x, y, CW, CH);
     }
     ctx.globalAlpha = 1;
@@ -701,6 +744,13 @@ function segInd(box) {
   ind.style.cssText = `width:${b.offsetWidth}px;transform:translateX(${b.offsetLeft}px)`;
 }
 function initWorkshop() {
+  // фон как на главной: сполохи и поле символов за шапкой, к карточкам гаснет
+  glyphField($('#wsGlyphs'), { ox: 0.5, oy: 0.05, rx: 0.85, ry: 0.95, cx: 0.5, cy: 0.1, alpha: 0.85 });
+  const bar = $('.ws-bar');
+  if (bar) {
+    const stuck = () => bar.classList.toggle('stuck', bar.getBoundingClientRect().top < parseFloat(getComputedStyle(bar).top) + 1);
+    addEventListener('scroll', stuck, { passive: true }); stuck();
+  }
   const qs = new URLSearchParams(location.search);
   const PAGE_SIZE = 24;
   const f = { tab: qs.has('backgrounds') || qs.has('bg') ? 'bg' : 'grids', q: '', tag: '', sort: 'popular', aspect: '' };
@@ -1126,36 +1176,70 @@ function renderSent(box, email, next) {
   };
 }
 
-// шапка профиля: аватар, ник, «о себе», Steam, цифры
+// шапка профиля: баннер, аватар поверх него, ник, «о себе», ссылки (Steam, Telegram), цифры
+const MONTHS_GEN = ['января', 'февраля', 'марта', 'апреля', 'мая', 'июня', 'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря'];
+const sinceText = iso => { const d = new Date(iso); return `на сайте с ${MONTHS_GEN[d.getMonth()]} ${d.getFullYear()}`; };
+const tgUrl = nick => 'https://t.me/' + encodeURIComponent(nick);
 function profileHead(p, { me, grids = [], works = null }) {
   const likes = grids.reduce((a, g) => a + (+g.likes || 0), 0), dls = grids.reduce((a, g) => a + (+g.downloads || 0), 0);
   const adm = me ? ACC.isAdmin() : p.admin;
-  const steam = p.steam ? `<a class="pf-steam" href="${esc(p.steam)}" target="_blank" rel="noopener">${icon('ext')}Профиль Steam</a>` : '';
+  const links = [
+    p.steam && `<a class="pf-link" href="${esc(p.steam)}" target="_blank" rel="noopener">${icon('steam')}Steam</a>`,
+    p.tg && `<a class="pf-link tg" href="${esc(tgUrl(p.tg))}" target="_blank" rel="noopener">${icon('telegram')}@${esc(p.tg)}</a>`,
+  ].filter(Boolean).join('');
   // чужой профиль глазами админа: убрать аватар или баннер
   const modBtns = !me && isAdmin() ? `${p.avatar ? `<button class="btn sm ghost danger" data-clear="avatar">${icon('trash')}Убрать аватар</button>` : ''}${p.banner ? `<button class="btn sm ghost danger" data-clear="banner">${icon('trash')}Убрать баннер</button>` : ''}` : '';
+  const stat = (n, a, b, c) => `<div><b>${num(n)}</b><span>${plural(n, a, b, c)}</span></div>`;
   return `<section class="pf-head">
     <div class="pf-banner${p.banner ? ' on' : ''}">${p.banner ? `<img src="${esc(p.banner)}" alt="" onerror="this.remove()">` : ''}
       ${me && ACC.media() ? `<button class="pf-banner-edit" id="pfBanner">${icon('image')}${p.banner ? 'Сменить баннер' : 'Добавить баннер'}</button>` : ''}</div>
-    <div class="pf-ava-wrap">${avatarHTML(p.avatar, p.nick, 'pf-ava')}${me ? `<button class="pf-ava-edit" id="pfAva" title="Сменить аватар" aria-label="Сменить аватар">${icon('edit')}</button>` : ''}</div>
-    <div class="pf-info">
-      ${me ? `<input class="pf-nick" id="pfNick" value="${esc(p.nick)}" maxlength="32" spellcheck="false" title="Ник — его видят в Мастерской">` : `<h1 class="pf-nick">${esc(p.nick || 'Игрок')}</h1>`}
-      ${me && ACC.ext() ? `<textarea class="pf-bio" id="pfBio" maxlength="200" rows="1" placeholder="Пара слов о себе: какие сетки делаешь, за кого играешь…">${esc(p.bio || '')}</textarea>` : p.bio ? `<p class="pf-bio">${esc(p.bio)}</p>` : ''}
-      <span class="pf-meta">${adm ? `<span class="adm-tag">${icon('star')}Админ</span>` : ''}${me ? `${icon('lock')}${esc(ACC.user()?.email || '')} — видишь только ты` : ''} ${p.created_at ? `с ${new Date(p.created_at).toLocaleDateString('ru', { month: 'long', year: 'numeric' })}` : ''} ${steam}</span>
-    </div>
-    <div class="pf-side">
-      <div class="pf-stats">
-        ${works ? `<div><b>${num(works.length)}</b><span>${plural(works.length, 'работа', 'работы', 'работ')}</span></div>` : ''}
-        <div><b>${num(grids.length)}</b><span>в Мастерской</span></div>
-        <div><b>${num(likes)}</b><span>${plural(likes, 'лайк', 'лайка', 'лайков')}</span></div>
-        <div><b>${num(dls)}</b><span>скачиваний</span></div>
+    <div class="pf-top">
+      <div class="pf-ava-wrap">${avatarHTML(p.avatar, p.nick, 'pf-ava')}${me ? `<button class="pf-ava-edit" id="pfAva" title="Сменить аватар" aria-label="Сменить аватар">${icon('edit')}</button>` : ''}</div>
+      <div class="pf-id">
+        ${me ? `<input class="pf-nick" id="pfNick" value="${esc(p.nick)}" maxlength="32" spellcheck="false" title="Ник — его видят в Мастерской">` : `<h1 class="pf-nick">${esc(p.nick || 'Игрок')}</h1>`}
+        <div class="pf-meta">${adm ? `<span class="adm-tag">${icon('star')}Админ</span>` : ''}${p.created_at ? `<span>${sinceText(p.created_at)}</span>` : ''}</div>
       </div>
       <div class="pf-actions">
-        ${me ? `<a class="btn primary sm" href="editor.html?new">${icon('brush')}Новая сетка</a>${ACC.ext() ? `<button class="btn sm" id="pfSteam">${icon('link')}Steam</button>` : ''}` : ''}
-        <button class="btn sm" id="pfShare" data-copy="${esc(new URL('profile.html?u=' + p.id, location.href).href)}">${icon('link')}Ссылка на профиль</button>
-        ${me ? `<button class="btn sm ghost" id="pfOut">${icon('logout')}Выйти</button>` : ''}${modBtns}
+        ${me ? `<a class="btn primary sm" href="editor.html?new">${icon('brush')}Новая сетка</a>${ACC.ext() ? `<button class="btn sm" id="pfLinks">${icon('link')}Ссылки</button>` : ''}` : ''}
+        <button class="btn sm" id="pfShare" data-copy="${esc(new URL('profile.html?u=' + p.id, location.href).href)}">${icon('copy')}${me ? 'Поделиться' : 'Ссылка на профиль'}</button>
+        ${me ? `<button class="btn sm ghost" id="pfOut" title="Выйти из аккаунта">${icon('logout')}Выйти</button>` : ''}${modBtns}
+      </div>
+    </div>
+    <div class="pf-body">
+      <div class="pf-about">
+        ${me && ACC.ext() ? `<textarea class="pf-bio" id="pfBio" maxlength="200" rows="1" placeholder="Пара слов о себе: какие сетки делаешь, за кого играешь…">${esc(p.bio || '')}</textarea>` : p.bio ? `<p class="pf-bio">${esc(p.bio)}</p>` : ''}
+        ${links ? `<div class="pf-links">${links}</div>` : me && ACC.ext() ? `<button class="pf-link add" id="pfLinksAdd">${icon('plus')}Добавить Steam или Telegram</button>` : ''}
+        ${me ? `<span class="pf-private">${icon('lock')}${esc(ACC.user()?.email || '')} — видишь только ты</span>` : ''}
+      </div>
+      <div class="pf-stats">
+        ${works ? stat(works.length, 'работа', 'работы', 'работ') : ''}
+        <div><b>${num(grids.length)}</b><span>в Мастерской</span></div>
+        ${stat(likes, 'лайк', 'лайка', 'лайков')}
+        ${stat(dls, 'скачивание', 'скачивания', 'скачиваний')}
       </div>
     </div>
   </section>`;
+}
+// ссылки в профиле: Steam и Telegram (ник, @ник или ссылка t.me — сохраняем только ник)
+function openLinksSheet(p, onDone) {
+  const m = openSheet(`<form class="sh-body links-sheet" id="lnForm">
+    <div class="sh-ico">${icon('link')}</div><h2>Ссылки в профиле</h2>
+    <p>Их видят все, кто откроет твой профиль. Пустое поле — ссылку убрать.</p>
+    <label class="ln-field"><span>${icon('steam')}Steam</span><input class="input" id="lnSteam" value="${esc(p.steam || '')}" placeholder="https://steamcommunity.com/id/…" inputmode="url" spellcheck="false"></label>
+    ${ACC.tg() ? `<label class="ln-field"><span>${icon('telegram')}Telegram</span><input class="input" id="lnTg" value="${p.tg ? '@' + esc(p.tg) : ''}" placeholder="@ник или t.me/ник" spellcheck="false" autocapitalize="off"></label>` : ''}
+    <div class="sh-actions"><button class="btn primary block">${icon('check')}Сохранить</button></div>
+  </form>`);
+  $('#lnForm', m.root).onsubmit = async e => {
+    e.preventDefault();
+    const fields = { steam: $('#lnSteam', m.root).value.trim() };
+    if (fields.steam && !/^https?:\/\//.test(fields.steam)) fields.steam = 'https://' + fields.steam;
+    fields.steam = fields.steam.replace(/^http:/, 'https:');
+    const tgIn = $('#lnTg', m.root);
+    if (tgIn) fields.tg = tgIn.value.trim().replace(/^(https?:\/\/)?(www\.)?(t\.me|telegram\.me)\//i, '').replace(/^@/, '').replace(/[/?#].*$/, '');
+    if (fields.tg && !/^[A-Za-z][A-Za-z0-9_]{3,31}$/.test(fields.tg)) { toast('Ник в Telegram — 5–32 символа: латиница, цифры и _, начинается с буквы.', 'err'); tgIn.focus(); return; }
+    try { const np = await ACC.updateProfile(fields); m.close(); toast('Ссылки сохранены', 'ok'); onDone(np); }
+    catch (er) { toast(er.message, 'err'); }
+  };
 }
 
 // работа → hero_grid_config.json (как экспорт в редакторе)
@@ -1352,12 +1436,7 @@ async function renderMyProfile(box) {
     const ban = $('#pfBanner'); if (ban) ban.onclick = () => openBannerSheet(p, np => { p = np; head(); });
     $('#pfOut').onclick = async () => { await ACC.signOut(); location.href = 'index.html'; };
     $('#pfShare').onclick = e => copyText(e.currentTarget.dataset.copy, 'Ссылка на профиль скопирована');
-    const st = $('#pfSteam');
-    if (st) st.onclick = async () => {
-      const v = prompt('Ссылка на профиль Steam (https://steamcommunity.com/…). Пусто — убрать.', p.steam || '');
-      if (v === null) return;
-      try { p = await ACC.updateProfile({ steam: v.trim() }); head(); toast(v.trim() ? 'Steam добавлен в профиль' : 'Ссылка убрана', 'ok'); } catch (e) { toast(e.message, 'err'); }
-    };
+    for (const b of $$('#pfLinks, #pfLinksAdd')) b.onclick = () => openLinksSheet(p, np => { p = np; head(); });
   }
 
   const ind = () => { const b = $('#pfTabs .chip.on'); $('#pfInd').style.cssText = `width:${b.offsetWidth}px;transform:translateX(${b.offsetLeft}px)`; };

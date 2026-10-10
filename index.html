@@ -14,7 +14,7 @@
 <link rel="preload" href="docs/hero-art.webp" as="image" fetchpriority="high">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap">
-<link rel="stylesheet" href="site.css?v=30">
+<link rel="stylesheet" href="site.css?v=35">
 </head>
 <body data-page="home">
 
@@ -49,7 +49,7 @@
           <a class="fc-more" href="guides.html#lineart">Как сделать красиво <span data-icon="arrow"></span></a>
         </article>
         <article class="fcard" style="--d:.49s">
-          <div class="fc-media fc-braille" aria-hidden="true"><pre id="fcBraille"></pre></div>
+          <div class="fc-media fc-braille" aria-hidden="true"><canvas id="fcBraille"></canvas></div>
           <b>Профиль Steam</b>
           <span>Брайль-арт для «Своего информационного поля» в один клик.</span>
           <a class="btn block" href="editor.html?steam">Сделать арт</a>
@@ -60,7 +60,7 @@
       <!-- вторая строка панелей: новое — фоны главного меню — и «Угадайка» дня -->
       <div class="frow">
         <a class="fwide" href="workshop.html?backgrounds" style="--d:.56s">
-          <span class="wc-art wc-bg" aria-hidden="true"><i class="wc-sky"></i><i class="wc-hud"></i><i class="wc-hud b"></i></span>
+          <span class="wc-art wc-bg has-img" aria-hidden="true"><img src="docs/menu-bg.webp" alt="" width="240" height="240"><i class="wc-hud"></i><i class="wc-hud b"></i></span>
           <span class="wc-text"><b>Фоны меню <em>новое</em></b><small>Видео и картинки на главный экран Доты</small></span>
           <span class="wc-go" data-icon="arrow"></span>
         </a>
@@ -182,11 +182,11 @@
 
 <div class="modal-root" id="modalRoot"></div>
 <div class="toasts" id="toasts"></div>
-<script src="heroes.js?v=30"></script>
-<script src="config.js?v=30"></script>
-<script src="auth.js?v=30"></script>
-<script src="gridrender.js?v=30"></script>
-<script src="catalog-api.js?v=30"></script>
-<script src="site.js?v=30"></script>
+<script src="heroes.js?v=35"></script>
+<script src="config.js?v=35"></script>
+<script src="auth.js?v=35"></script>
+<script src="gridrender.js?v=35"></script>
+<script src="catalog-api.js?v=35"></script>
+<script src="site.js?v=35"></script>
 </body>
 </html>

@@ -175,9 +175,8 @@ button:focus { outline: none; }
 .fc-lineart img:nth-child(3) { animation-delay: 8s; }
 .fcard:hover .fc-lineart img { transform: scale(1.06); }
 @keyframes fcCycle { 0% { opacity: 0; } 6% { opacity: 1; } 33% { opacity: 1; } 39% { opacity: 0; } 100% { opacity: 0; } }
-.fc-braille { display: grid; place-items: center; }
-.fc-braille pre { margin: 0; color: oklch(0.86 0.02 250); font: 10.5px/1.05 "Segoe UI Symbol", "DejaVu Sans", var(--mono); letter-spacing: 0; transition: color .3s; }
-.fcard:hover .fc-braille pre { color: oklch(0.93 0.03 70); }
+.fc-braille { display: block; }
+.fc-braille canvas { position: absolute; inset: 0; display: block; width: 100%; height: 100%; }
 .fcard > b { font-size: 18px; font-weight: 700; letter-spacing: -.01em; }
 .fcard > span { flex: 1; margin-bottom: 12px; color: var(--muted); font-size: 13.5px; line-height: 1.45; }
 .fc-more { display: flex; align-items: center; justify-content: center; gap: 6px; margin-top: 8px; color: var(--muted); font-size: 13.5px; text-decoration: none; transition: color .15s; }
@@ -377,7 +376,9 @@ body[data-page="workshop"]::before { content: ""; position: absolute; z-index: -
 .seg.sm button { height: 28px; padding: 0 11px; font-size: 12.5px; }
 .seg.sm .seg-ind { height: 28px; }
 
-.ws-bar { position: sticky; top: calc(var(--nav-h) - 6px); z-index: 10; display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; padding: 12px 0; border-bottom: 1px solid var(--line); background: linear-gradient(var(--bg) 80%, oklch(0.14 0.008 var(--h) / .0)); animation: rise .6s var(--ease) .14s both; }
+.ws-bar { position: sticky; top: calc(var(--nav-h) - 6px); z-index: 10; display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; padding: 12px 0; border-bottom: 1px solid var(--line); transition: background-color .25s; animation: rise .6s var(--ease) .14s both; }
+/* прилипла к меню при прокрутке — подложка, чтобы карточки не просвечивали; на месте — прозрачная поверх фона */
+.ws-bar.stuck { background: color-mix(in oklab, var(--bg) 82%, transparent); -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px); }
 .search { position: relative; flex: 0 1 340px; }
 .search .i { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--muted); transition: color .15s; }
 .search:focus-within .i { color: var(--accent); }
@@ -672,13 +673,12 @@ body[data-page="workshop"]::before { content: ""; position: absolute; z-index: -
 .input.code { height: 50px; text-align: center; font: 600 18px var(--mono); letter-spacing: .25em; }
 .link { padding: 0; border: 0; background: none; color: var(--accent-hi); font-size: 13.5px; cursor: pointer; }
 .link:hover { text-decoration: underline; text-underline-offset: 3px; }
-.pf-head { --pfp: 28px; position: relative; overflow: hidden; display: flex; flex-wrap: wrap; align-items: center; gap: 22px; margin-bottom: 22px; padding: var(--pfp); border-radius: 26px; background: radial-gradient(640px 220px at 0% 0%, color-mix(in oklab, var(--c1) 20%, transparent), transparent 70%), var(--card); border: 1px solid var(--line); animation: rise .5s var(--ease) both; }
-.pf-ava { width: 88px; height: 88px; font-size: 34px; box-shadow: 0 0 0 3px var(--card), 0 0 0 5px color-mix(in oklab, var(--c2) 60%, transparent); }
-.pf-info { display: flex; flex: 1; flex-direction: column; gap: 6px; min-width: 220px; }
+.pf-head { --pfp: 28px; position: relative; overflow: hidden; margin-bottom: 22px; padding: var(--pfp); border-radius: 26px; background: radial-gradient(640px 220px at 0% 0%, color-mix(in oklab, var(--c1) 20%, transparent), transparent 70%), var(--card); border: 1px solid var(--line); animation: rise .5s var(--ease) both; }
+.pf-ava { width: 116px; height: 116px; font-size: 44px; box-shadow: 0 0 0 5px var(--card), 0 0 0 7px color-mix(in oklab, var(--c2) 55%, transparent), 0 18px 40px -18px rgba(0, 0, 0, .9); }
 .pf-nick { width: 100%; max-width: 440px; margin: 0 0 0 -9px; padding: 2px 8px; border: 1px solid transparent; border-radius: 10px; background: transparent; color: var(--ink); font: 750 32px/1.15 var(--font); letter-spacing: -.03em; }
 input.pf-nick:hover { border-color: var(--line); }
 input.pf-nick:focus { outline: 0; border-color: var(--accent); background: var(--bg-2); }
-.pf-meta { display: flex; align-items: center; gap: 6px; color: var(--muted); font-size: 13.5px; }
+.pf-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; min-height: 22px; color: var(--muted); font-size: 13.5px; }
 .pf-meta .i { width: 14px; height: 14px; }
 .pf-actions { display: flex; flex-wrap: wrap; gap: 8px; }
 .pf-actions .i { width: 16px; height: 16px; }
@@ -702,9 +702,6 @@ input.pf-nick:focus { outline: 0; border-color: var(--accent); background: var(-
 p.pf-bio { margin: 0; padding: 0; }
 textarea.pf-bio:hover { border-color: var(--line); }
 textarea.pf-bio:focus { outline: 0; border-color: var(--accent); background: var(--bg-2); }
-.pf-steam { display: inline-flex; align-items: center; gap: 5px; margin-left: 6px; color: var(--accent-hi); text-decoration: none; }
-.pf-steam:hover { text-decoration: underline; }
-.pf-side { display: flex; flex-direction: column; align-items: flex-end; gap: 14px; }
 .pf-stats { display: flex; gap: 6px; }
 .pf-stats div { min-width: 82px; padding: 9px 12px; border-radius: 12px; background: oklch(0 0 0 / .2); border: 1px solid var(--line); text-align: center; }
 .pf-stats b { display: block; font: 700 18px var(--mono); }
@@ -729,7 +726,11 @@ textarea.pf-bio:focus { outline: 0; border-color: var(--accent); background: var
 .ava-heroes button:hover { transform: scale(1.08); box-shadow: 0 0 0 2px var(--accent); }
 .ava-heroes img { width: 100%; height: 100%; object-fit: cover; object-position: 50% 20%; display: block; }
 .ava img[src*="_vert"], .sh-ava img[src*="_vert"], .pf-ava img[src*="_vert"] { object-position: 50% 18%; }
-@media (max-width: 760px) { .pf-side { align-items: stretch; width: 100%; } .pf-stats div { flex: 1; min-width: 0; } }
+@media (max-width: 760px) {
+  .pf-stats { width: 100%; } .pf-stats div { flex: 1; min-width: 0; }
+  .pf-top { margin-top: -52px; } .pf-ava { width: 96px; height: 96px; font-size: 36px; }
+  .pf-top .pf-actions { width: 100%; padding-bottom: 0; }
+}
 .modal-side .by a { color: var(--accent-hi); font-weight: 600; text-decoration: none; }
 .modal-side .by a:hover { text-decoration: underline; }
 
@@ -870,7 +871,7 @@ textarea.pf-bio:focus { outline: 0; border-color: var(--accent); background: var
   .tools-ind { width: 34px; height: 34px; }
   .big-num { order: 0; margin: 0; text-align: left; padding-bottom: 0; }
   .big-num b { font-size: 56px; }
-  .pf-head { --pfp: 20px; }
+  .pf-head { --pfp: 18px; }
   .pf-nick { font-size: 26px; }
   .article p, .article li { font-size: 15.5px; }
 }
@@ -903,12 +904,30 @@ textarea.pf-bio:focus { outline: 0; border-color: var(--accent); background: var
 .crop-acts .i { width: 16px; height: 16px; }
 
 /* ---------- баннер профиля: своя картинка или GIF; без него — мягкий градиент ---------- */
-.pf-banner { position: relative; flex: 0 0 calc(100% + var(--pfp) * 2); height: 110px; margin: calc(var(--pfp) * -1) calc(var(--pfp) * -1) -4px; background: radial-gradient(520px 160px at 85% 0%, color-mix(in oklab, var(--c2) 26%, transparent), transparent 70%), radial-gradient(640px 200px at 0% 0%, color-mix(in oklab, var(--c1) 30%, transparent), transparent 70%); overflow: hidden; }
-.pf-banner.on { height: auto; aspect-ratio: 4 / 1; min-height: 120px; max-height: 300px; background: var(--bg-2); }
+.pf-banner { position: relative; height: 130px; margin: calc(var(--pfp) * -1) calc(var(--pfp) * -1) 0; background: radial-gradient(520px 160px at 85% 0%, color-mix(in oklab, var(--c2) 26%, transparent), transparent 70%), radial-gradient(640px 200px at 0% 0%, color-mix(in oklab, var(--c1) 30%, transparent), transparent 70%); overflow: hidden; }
+.pf-banner.on { height: clamp(120px, 22vw, 300px); background: var(--bg-2); }
 .pf-banner img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
 .pf-banner::after { content: ""; position: absolute; inset: auto 0 0; height: 45%; background: linear-gradient(transparent, var(--card)); pointer-events: none; }
-.pf-head .pf-ava-wrap { z-index: 1; align-self: flex-start; margin-top: -58px; }
-.pf-head .pf-info, .pf-head .pf-side { position: relative; z-index: 1; }
+/* верх: аватар наезжает на баннер, рядом ник, справа действия */
+.pf-top { position: relative; z-index: 1; display: flex; flex-wrap: wrap; align-items: flex-end; gap: 14px 20px; margin-top: -64px; }
+.pf-id { display: flex; flex: 1; flex-direction: column; gap: 4px; min-width: 220px; padding-bottom: 4px; }
+.pf-top .pf-actions { padding-bottom: 6px; }
+/* низ: «о себе», ссылки, приватная почта — слева, цифры — справа */
+.pf-body { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: 18px 28px; margin-top: 18px; }
+.pf-about { display: flex; flex: 1; flex-direction: column; align-items: flex-start; gap: 12px; min-width: 260px; }
+.pf-links { display: flex; flex-wrap: wrap; gap: 8px; }
+.pf-link { display: inline-flex; align-items: center; gap: 7px; height: 34px; padding: 0 14px 0 11px; border: 1px solid var(--line); border-radius: 999px; background: var(--bg-2); color: var(--ink-2); font: 600 13.5px var(--font); text-decoration: none; cursor: pointer; transition: border-color .2s, color .2s, transform .25s var(--spring); }
+.pf-link .i { width: 17px; height: 17px; }
+.pf-link:hover { border-color: var(--accent-line); color: var(--ink); transform: translateY(-1px); }
+.pf-link.tg .i { color: oklch(0.72 0.12 235); }
+.pf-link.add { border-style: dashed; background: transparent; color: var(--muted); }
+.pf-private { display: inline-flex; align-items: center; gap: 6px; color: var(--faint); font-size: 12.5px; }
+.pf-private .i { width: 13px; height: 13px; }
+/* окно «Ссылки в профиле» */
+.links-sheet { gap: 12px; }
+.ln-field { display: flex; flex-direction: column; gap: 6px; width: 100%; text-align: left; }
+.ln-field span { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); font-size: 13px; font-weight: 600; }
+.ln-field .i { width: 15px; height: 15px; }
 .pf-banner-edit { position: absolute; z-index: 2; right: 14px; top: 14px; display: inline-flex; align-items: center; gap: 6px; padding: 7px 12px; border: 0; border-radius: 10px; background: rgba(10, 8, 6, .62); -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); color: #fff; font: 600 13px var(--font); cursor: pointer; transition: background .15s, transform .2s var(--spring); }
 .pf-banner-edit .i { width: 15px; height: 15px; }
 .pf-banner-edit:hover { background: rgba(10, 8, 6, .82); transform: translateY(-1px); }
@@ -918,3 +937,10 @@ textarea.pf-bio:focus { outline: 0; border-color: var(--accent); background: var
 .modal.sheet:has(.ban-crop) { width: min(720px, 100%); }
 .ban-crop .crop-cv { width: 100%; aspect-ratio: 4 / 1; border-radius: 12px; }
 .ban-crop .crop-zoom { width: min(360px, 100%); }
+
+/* ---------- Мастерская: фон как на главной, только за шапкой ---------- */
+.hero-bg.ws-bg { position: absolute; z-index: -1; inset: 0 0 auto; height: 720px; }
+.ws-bg .au-1 { opacity: .22; }
+.ws-bg .au-2 { opacity: .12; }
+.ws-bg .bg-vignette { background: radial-gradient(ellipse 120% 90% at 50% 20%, transparent 55%, oklch(0.09 0.008 var(--h) / .7)), linear-gradient(180deg, transparent 45%, var(--bg)); }
+body[data-page="workshop"]::before { display: none; }
