@@ -1859,11 +1859,14 @@ async function importJsonFiles(items, { remember = true } = {}) {
     toast(`Импортировано ${ids.length} категорий из ${chosen.length} сет. Каждую можно двигать отдельно, рамкой — выделить несколько.`, 'ok');
   };
 }
+// Категория без героев в игре — одна подпись, какой бы ширины её ни записали. Другие редакторы ставят
+// символам ширину и высоту, и раньше каждая такая точка становилась пустой рамкой героев (оранжевые квадраты).
+// Рамкой остаётся только безымянная пустая категория — заготовка под героев, без подписи её иначе не увидеть.
 function categoryToEl(c) {
   const name = String(c.category_name ?? ''), heroes = Array.isArray(c.hero_ids) ? c.hero_ids : [];
   const w = +c.width || 0, h = +c.height || 0;
   const base = { name, x: +c.x_position || 0, y: +c.y_position || 0 };
-  if (heroes.length || (w > 1 && h > 1)) return { ...base, t: 'hero', w: Math.max(w, 10), h: Math.max(h, 10), heroes };
+  if (heroes.length || (!name.trim() && w > 1 && h > 1)) return { ...base, t: 'hero', w: Math.max(w, 10), h: Math.max(h, 10), heroes };
   return { ...base, t: [...name.trim()].length <= 2 ? 'glyph' : 'text' };
 }
 function elToCategory(e) {
@@ -1975,7 +1978,7 @@ function openHelp() {
   const K = [['Все команды', 'Ctrl+K'], ['Выделение / рука', 'V / H, пробел'], ['Карандаш, линия, гор./верт.', 'B, L, X'], ['Прямоуг., эллипс, ромб, треуг.', 'R, O, D, Y'], ['Ластик, текст, герои', 'E, T, G'],
     ['Ровно / квадрат', 'Shift при рисовании'], ['Стереть карандашом', 'ПКМ'], ['Выделить один элемент группы', 'Alt + клик'], ['Добавить к выделению', 'Shift + клик'],
     ['Группировать / разгруппировать', 'Ctrl+G / Ctrl+Shift+G'], ['Дублировать', 'Ctrl+D'], ['Копировать / вставить', 'Ctrl+C / Ctrl+V'], ['Удалить', 'Delete'],
-    ['Сдвиг', 'Стрелки (Shift ×10)'], ['Отменить / повторить', 'Ctrl+Z / Ctrl+Shift+Z'], ['Зум', 'колесо, + / −'], ['Вписать холст', 'Shift+1'], ['Как в игре / назад', 'Tab, Esc'], ['Вставить картинку', 'Ctrl+V'], ['Тема', 'Shift+T']];
+    ['Сдвиг', 'Стрелки (Shift ×10)'], ['Отменить / повторить', 'Ctrl+Z / Ctrl+Shift+Z'], ['Зум', 'колесо, + / −'], ['Вписать холст', 'Shift+1'], ['Как в игре / назад', 'Tab, Esc'], ['Вставить картинку', 'Ctrl+V'], ['Открыть JSON', 'Ctrl+O'], ['Тема', 'Shift+T']];
   openModal(`${modalHead('Горячие клавиши')}<div class="modal-body"><div class="keys">${K.map(([a, b]) => `<span>${a}</span><span><kbd>${b}</kbd></span>`).join('')}</div></div>
     <div class="modal-foot"><span class="info">Автор · Discord <b style="color:var(--ink)">@ahttps</b> — связь, заказы, предложения</span><button class="btn sm" id="copyDiscord">Скопировать ник</button></div>`);
   $('#copyDiscord').onclick = () => copyText('ahttps', 'Ник Discord скопирован');
@@ -1991,7 +1994,7 @@ function commandList() {
   });
   const sel = st.sel.size > 0;
   return [
-    { g: 'Файл', icon: 'folder', label: 'Открыть hero_grid_config.json', words: 'json импорт', run: openJson },
+    { g: 'Файл', icon: 'folder', label: 'Открыть hero_grid_config.json', key: 'Ctrl O', words: 'json импорт', run: openJson },
     { g: 'Файл', icon: 'download', label: 'Экспорт', key: 'Ctrl S', words: 'скачать сохранить json', run: openExportModal },
     { g: 'Файл', icon: 'upload', label: 'Выложить в Мастерскую', words: 'опубликовать публикация', run: openPublishModal },
     { g: 'Добавить', icon: 'image', label: 'Картинку — мозаика, ASCII, line-art', key: 'Ctrl V', run: () => doAdd('image') },
@@ -2085,6 +2088,7 @@ $('#configName').value = S.configName;
 $('#configName').oninput = e => { S.configName = e.target.value; persist(); };
 const openJson = async () => importJsonFiles(await pickJsonFiles());
 $('#esOpen').onclick = openJson;
+$('#btnImport').onclick = openJson;
 $('#btnExport').onclick = openExportModal;
 $('#btnPublish').onclick = openPublishModal;
 $('#btnUndo').onclick = undo; $('#btnRedo').onclick = redo;
@@ -2211,6 +2215,7 @@ document.addEventListener('keydown', e => {
   if (ctrl && code === 'KeyG') { e.preventDefault(); e.shiftKey ? ungroupSel() : groupSel(); return; }
   if (ctrl && code === 'KeyC') { if (st.sel.size) { e.preventDefault(); copySel(); } return; }
   if (ctrl && code === 'KeyS') { e.preventDefault(); openExportModal(); return; }
+  if (ctrl && code === 'KeyO') { e.preventDefault(); openJson(); return; }
   if (ctrl) return;
   if (e.key === 'Delete' || e.key === 'Backspace') { e.preventDefault(); deleteSel(); return; }
   if (e.key === 'Escape') { if (st.preview) setPreview(false); else clearSel(); return; }

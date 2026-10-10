@@ -587,3 +587,20 @@ alter table public.profiles add column if not exists tg text not null default ''
 alter table public.profiles drop constraint if exists profiles_tg;
 alter table public.profiles add constraint profiles_tg check (tg = '' or tg ~ '^[A-Za-z][A-Za-z0-9_]{3,31}$');
 grant update (nick, avatar, bio, steam, banner, tg) on public.profiles to authenticated;
+
+-- =====================================================================
+-- Фоны на главной (2.6): админ отмечает фон «На главную», и он идёт фоном первого экрана сайта.
+-- Сайт берёт случайный из отмеченных; 18+ и скрытые на главную не попадают.
+-- =====================================================================
+alter table public.backgrounds add column if not exists featured boolean not null default false;
+create index if not exists backgrounds_featured_idx on public.backgrounds (created_at desc) where featured and not hidden;
+
+create or replace function public.admin_feature(p_id uuid, p_on boolean) returns boolean
+language plpgsql security definer set search_path = public as $$
+begin
+  if not public.is_admin() then raise exception 'not_admin'; end if;
+  update backgrounds set featured = coalesce(p_on, false) where id = p_id;
+  return found;
+end $$;
+revoke all on function public.admin_feature(uuid, boolean) from public, anon;
+grant execute on function public.admin_feature(uuid, boolean) to authenticated;

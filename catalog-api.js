@@ -298,9 +298,17 @@ window.CatalogAPI = (() => {
       }
     },
     async get(id) {
-      const r = await rest(`/backgrounds?select=${BG_COLS},reports,hidden&id=eq.${encodeURIComponent(id)}`);
+      // featured появляется после schema.sql 2.6 — без неё фон всё равно открывается
+      const one = extra => rest(`/backgrounds?select=${BG_COLS},reports,hidden${extra}&id=eq.${encodeURIComponent(id)}`);
+      const r = await one(',featured').catch(e => { if (/featured/.test(e.message)) return one(''); throw e; });
       if (!r.data?.length) throw new Error('Фон не найден — возможно, его удалили.');
       return withUrls(r.data[0]);
+    },
+    // фоны, которые админ отметил «На главную»: без 18+ и скрытых, новые первыми
+    async featured(limit = 12) {
+      if (!remote) return [];
+      const p = new URLSearchParams({ select: BG_COLS, featured: 'is.true', hidden: 'is.false', nsfw: 'is.false', order: 'created_at.desc', limit });
+      try { return (await rest('/backgrounds?' + p)).data.map(withUrls); } catch { return []; }
     },
     // скачать с понятным именем файла: Storage сам ставит Content-Disposition
     downloadUrl: (b, name) => b.file + '?download=' + encodeURIComponent(name),
@@ -360,6 +368,10 @@ window.CatalogAPI = (() => {
     },
     // kind: 'grid' | 'bg'; hidden: true — спрятать, false — вернуть в Мастерскую
     moderate: (kind, id, hidden) => rpc('admin_moderate', { p_kind: kind, p_id: id, p_hidden: !!hidden }),
+    // фон на главной сайта: on — показывать, false — убрать
+    feature: (id, on) => rpc('admin_feature', { p_id: id, p_on: !!on }).catch(e => {
+      throw /admin_feature/.test(e.message) ? new Error('Сначала выполни свежий supabase/schema.sql — в базе ещё нет «На главную».') : e;
+    }),
   };
 
   // теги: автор выбирает до 5 при публикации; «18+» — отдельная пометка

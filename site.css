@@ -127,6 +127,25 @@ button:focus { outline: none; }
 @keyframes auA { to { transform: translate(160px, 110px) scale(1.18); } }
 @keyframes auB { to { transform: translate(-140px, 160px) scale(1.25); } }
 @keyframes auC { to { transform: translate(-180px, -60px) scale(1.1); } }
+/* видео под всем фоном: фон из Мастерской «На главную» или туман (docs/hero-bg.webm). Любой ролик
+   тонируется под тему — тёплый графит, приглушено, слева темнее, чтобы заголовок читался. */
+.bg-media { position: absolute; inset: 0; background: var(--bg); }
+.bg-media > video, .bg-media > img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: 0; transition: opacity 1.6s var(--ease);
+  filter: grayscale(.4) sepia(.55) hue-rotate(-16deg) saturate(1.7) brightness(var(--bgk, .95)) contrast(1.2); }
+.bg-media > .on { opacity: 1; }
+/* фон из Мастерской: чуть размыт, чтобы мелкие детали не спорили с заголовком; увеличен — края размытия за экраном */
+.bg-media > .feat { filter: grayscale(.4) sepia(.55) hue-rotate(-16deg) saturate(1.5) brightness(var(--bgk, .45)) contrast(1.15) blur(2px); transform: scale(1.03); }
+.bg-media::after { content: ""; position: absolute; inset: 0;
+  background: linear-gradient(90deg, oklch(0.14 0.008 var(--h) / .78) 0%, oklch(0.14 0.008 var(--h) / .35) 45%, transparent 75%),
+    linear-gradient(180deg, oklch(0.14 0.008 var(--h) / .5) 0%, transparent 22%); }
+/* сполохи над видео — тише, иначе красный забивает картинку */
+.bg-media ~ .au-1 { opacity: .18; }
+.bg-media ~ .au-2 { opacity: .1; }
+.bg-media ~ .au-3 { opacity: .12; }
+.hero-credit { position: absolute; z-index: 4; right: 24px; top: calc(var(--nav-h) + 6px); display: flex; align-items: center; gap: 6px; max-width: min(360px, 60vw); padding: 5px 11px; border-radius: 99px; background: oklch(0.14 0.008 var(--h) / .6); border: 1px solid oklch(1 0 0 / .07); color: var(--muted); font-size: 12px; text-decoration: none; backdrop-filter: blur(8px); animation: fade .6s var(--ease) both; transition: color .2s, border-color .2s; }
+.hero-credit span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hero-credit .i { width: 14px; height: 14px; }
+.hero-credit:hover { color: var(--ink); border-color: var(--accent-line); }
 /* затухание к краям считает сам site.js — CSS-маска на анимированном холсте дорогая */
 .bg-glyphs { position: absolute; inset: 0; width: 100%; height: 100%; }
 /* зерно неподвижное и без mix-blend-mode: иначе браузер пересчитывает смешивание каждый кадр фона */
@@ -944,3 +963,22 @@ textarea.pf-bio:focus { outline: 0; border-color: var(--accent); background: var
 .ws-bg .au-2 { opacity: .12; }
 .ws-bg .bg-vignette { background: radial-gradient(ellipse 120% 90% at 50% 20%, transparent 55%, oklch(0.09 0.008 var(--h) / .7)), linear-gradient(180deg, transparent 45%, var(--bg)); }
 body[data-page="workshop"]::before { display: none; }
+
+/* ---------- фон в Dota: сборка pak02_dir.vpk и шаги установки ---------- */
+/* окно выше экрана — прокручивается целиком (margin: auto держит его по центру, пока влезает) */
+.modal-root:has(.db-body) { overflow-y: auto; place-items: normal; }
+.modal.sheet:has(.db-body) { width: min(520px, 100%); max-height: none; margin: auto; }
+.db-body { text-align: left; align-items: stretch; }
+.db-body h2, .db-body > .sh-ico { align-self: center; text-align: center; }
+.db-body .db-lead { text-align: center; }
+.db-body code, .db-body .hint code { font: 12px var(--mono); padding: 1px 5px; border-radius: 5px; background: var(--bg-2); color: var(--ink-2); word-break: normal; white-space: nowrap; }
+.db-body .sh-steps li { margin: 8px 0; line-height: 1.5; }
+.db-left { margin: 0; text-align: left; }
+.db-prev { cursor: default; }
+.db-prev:hover { border-color: var(--line-strong); background: var(--bg-2); }
+.db-screens { align-self: flex-start; }
+.db-prog { display: flex; flex-direction: column; gap: 6px; color: var(--muted); font-size: 12.5px; }
+.modal.busy .drop, .modal.busy .seg, .modal.busy .check { opacity: .55; pointer-events: none; }
+.db-warn { display: flex; gap: 10px; padding: 12px 14px; border-radius: 12px; background: var(--bg-2); border: 1px solid var(--line); color: var(--muted); font-size: 13px; line-height: 1.5; }
+.db-warn .i { flex: none; width: 19px; height: 19px; margin-top: 1px; color: var(--gold); }
+.db-warn b { color: var(--ink); }
