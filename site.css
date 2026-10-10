@@ -672,7 +672,7 @@ body[data-page="workshop"]::before { content: ""; position: absolute; z-index: -
 .input.code { height: 50px; text-align: center; font: 600 18px var(--mono); letter-spacing: .25em; }
 .link { padding: 0; border: 0; background: none; color: var(--accent-hi); font-size: 13.5px; cursor: pointer; }
 .link:hover { text-decoration: underline; text-underline-offset: 3px; }
-.pf-head { display: flex; flex-wrap: wrap; align-items: center; gap: 22px; margin-bottom: 22px; padding: 28px; border-radius: 26px; background: radial-gradient(640px 220px at 0% 0%, color-mix(in oklab, var(--c1) 20%, transparent), transparent 70%), var(--card); border: 1px solid var(--line); animation: rise .5s var(--ease) both; }
+.pf-head { --pfp: 28px; position: relative; overflow: hidden; display: flex; flex-wrap: wrap; align-items: center; gap: 22px; margin-bottom: 22px; padding: var(--pfp); border-radius: 26px; background: radial-gradient(640px 220px at 0% 0%, color-mix(in oklab, var(--c1) 20%, transparent), transparent 70%), var(--card); border: 1px solid var(--line); animation: rise .5s var(--ease) both; }
 .pf-ava { width: 88px; height: 88px; font-size: 34px; box-shadow: 0 0 0 3px var(--card), 0 0 0 5px color-mix(in oklab, var(--c2) 60%, transparent); }
 .pf-info { display: flex; flex: 1; flex-direction: column; gap: 6px; min-width: 220px; }
 .pf-nick { width: 100%; max-width: 440px; margin: 0 0 0 -9px; padding: 2px 8px; border: 1px solid transparent; border-radius: 10px; background: transparent; color: var(--ink); font: 750 32px/1.15 var(--font); letter-spacing: -.03em; }
@@ -870,7 +870,7 @@ textarea.pf-bio:focus { outline: 0; border-color: var(--accent); background: var
   .tools-ind { width: 34px; height: 34px; }
   .big-num { order: 0; margin: 0; text-align: left; padding-bottom: 0; }
   .big-num b { font-size: 56px; }
-  .pf-head { padding: 22px; }
+  .pf-head { --pfp: 20px; }
   .pf-nick { font-size: 26px; }
   .article p, .article li { font-size: 15.5px; }
 }
@@ -901,3 +901,20 @@ textarea.pf-bio:focus { outline: 0; border-color: var(--accent); background: var
 .crop-zoom input { flex: 1; accent-color: var(--accent); }
 .crop-acts { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; width: 100%; margin-top: 4px; }
 .crop-acts .i { width: 16px; height: 16px; }
+
+/* ---------- баннер профиля: своя картинка или GIF; без него — мягкий градиент ---------- */
+.pf-banner { position: relative; flex: 0 0 calc(100% + var(--pfp) * 2); height: 110px; margin: calc(var(--pfp) * -1) calc(var(--pfp) * -1) -4px; background: radial-gradient(520px 160px at 85% 0%, color-mix(in oklab, var(--c2) 26%, transparent), transparent 70%), radial-gradient(640px 200px at 0% 0%, color-mix(in oklab, var(--c1) 30%, transparent), transparent 70%); overflow: hidden; }
+.pf-banner.on { height: auto; aspect-ratio: 4 / 1; min-height: 120px; max-height: 300px; background: var(--bg-2); }
+.pf-banner img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.pf-banner::after { content: ""; position: absolute; inset: auto 0 0; height: 45%; background: linear-gradient(transparent, var(--card)); pointer-events: none; }
+.pf-head .pf-ava-wrap { z-index: 1; align-self: flex-start; margin-top: -58px; }
+.pf-head .pf-info, .pf-head .pf-side { position: relative; z-index: 1; }
+.pf-banner-edit { position: absolute; z-index: 2; right: 14px; top: 14px; display: inline-flex; align-items: center; gap: 6px; padding: 7px 12px; border: 0; border-radius: 10px; background: rgba(10, 8, 6, .62); -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); color: #fff; font: 600 13px var(--font); cursor: pointer; transition: background .15s, transform .2s var(--spring); }
+.pf-banner-edit .i { width: 15px; height: 15px; }
+.pf-banner-edit:hover { background: rgba(10, 8, 6, .82); transform: translateY(-1px); }
+.ban-sheet { gap: 12px; }
+.ban-prev { width: 100%; aspect-ratio: 4 / 1; border-radius: 12px; background: radial-gradient(320px 100px at 0% 0%, color-mix(in oklab, var(--c1) 30%, transparent), transparent 70%), var(--bg-2); overflow: hidden; }
+.ban-prev img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.modal.sheet:has(.ban-crop) { width: min(720px, 100%); }
+.ban-crop .crop-cv { width: 100%; aspect-ratio: 4 / 1; border-radius: 12px; }
+.ban-crop .crop-zoom { width: min(360px, 100%); }

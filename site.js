@@ -202,7 +202,8 @@ function openSheet(html) {
   const onKey = e => { if (e.key === 'Escape') close(); };
   document.addEventListener('keydown', onKey);
   root.onclick = e => { if (e.target === root || e.target.closest('.modal-x')) close(); };
-  return { root, close };
+  // root — само окно: оно новое при каждом открытии, так что обработчики на нём не копятся
+  return { root: $('.modal', root), close };
 }
 function openInfo(kind) {
   const a = SITE.author || {};
@@ -1130,7 +1131,11 @@ function profileHead(p, { me, grids = [], works = null }) {
   const likes = grids.reduce((a, g) => a + (+g.likes || 0), 0), dls = grids.reduce((a, g) => a + (+g.downloads || 0), 0);
   const adm = me ? ACC.isAdmin() : p.admin;
   const steam = p.steam ? `<a class="pf-steam" href="${esc(p.steam)}" target="_blank" rel="noopener">${icon('ext')}Профиль Steam</a>` : '';
+  // чужой профиль глазами админа: убрать аватар или баннер
+  const modBtns = !me && isAdmin() ? `${p.avatar ? `<button class="btn sm ghost danger" data-clear="avatar">${icon('trash')}Убрать аватар</button>` : ''}${p.banner ? `<button class="btn sm ghost danger" data-clear="banner">${icon('trash')}Убрать баннер</button>` : ''}` : '';
   return `<section class="pf-head">
+    <div class="pf-banner${p.banner ? ' on' : ''}">${p.banner ? `<img src="${esc(p.banner)}" alt="" onerror="this.remove()">` : ''}
+      ${me && ACC.media() ? `<button class="pf-banner-edit" id="pfBanner">${icon('image')}${p.banner ? 'Сменить баннер' : 'Добавить баннер'}</button>` : ''}</div>
     <div class="pf-ava-wrap">${avatarHTML(p.avatar, p.nick, 'pf-ava')}${me ? `<button class="pf-ava-edit" id="pfAva" title="Сменить аватар" aria-label="Сменить аватар">${icon('edit')}</button>` : ''}</div>
     <div class="pf-info">
       ${me ? `<input class="pf-nick" id="pfNick" value="${esc(p.nick)}" maxlength="32" spellcheck="false" title="Ник — его видят в Мастерской">` : `<h1 class="pf-nick">${esc(p.nick || 'Игрок')}</h1>`}
@@ -1147,7 +1152,7 @@ function profileHead(p, { me, grids = [], works = null }) {
       <div class="pf-actions">
         ${me ? `<a class="btn primary sm" href="editor.html?new">${icon('brush')}Новая сетка</a>${ACC.ext() ? `<button class="btn sm" id="pfSteam">${icon('link')}Steam</button>` : ''}` : ''}
         <button class="btn sm" id="pfShare" data-copy="${esc(new URL('profile.html?u=' + p.id, location.href).href)}">${icon('link')}Ссылка на профиль</button>
-        ${me ? `<button class="btn sm ghost" id="pfOut">${icon('logout')}Выйти</button>` : ''}
+        ${me ? `<button class="btn sm ghost" id="pfOut">${icon('logout')}Выйти</button>` : ''}${modBtns}
       </div>
     </div>
   </section>`;
@@ -1162,7 +1167,7 @@ function workToConfig(w) {
   return JSON.stringify({ version: 3, configs: [{ config_name: d.settings?.configName || w.title, categories }] }, null, '\t');
 }
 
-// аватар: своя картинка (кадрируешь сам, квадрат 160 px, webp), портрет героя или картинка из Discord/GitHub
+// аватар: своя картинка (кадрируешь сам, квадрат 160 px, webp), GIF (как есть, до 2 МБ), портрет героя или картинка из Discord/GitHub
 function openAvatarSheet(p, onDone) {
   const heroes = (window.HEROES || []).slice().sort((a, b) => a.n.localeCompare(b.n));
   const prov = ACC.user()?.meta?.avatar;
@@ -1170,7 +1175,7 @@ function openAvatarSheet(p, onDone) {
     ${avatarHTML(p.avatar, p.nick, 'sh-ava')}
     <h2>Аватар</h2>
     <div class="sh-actions">
-      ${ACC.ext() ? `<button class="btn primary block" data-av="upload">${icon('upload')}Загрузить свою картинку<span class="sh-note">png, jpg, webp, gif</span></button>` : ''}
+      ${ACC.ext() ? `<button class="btn primary block" data-av="upload">${icon('upload')}Загрузить свою картинку<span class="sh-note">${ACC.media() ? 'или GIF до 2 МБ' : 'png, jpg, webp'}</span></button>` : ''}
       ${prov ? `<button class="btn block" data-av="prov">${icon('user')}Как в Discord / GitHub</button>` : ''}
       ${p.avatar ? `<button class="btn block ghost" data-av="clear">${icon('trash')}Убрать аватар</button>` : ''}
     </div>
@@ -1194,36 +1199,95 @@ function openAvatarSheet(p, onDone) {
   });
   $('#avFile', m.root).onchange = async e => {
     const f = e.target.files[0]; if (!f) return;
-    const src = URL.createObjectURL(f);
+    const back = () => openAvatarSheet(p, onDone);
+    // GIF не пережимаем — иначе пропадёт анимация; кладём в хранилище как есть
+    if (f.type === 'image/gif' && ACC.media()) {
+      if (f.size > 2 * 1048576) { toast(`GIF для аватара — до 2 МБ, а этот ${mb(f.size)}. Сожми его или обрежь.`, 'err'); e.target.value = ''; return; }
+      uploadMedia(m, 'avatar', f, onDone, back); return;
+    }
     try {
-      const img = await new Promise((res, rej) => { const im = new Image(); im.onload = () => res(im); im.onerror = () => rej(new Error('Не удалось открыть картинку')); im.src = src; });
-      cropAvatar(m, img, set, () => openAvatarSheet(p, onDone));
+      const img = await loadImage(f);
+      cropImage(m, img, { title: 'Выбери кадр', text: 'Двигай картинку и приближай — в аватар попадёт то, что внутри круга.', round: true, outW: 160, outH: 160 }, async out => {
+        // база принимает до ~90 КБ; webp обычно 5–15 КБ, Safari без webp — jpeg
+        let url = out.toDataURL('image/webp', 0.88);
+        if (!url.startsWith('data:image/webp')) url = out.toDataURL('image/jpeg', 0.88);
+        if (url.length > 88000) url = out.toDataURL('image/jpeg', 0.7);
+        await set(url);
+      }, back);
     } catch (er) { toast(er.message, 'err'); }
   };
 }
-// кадрирование: тянешь картинку и приближаешь (ползунок или колёсико), в аватар уходит то, что в круге
-function cropAvatar(m, img, save, back) {
+const loadImage = f => new Promise((res, rej) => { const im = new Image(); im.onload = () => res(im); im.onerror = () => rej(new Error('Не удалось открыть картинку')); im.src = URL.createObjectURL(f); });
+// файл аватара или баннера — в хранилище профиля; не вышло — возвращаемся к выбору
+async function uploadMedia(m, kind, blob, onDone, back) {
   const body = $('.sh-body', m.root);
-  body.className = 'sh-body ava-crop';
-  body.innerHTML = `<h2>Выбери кадр</h2><p>Двигай картинку и приближай — в аватар попадёт то, что внутри круга.</p>
-    <canvas class="crop-cv" width="560" height="560" aria-label="Кадр аватара"></canvas>
+  body.className = 'sh-body';
+  body.innerHTML = `<div class="sh-ico">${icon('upload')}</div><h2>Загружаю…</h2><p>${kind === 'banner' ? 'Баннер' : 'Аватар'} · ${mb(blob.size)}</p>`;
+  applyIcons(body);
+  try { const np = await ACC.setMedia(kind, blob); m.close(); toast(kind === 'banner' ? 'Баннер обновлён' : 'Аватар обновлён', 'ok'); onDone(np); }
+  catch (e) { toast(e.message, 'err'); back(); }
+}
+// баннер над профилем: картинку кадрируем в 4:1 (1600 × 400, webp), GIF — как есть, до 5 МБ
+function openBannerSheet(p, onDone) {
+  const m = openSheet(`<div class="sh-body ban-sheet">
+    <div class="ban-prev">${p.banner ? `<img src="${esc(p.banner)}" alt="">` : ''}</div>
+    <h2>Баннер профиля</h2>
+    <p>Широкая картинка над профилем — её видят все, кто зайдёт. GIF тоже можно: он будет двигаться.</p>
+    <div class="sh-actions">
+      <button class="btn primary block" data-ban="upload">${icon('upload')}Загрузить картинку или GIF<span class="sh-note">GIF до 5 МБ</span></button>
+      ${p.banner ? `<button class="btn block ghost" data-ban="clear">${icon('trash')}Убрать баннер</button>` : ''}
+    </div>
+  </div><input type="file" id="banFile" accept="image/png,image/jpeg,image/webp,image/gif" hidden>`);
+  const back = () => openBannerSheet(p, onDone);
+  m.root.addEventListener('click', async e => {
+    const a = e.target.closest('[data-ban]')?.dataset.ban;
+    if (a === 'upload') $('#banFile', m.root).click();
+    else if (a === 'clear') {
+      try { const np = await ACC.setMedia('banner', null); m.close(); toast('Баннер убран', 'ok'); onDone(np); } catch (er) { toast(er.message, 'err'); }
+    }
+  });
+  $('#banFile', m.root).onchange = async e => {
+    const f = e.target.files[0]; if (!f) return;
+    if (f.type === 'image/gif') {
+      if (f.size > 5 * 1048576) { toast(`GIF для баннера — до 5 МБ, а этот ${mb(f.size)}.`, 'err'); e.target.value = ''; return; }
+      uploadMedia(m, 'banner', f, onDone, back); return;
+    }
+    try {
+      const img = await loadImage(f);
+      cropImage(m, img, { title: 'Кадр баннера', text: 'Двигай и приближай — так баннер встанет над профилем.', aspect: 4, outW: 1600, outH: 400 }, async out => {
+        let blob = await new Promise(ok => out.toBlob(ok, 'image/webp', 0.86));
+        if (!blob || blob.type !== 'image/webp') blob = await new Promise(ok => out.toBlob(ok, 'image/jpeg', 0.86)); // Safari не умеет webp
+        await uploadMedia(m, 'banner', blob, onDone, back);
+      }, back);
+    } catch (er) { toast(er.message, 'err'); }
+  };
+}
+// кадрирование: тянешь картинку и приближаешь (ползунок или колёсико); round — круг для аватара, aspect — ширина к высоте
+// save получает готовый холст outW × outH
+function cropImage(m, img, { title, text, round = false, aspect = 1, outW, outH }, save, back) {
+  const body = $('.sh-body', m.root);
+  body.className = 'sh-body ava-crop' + (aspect > 1 ? ' ban-crop' : '');
+  body.innerHTML = `<h2>${esc(title)}</h2><p>${esc(text)}</p>
+    <canvas class="crop-cv" width="${aspect > 1 ? 960 : 560}" height="${Math.round((aspect > 1 ? 960 : 560) / aspect)}" aria-label="${esc(title)}"></canvas>
     <label class="crop-zoom" title="Приблизить">${icon('search')}<input type="range" min="1" max="5" step="0.01" value="1" aria-label="Приближение"></label>
     <div class="crop-acts"><button class="btn" data-crop="back">Назад</button><button class="btn primary" data-crop="ok">${icon('check')}Готово</button></div>`;
   const cv = $('.crop-cv', body), c = cv.getContext('2d'), zoom = $('.crop-zoom input', body);
-  const W = img.naturalWidth, H = img.naturalHeight, S = cv.width, fit = S / Math.min(W, H);
+  const W = img.naturalWidth, H = img.naturalHeight, CW = cv.width, CH = cv.height, fit = Math.max(CW / W, CH / H);
   let z = 1, cx = W / 2, cy = H / 2;
-  // видимый квадрат в пикселях картинки; картинка всегда закрывает кадр целиком
+  // видимая область в пикселях картинки; картинка всегда закрывает кадр целиком
   const view = () => {
-    const side = S / (fit * z);
-    cx = Math.min(Math.max(cx, side / 2), W - side / 2); cy = Math.min(Math.max(cy, side / 2), H - side / 2);
-    return [cx - side / 2, cy - side / 2, side];
+    const vw = CW / (fit * z), vh = CH / (fit * z);
+    cx = Math.min(Math.max(cx, vw / 2), W - vw / 2); cy = Math.min(Math.max(cy, vh / 2), H - vh / 2);
+    return [cx - vw / 2, cy - vh / 2, vw, vh];
   };
   const paint = () => {
-    const [x, y, side] = view();
+    const [x, y, vw, vh] = view();
     c.imageSmoothingQuality = 'high';
-    c.clearRect(0, 0, S, S); c.drawImage(img, x, y, side, side, 0, 0, S, S);
-    c.fillStyle = 'rgba(8, 6, 6, .62)'; c.beginPath(); c.rect(0, 0, S, S); c.arc(S / 2, S / 2, S / 2 - 3, 0, Math.PI * 2); c.fill('evenodd');
-    c.strokeStyle = 'rgba(255, 255, 255, .5)'; c.lineWidth = 3; c.beginPath(); c.arc(S / 2, S / 2, S / 2 - 3, 0, Math.PI * 2); c.stroke();
+    c.clearRect(0, 0, CW, CH); c.drawImage(img, x, y, vw, vh, 0, 0, CW, CH);
+    if (!round) return;
+    const r = CW / 2 - 3;
+    c.fillStyle = 'rgba(8, 6, 6, .62)'; c.beginPath(); c.rect(0, 0, CW, CH); c.arc(CW / 2, CH / 2, r, 0, Math.PI * 2); c.fill('evenodd');
+    c.strokeStyle = 'rgba(255, 255, 255, .5)'; c.lineWidth = 3; c.beginPath(); c.arc(CW / 2, CH / 2, r, 0, Math.PI * 2); c.stroke();
   };
   const setZoom = v => { z = Math.min(5, Math.max(1, v)); zoom.value = z; paint(); };
   zoom.oninput = () => setZoom(+zoom.value);
@@ -1232,7 +1296,7 @@ function cropAvatar(m, img, save, back) {
   cv.onpointerdown = e => { drag = { x: e.clientX, y: e.clientY }; cv.setPointerCapture(e.pointerId); };
   cv.onpointermove = e => {
     if (!drag) return;
-    const k = S / cv.clientWidth / (fit * z);
+    const k = CW / cv.clientWidth / (fit * z);
     cx -= (e.clientX - drag.x) * k; cy -= (e.clientY - drag.y) * k;
     drag = { x: e.clientX, y: e.clientY }; paint();
   };
@@ -1242,17 +1306,13 @@ function cropAvatar(m, img, save, back) {
     const a = e.target.closest('[data-crop]')?.dataset.crop;
     if (a === 'back') { URL.revokeObjectURL(img.src); back(); return; }
     if (a !== 'ok') return;
-    const [x, y, side] = view(), out = document.createElement('canvas');
-    out.width = out.height = 160;
+    const [x, y, vw, vh] = view(), out = document.createElement('canvas');
+    out.width = outW; out.height = outH;
     const o = out.getContext('2d'); o.imageSmoothingQuality = 'high';
-    o.drawImage(img, x, y, side, side, 0, 0, 160, 160);
-    // база принимает до ~90 КБ; webp обычно 5–15 КБ, Safari без webp — jpeg
-    let url = out.toDataURL('image/webp', 0.88);
-    if (!url.startsWith('data:image/webp')) url = out.toDataURL('image/jpeg', 0.88);
-    if (url.length > 88000) url = out.toDataURL('image/jpeg', 0.7);
+    o.drawImage(img, x, y, vw, vh, 0, 0, outW, outH);
     const ok = e.target.closest('button'); ok.disabled = true;
-    await save(url);   // при ошибке save сам покажет её — даём нажать ещё раз
-    ok.disabled = false;
+    await save(out);   // при ошибке save сам покажет её — даём нажать ещё раз
+    if (ok.isConnected) ok.disabled = false;
   };
 }
 
@@ -1289,6 +1349,7 @@ async function renderMyProfile(box) {
       bio.onchange = async () => { try { p = await ACC.updateProfile({ bio: bio.value.trim().slice(0, 200) }); toast('Сохранено', 'ok'); } catch (e) { toast(e.message, 'err'); } };
     }
     $('#pfAva').onclick = $('.pf-ava-wrap .pf-ava').onclick = () => openAvatarSheet(p, np => { p = np; head(); });
+    const ban = $('#pfBanner'); if (ban) ban.onclick = () => openBannerSheet(p, np => { p = np; head(); });
     $('#pfOut').onclick = async () => { await ACC.signOut(); location.href = 'index.html'; };
     $('#pfShare').onclick = e => copyText(e.currentTarget.dataset.copy, 'Ссылка на профиль скопирована');
     const st = $('#pfSteam');
@@ -1393,6 +1454,11 @@ async function renderPublicProfile(box, id) {
     applyIcons(box);
     $('#pfShare').onclick = e => copyText(e.currentTarget.dataset.copy, 'Ссылка на профиль скопирована');
     $('#pfList').onclick = e => { const c = e.target.closest('.gcard[data-id]'); if (c) openGrid(c.dataset.id); };
+    for (const b of $$('[data-clear]', box)) b.onclick = async () => {
+      const what = b.dataset.clear === 'banner' ? 'баннер' : 'аватар';
+      if (!confirm(`Убрать ${what} у «${p.nick}»?`)) return;
+      try { await ACC.adminClear(p.id, b.dataset.clear); toast(`${what[0].toUpperCase() + what.slice(1)} убран`, 'ok'); renderPublicProfile(box, id); } catch (e) { toast(e.message, 'err'); }
+    };
   } catch (e) { box.innerHTML = `<div class="auth-card"><h1>Профиль не найден</h1><p>${esc(e.message)}</p><a class="btn" href="workshop.html">В Мастерскую</a></div>`; }
 }
 

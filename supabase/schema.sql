@@ -523,3 +523,59 @@ begin
 end $$;
 revoke all on function public.admin_moderate(text, uuid, boolean) from public, anon;
 grant execute on function public.admin_moderate(text, uuid, boolean) to authenticated;
+
+-- =====================================================================
+-- Профили: баннер и GIF-аватарки.
+-- Файлы лежат в публичном бакете profiles: у каждого своя папка <id аккаунта>/ и не больше 6 файлов в ней
+-- (старые сайт стирает сам после каждой смены). Обычные картинки сайт сам кадрирует и пережимает в WebP,
+-- GIF кладёт как есть: аватар — до 2 МБ (проверяет сайт), баннер — до 5 МБ (лимит бакета).
+-- =====================================================================
+
+insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+values ('profiles', 'profiles', true, 5242880, array['image/png', 'image/jpeg', 'image/webp', 'image/gif'])
+on conflict (id) do update set public = excluded.public, file_size_limit = excluded.file_size_limit, allowed_mime_types = excluded.allowed_mime_types;
+
+-- сколько файлов уже в папке аккаунта (security definer — считаем мимо RLS самого storage.objects)
+create or replace function public._profile_files(p_uid uuid) returns int
+language sql stable security definer set search_path = public as $$
+  select count(*)::int from storage.objects where bucket_id = 'profiles' and name like p_uid::text || '/%'
+$$;
+revoke all on function public._profile_files(uuid) from public, anon;
+grant execute on function public._profile_files(uuid) to authenticated;
+
+drop policy if exists "profiles: upload to own folder" on storage.objects;
+create policy "profiles: upload to own folder" on storage.objects for insert to authenticated
+  with check (bucket_id = 'profiles' and (storage.foldername(name))[1] = auth.uid()::text and public._profile_files(auth.uid()) < 6);
+drop policy if exists "profiles: see own files" on storage.objects;
+create policy "profiles: see own files" on storage.objects for select to authenticated
+  using (bucket_id = 'profiles' and ((storage.foldername(name))[1] = auth.uid()::text or (select public.is_admin())));
+drop policy if exists "profiles: delete own files" on storage.objects;
+create policy "profiles: delete own files" on storage.objects for delete to authenticated
+  using (bucket_id = 'profiles' and ((storage.foldername(name))[1] = auth.uid()::text or (select public.is_admin())));
+
+-- баннер — только файл из этого бакета
+alter table public.profiles add column if not exists banner text not null default '';
+alter table public.profiles drop constraint if exists profiles_banner;
+alter table public.profiles add constraint profiles_banner check (banner = ''
+  or (banner ~ '^https://[^/]+/storage/v1/object/public/profiles/' and char_length(banner) <= 500));
+grant update (nick, avatar, bio, steam, banner) on public.profiles to authenticated;
+
+-- админ убирает чужой аватар или баннер; возвращает старую ссылку, чтобы сайт стёр файл из бакета
+create or replace function public.admin_clear_media(p_user uuid, p_what text) returns text
+language plpgsql security definer set search_path = public as $$
+declare v_old text;
+begin
+  if not public.is_admin() then raise exception 'not_admin'; end if;
+  if p_what = 'avatar' then
+    select avatar into v_old from profiles where id = p_user;
+    update profiles set avatar = '' where id = p_user;
+  elsif p_what = 'banner' then
+    select banner into v_old from profiles where id = p_user;
+    update profiles set banner = '' where id = p_user;
+  else
+    raise exception 'bad_kind';
+  end if;
+  return coalesce(v_old, '');
+end $$;
+revoke all on function public.admin_clear_media(uuid, text) from public, anon;
+grant execute on function public.admin_clear_media(uuid, text) to authenticated;

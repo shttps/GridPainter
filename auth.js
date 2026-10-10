@@ -33,6 +33,7 @@ window.Accounts = (() => {
     profiles_avatar: 'Картинка для аватара слишком большая — выбери другую.',
     profiles_bio: '«О себе» — до 200 символов.',
     profiles_steam: 'Ссылка на Steam должна начинаться с https://steamcommunity.com/',
+    profiles_banner: 'Баннер должен быть загружен через сайт.',
     JWT: 'Сессия истекла — войди ещё раз.',
   };
   const nice = (msg, code) => {
@@ -104,12 +105,18 @@ window.Accounts = (() => {
   // bio и steam появляются после обновления базы (SQL из README); до этого профиль работает без них.
   // Не запоминаем «колонок нет» навсегда: иначе после обновления базы у старых посетителей
   // так и не появлялись «о себе», Steam и загрузка своей аватарки
-  let ext = true;
+  let ext = true, bext = true;   // bext — есть колонка banner и бакет profiles (schema.sql 2.4)
   try { localStorage.removeItem('gs.profileExt'); } catch {}
-  const pcols = () => 'id,nick,avatar,created_at' + (ext ? ',bio,steam' : '');
+  const pcols = () => 'id,nick,avatar,created_at' + (ext ? ',bio,steam' : '') + (bext ? ',banner' : '');
   async function prest(path, opts) {
-    try { return await rest(path.replace('{cols}', pcols()), opts); }
-    catch (e) { if (ext && /bio|steam/.test(e.message)) { ext = false; return rest(path.replace('{cols}', pcols()), opts); } throw e; }
+    for (let i = 0; ; i++) {
+      try { return await rest(path.replace('{cols}', pcols()), opts); }
+      catch (e) {
+        if (i < 2 && bext && /banner/.test(e.message)) { bext = false; continue; }
+        if (i < 2 && ext && /bio|steam/.test(e.message)) { ext = false; continue; }
+        throw e;
+      }
+    }
   }
   // админ ли аккаунт; таблицы admins ещё нет (не выполнен свежий schema.sql) — значит, нет
   const isAdminId = async id => { try { return !!(await rest(`/admins?select=user_id&user_id=eq.${encodeURIComponent(id)}`)).length; } catch { return false; } };
@@ -126,7 +133,53 @@ window.Accounts = (() => {
   async function updateProfile(fields) {
     const p = (await prest(`/profiles?id=eq.${session.user.id}&select={cols}`, { method: 'PATCH', headers: { Prefer: 'return=representation' }, body: fields }))[0];
     profile = p; save('gs.profile', p); emit();
+    // сменили аватар или баннер — старый файл из бакета больше не нужен
+    if ('avatar' in fields || 'banner' in fields) tidyMedia();
     return p;
+  }
+
+  // ---------- файлы профиля: GIF-аватар и баннер (Storage, бакет profiles) ----------
+  // у каждого своя папка <id аккаунта>/; в ней живут только текущие аватар и баннер, остальное стираем
+  const store = base + '/storage/v1/object', PUB = store + '/public/profiles/';
+  const MEDIA_EXT = { 'image/gif': 'gif', 'image/webp': 'webp', 'image/jpeg': 'jpg', 'image/png': 'png' };
+  const inBucket = url => typeof url === 'string' && url.startsWith(PUB) ? decodeURIComponent(url.slice(PUB.length)) : null;
+  const storeHeaders = async () => ({ apikey: cfg.key, Authorization: 'Bearer ' + await token(), 'Content-Type': 'application/json' });
+  async function unlinkMedia(paths) {
+    paths = paths.filter(Boolean); if (!paths.length) return;
+    await fetch(store + '/profiles', { method: 'DELETE', headers: await storeHeaders(), body: JSON.stringify({ prefixes: paths }) }).catch(() => {});
+  }
+  async function tidyMedia() {
+    const uid = session?.user?.id; if (!uid) return;
+    try {
+      const r = await fetch(store + '/list/profiles', { method: 'POST', headers: await storeHeaders(), body: JSON.stringify({ prefix: uid + '/', limit: 100 }) });
+      if (!r.ok) return;
+      const keep = new Set([inBucket(profile?.avatar), inBucket(profile?.banner)]);
+      await unlinkMedia((await r.json()).map(f => `${uid}/${f.name}`).filter(f => !keep.has(f)));
+    } catch { /* уборка — не повод ломать профиль */ }
+  }
+  // kind: 'avatar' | 'banner'; blob — готовый файл (GIF как есть, картинка уже пережата), null — убрать
+  async function setMedia(kind, blob) {
+    if (!blob) return updateProfile({ [kind]: '' });
+    const uid = session?.user?.id, t = await token();
+    if (!uid || !t) throw new Error(ERRORS.JWT);
+    const ext = MEDIA_EXT[blob.type]; if (!ext) throw new Error('Подойдут PNG, JPEG, WebP и GIF.');
+    const path = `${uid}/${kind}-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}.${ext}`;
+    let res;
+    try { res = await fetch(`${store}/profiles/${path}`, { method: 'POST', headers: { apikey: cfg.key, Authorization: 'Bearer ' + t, 'Content-Type': blob.type, 'Cache-Control': 'max-age=31536000' }, body: blob }); }
+    catch { throw new Error('Нет связи с сервером. Проверь интернет.'); }
+    if (!res.ok) {
+      const d = await res.json().catch(() => ({})), m = String(d.message || d.error || '');
+      throw new Error(res.status === 413 || /size|large/i.test(m) ? 'Файл слишком большой: GIF-аватар — до 2 МБ, баннер — до 5 МБ.'
+        : /bucket/i.test(m) ? 'Хранилище профилей ещё не настроено — нужен свежий schema.sql.'
+        : /security|policy/i.test(m) ? 'Не получилось сохранить файл — попробуй ещё раз через минуту.' : m || 'Не удалось загрузить файл.');
+    }
+    try { return await updateProfile({ [kind]: PUB + path }); }
+    catch (e) { tidyMedia(); throw e; }
+  }
+  // админ: убрать чужой аватар или баннер (и стереть файл, если он в бакете)
+  async function adminClear(uid, kind) {
+    const old = await rest('/rpc/admin_clear_media', { method: 'POST', body: { p_user: uid, p_what: kind } });
+    await unlinkMedia([inBucket(old)]);
   }
   async function getProfile(id) {
     const [p, adm] = await Promise.all([prest(`/profiles?select={cols}&id=eq.${encodeURIComponent(id)}`), isAdminId(id)]);
@@ -191,6 +244,7 @@ window.Accounts = (() => {
     error: () => { const e = lastError; lastError = ''; return e; },
     onChange: f => { listeners.add(f); return () => listeners.delete(f); },
     ready, token, sendLink, verifyCode, oauth, signOut, loadProfile, updateProfile, getProfile, authors, projects, userGrids,
-    ext: () => ext,
+    setMedia, adminClear,
+    ext: () => ext, media: () => bext,
   };
 })();
