@@ -1956,10 +1956,10 @@ function openPublishModal() {
     try {
       API.setAuthor(author);
       const id = await API.publish({ title, author, description: $('#pbDesc').value, config: { config_name: title, categories: cats }, thumb, tags: [...tags], nsfw: $('#pb18').checked });
-      const url = new URL('workshop.html?id=' + id, location.href).href;
+      const url = new URL('grid.html?id=' + id, location.href).href;
       $('#pbBody').innerHTML = `<div class="pub-done"><div class="pub-ok">✓</div><b>«${esc(title)}» в Мастерской</b><span>Поделись ссылкой — по ней сетку можно посмотреть, скачать и открыть в редакторе.</span>
         <div class="pub-link"><input class="input" readonly value="${esc(url)}"><button class="btn" id="pbCopy" data-icon="link">Копировать</button></div></div>`;
-      m.root.querySelector('.modal-foot').innerHTML = `<button class="btn" data-close>Закрыть</button><a class="btn primary" href="workshop.html?id=${id}" data-icon="grid">Открыть в Мастерской</a>`;
+      m.root.querySelector('.modal-foot').innerHTML = `<button class="btn" data-close>Закрыть</button><a class="btn primary" href="grid.html?id=${id}" data-icon="grid">Открыть страницу сетки</a>`;
       applyIcons(m.root);
       for (const b of $$('[data-close]', m.root)) b.onclick = m.close;
       $('#pbCopy').onclick = () => copyText(url, 'Ссылка скопирована');

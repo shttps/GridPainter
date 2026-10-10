@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Сетка героев Dota 2 · Grid Studio</title>
+<meta name="description" content="Сетка героев Dota 2 из Мастерской Grid Studio: живое превью с портретами, скачивание hero_grid_config.json и правка в редакторе.">
+<meta name="theme-color" content="#0f0d0c">
+<meta property="og:title" content="Сетка героев Dota 2 · Grid Studio">
+<meta property="og:description" content="Сетка героев из Мастерской Grid Studio — посмотри, скачай или открой в редакторе.">
+<meta property="og:image" content="https://shttps.github.io/GridPainter/docs/ingame.webp">
+<link rel="icon" href="logo.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="site.css?v=41">
+</head>
+<body data-page="grid">
+<!-- страница одной сетки: шапка с действиями, большое превью, описание и «что внутри», установка, ещё от автора и похожие.
+     Всё рисует site.js (initGridPage) по ?id=<сетка> -->
+<main class="wrap gp" id="gp">
+  <div class="gp-loading"><span class="loading">Загружаю сетку…</span></div>
+</main>
+
+<footer class="wrap site-foot">
+  <div class="bottom-bar" data-bottom-bar></div>
+  <span class="foot-note">© 2026 shttps · Dota 2 — товарный знак Valve Corporation, проект с Valve не связан.</span>
+</footer>
+
+<div class="modal-root" id="modalRoot"></div>
+<div class="toasts" id="toasts"></div>
+<script src="heroes.js?v=37"></script>
+<script src="config.js?v=37"></script>
+<script src="auth.js?v=37"></script>
+<script src="gridrender.js?v=37"></script>
+<script src="catalog-api.js?v=39"></script>
+<script src="dotabg.js?v=37"></script>
+<script src="site.js?v=41"></script>
+</body>
+</html>

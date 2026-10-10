@@ -132,7 +132,7 @@
       if (!workshopPick) { st.gridNote = 'В Мастерской пока нет сеток'; paint(); return; }
       const cfg = await API.config(workshopPick.id);
       st.cats = cfg?.categories || []; st.gridName = workshopPick.title;
-      note.innerHTML = `${st.grid === 'editor' ? 'В <a href="editor.html">редакторе</a> пусто — показываю ' : ''}«${esc(workshopPick.title)}» — ${esc(workshopPick.author)}, из <a href="workshop.html?id=${encodeURIComponent(workshopPick.id)}">Мастерской</a>.`;
+      note.innerHTML = `${st.grid === 'editor' ? 'В <a href="editor.html">редакторе</a> пусто — показываю ' : ''}«${esc(workshopPick.title)}» — ${esc(workshopPick.author)}, из <a href="grid.html?id=${encodeURIComponent(workshopPick.id)}">Мастерской</a>.`;
     } catch { st.gridNote = 'Мастерская не ответила'; }
     showCap();
   }
@@ -161,7 +161,7 @@
     $('#bgbDrop').classList.add('has');
     $('#bgbBuild').disabled = false;
     $('#bgbPublish').hidden = !!bg;
-    $('#bgbSrc').innerHTML = bg ? `${icon('compass')}«${esc(bg.title)}» из <a href="workshop.html?bg=${encodeURIComponent(bg.id)}">Мастерской</a>` : `${icon('file')}${esc(name.length > 40 ? name.slice(0, 38) + '…' : name)} · ${mb(blob.size)}`;
+    $('#bgbSrc').innerHTML = bg ? `${icon('compass')}«${esc(bg.title)}» из <a href="bg.html?id=${encodeURIComponent(bg.id)}">Мастерской</a>` : `${icon('file')}${esc(name.length > 40 ? name.slice(0, 38) + '…' : name)} · ${mb(blob.size)}`;
     $('#bgbPick').lastChild.textContent = 'Другой файл';
     $('#bgbFileNote').textContent = kind === 'video' ? `Видео ${secs(el.duration)}. В фон пойдёт отрезок до 30 секунд — двигай начало под превью.` : kind === 'gif' ? 'GIF станет видео из своих кадров.' : 'Картинка станет неподвижным видео.';
     setupTrim();

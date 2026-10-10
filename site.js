@@ -119,7 +119,7 @@ const isAdmin = () => !!ACC?.enabled && ACC.isAdmin();
 const GAME_START = new Date(2026, 9, 9);
 const gameDay = (d = new Date()) => Math.round((new Date(d.getFullYear(), d.getMonth(), d.getDate()) - GAME_START) / 864e5) + 1;
 // куда можно вернуться после входа: только страницы этого сайта
-const safeNext = s => /^(index|workshop|editor|guides|game|profile)\.html(\?[\w=&%.-]*)?$/.test(s || '') ? s : '';
+const safeNext = s => /^(index|workshop|grid|bg|editor|guides|game|profile|background)\.html(\?[\w=&%.-]*)?$/.test(s || '') ? s : '';
 
 // ---------- меню сверху ----------
 const NAV = [['workshop', 'workshop.html', 'compass', 'Мастерская'], ['background', 'background.html', 'image', 'Фон меню'], ['guides', 'guides.html', 'book', 'Гайды'], ['game', 'game.html', 'dice', 'Угадайка']];
@@ -130,7 +130,7 @@ function renderNav() {
     <a class="logo" href="index.html" aria-label="Grid Studio — на главную">${LOGO}<span>Grid<b>Studio</b></span></a>
     <div class="nav-links" id="navLinks">
       <span class="nav-hl" aria-hidden="true"></span>
-      ${NAV.map(([k, href, ic, label]) => `<a href="${href}"${k === PAGE ? ' aria-current="page"' : ''}>${icon(ic)}${label}${k === 'workshop' ? '<b class="nav-badge" data-cat-count hidden></b>' : ''}</a>`).join('')}
+      ${NAV.map(([k, href, ic, label]) => `<a href="${href}"${k === (PAGE === 'grid' || PAGE === 'bg' ? 'workshop' : PAGE) ? ' aria-current="page"' : ''}>${icon(ic)}${label}${k === 'workshop' ? '<b class="nav-badge" data-cat-count hidden></b>' : ''}</a>`).join('')}
       <a href="editor.html" class="nav-studio">${icon('brush')}Редактор${icon('arrow')}</a>
     </div>
     <div class="nav-acc" id="navAcc"></div>
@@ -251,7 +251,7 @@ function cardHTML(g, k = 0) {
       ${API.isMine(g.id, g.user_id) ? '<span class="gmine">моя</span>' : ''}
       ${g.nsfw ? '<span class="g18">18+</span>' : ''}${hide ? nsfwCover() : ''}</span>
     <div class="ginfo">
-      <div class="gmain"><b class="gtitle" title="${esc(g.title)}">${esc(g.title)}</b>
+      <div class="gmain"><a class="gtitle" href="${gridUrl(g.id)}" title="${esc(g.title)}">${esc(g.title)}</a>
         <span class="gby">${authorAva(g.user_id, g.author)}${esc(g.author)}<i>· ${ago(g.created_at)}</i></span></div>
       <div class="gacts"><span class="gdl" title="Скачали: ${num(g.downloads)}">${icon('download')}${num(g.downloads)}</span>
         <button class="glike${API.isLiked(g.id) ? ' liked' : ''}" data-grid-like="${esc(g.id)}" data-likes aria-label="Лайк">${icon('heart')}${num(g.likes)}</button></div>
@@ -309,7 +309,7 @@ document.addEventListener('click', async e => {
   } catch (er) { toast(er.message, 'err'); }
   b.disabled = false;
 }, true);
-// «В Dota» на карточке фона — просто ссылка в сборщик: окно фона при этом не открываем
+// «В Dota» на карточке фона — просто ссылка в сборщик: страницу фона при этом не открываем
 document.addEventListener('click', e => { if (e.target.closest('[data-bg-dota]') && !e.target.closest('.hide18')) e.stopPropagation(); }, true);
 // карточка — <article>, поэтому Enter открывает её вручную
 document.addEventListener('keydown', e => {
@@ -327,65 +327,170 @@ function askAdult(onShow) {
   });
 }
 
-// ---------- окно сетки ----------
-async function openGrid(id, { onChange } = {}) {
-  const root = $('#modalRoot');
-  root.innerHTML = `<div class="modal"><div class="modal-view"><span class="loading">Загружаю сетку…</span></div><div class="modal-side"><span class="loading"> </span></div></div>`;
-  setUrlId(id);
-  let alive = true;
-  const close = () => { alive = false; root.innerHTML = ''; setUrlId(null); document.removeEventListener('keydown', onKey); };
-  const onKey = e => { if (e.key === 'Escape') close(); };
-  document.addEventListener('keydown', onKey);
-  root.onclick = e => { if (e.target === root) close(); };
+// ---------- страницы сетки и фона: общее ----------
+// Сетка и фон открываются своей страницей, а не окном: их можно открыть в новой вкладке, переслать ссылкой и вернуться «назад».
+const gridUrl = id => 'grid.html?id=' + encodeURIComponent(id);
+const bgPageUrl = id => 'bg.html?id=' + encodeURIComponent(id);
+// клик по карточке: ссылки внутри карточки срабатывают сами; с Ctrl/⌘/Shift — в новой вкладке
+function goTo(url, e) {
+  if (e?.target?.closest?.('a[href]')) return;
+  if (e && (e.ctrlKey || e.metaKey || e.shiftKey)) window.open(url, '_blank', 'noopener');
+  else location.href = url;
+}
+const goGrid = (id, e) => goTo(gridUrl(id), e);
+const goBg = (id, e) => goTo(bgPageUrl(id), e);
+// колёсиком по карточке — тоже в новой вкладке, как по обычной ссылке
+const cardUrl = c => c.dataset.id ? gridUrl(c.dataset.id) : bgPageUrl(c.dataset.bg);
+document.addEventListener('mousedown', e => { if (e.button === 1 && e.target.closest('.gcard[data-id], .bcard[data-bg]')) e.preventDefault(); });
+document.addEventListener('auxclick', e => {
+  const c = e.button === 1 && e.target.closest('.gcard[data-id]:not(.hide18), .bcard[data-bg]:not(.hide18)');
+  if (c && !e.target.closest('a[href], button')) { e.preventDefault(); window.open(cardUrl(c), '_blank', 'noopener'); }
+});
+// сетки или фона нет — вместо страницы заглушка со ссылкой обратно
+function pageFail(box, title, text, back = 'workshop.html') {
+  box.innerHTML = `<div class="gp-empty">${MARK}<h1>${title}</h1><p>${esc(text)}</p>
+    <div class="gp-empty-acts"><a class="btn primary" href="${back}">${icon('compass')}В Мастерскую</a><a class="btn" href="editor.html">${icon('brush')}Открыть редактор</a></div></div>`;
+}
+// «← Мастерская»: если пришли оттуда — шаг назад по истории, чтобы не потерять фильтры и прокрутку
+function bindBack(from) {
+  $('#gpBack').onclick = e => {
+    let ref = null; try { ref = new URL(document.referrer); } catch {}
+    if (ref && ref.origin === location.origin && from.test(ref.pathname) && history.length > 1) { e.preventDefault(); history.back(); }
+  };
+}
+// превью на весь экран: вместе с панелью над ним
+function bindFullscreen(stage, onChange) {
+  const full = $('#gpFull');
+  if (!stage.requestFullscreen) { full.hidden = true; return; }
+  full.onclick = () => document.fullscreenElement ? document.exitFullscreen() : stage.requestFullscreen().catch(() => {});
+  document.addEventListener('fullscreenchange', () => {
+    const on = document.fullscreenElement === stage;
+    full.innerHTML = `${icon(on ? 'x' : 'ext')}<span>${on ? 'Выйти' : 'На весь экран'}</span>`;
+    requestAnimationFrame(onChange);
+  });
+}
 
+// ---------- страница сетки (grid.html?id=…) ----------
+const gridJSON = (g, cats) => JSON.stringify({ version: 3, configs: [{ config_name: g.title, categories: cats }] }, null, '\t');
+const STEAM_CFG = 'Steam\\userdata\\<твой ID>\\570\\remote\\cfg';
+
+async function initGridPage() {
+  const box = $('#gp'), id = new URLSearchParams(location.search).get('id');
+  if (!id) return pageFail(box, 'Сетка не выбрана', 'В ссылке нет номера сетки — найди нужную в Мастерской.');
   let g;
-  try { g = await API.get(id); } catch (e) { if (alive) { close(); toast(e.message, 'err'); } return; }
-  if (!alive) return;
-  const cats = g.config?.categories || [];
-  const mine = API.isMine(g.id, g.user_id), adm = isAdmin();
-  // у сеток из аккаунта автор — ссылка на его профиль
+  // профиль ждём вместе с сеткой: от него зависит, показать ли «Удалить» и плашку админа
+  try { [g] = await Promise.all([API.get(id), ACC?.enabled ? ACC.ready().catch(() => {}) : null]); }
+  catch (e) { document.title = 'Сетка не найдена · Grid Studio'; return pageFail(box, 'Сетка не найдена', e.message); }
+
+  const cats = g.config?.categories || [], st = GridRender.stats(cats);
+  const uniq = new Set(cats.flatMap(c => Array.isArray(c.hero_ids) ? c.hero_ids : [])).size;
+  const size = new Blob([gridJSON(g, cats)]).size;
+  const kind = API.KINDS[g.kind] || 'Сетка', hide = g.nsfw && !API.adult();
   const author = g.user_id && ACC?.enabled ? `<a href="profile.html?u=${encodeURIComponent(g.user_id)}">${esc(g.author)}</a>` : `<b>${esc(g.author)}</b>`;
-  root.innerHTML = `<div class="modal" role="dialog" aria-label="${esc(g.title)}">
-    <button class="modal-x" data-icon="x" aria-label="Закрыть"></button>
-    <div class="modal-view${g.nsfw && !API.adult() ? ' hide18' : ''}" data-preview-bg><canvas id="gv"></canvas>${g.nsfw && !API.adult() ? nsfwCover() : ''}</div>
-    <div class="modal-side">
-      <div><h2>${esc(g.title)}</h2><div class="by">${authorAva(g.user_id, g.author)}от ${author} · ${ago(g.created_at)}</div></div>
-      ${adm ? adminBox(g, mine) : ''}
-      ${g.description ? `<div class="desc">${esc(g.description)}</div>` : ''}
-      ${tagsHTML([...(g.nsfw ? ['18+'] : []), ...(g.tags || [])], 9)}
-      <div class="stats">
-        <div><b data-likes>${num(g.likes)}</b><span>${plural(g.likes, 'лайк', 'лайка', 'лайков')}</span></div>
-        <div><b>${num(g.downloads)}</b><span>скачиваний</span></div>
-        <div><b>${num(g.cats)}</b><span>${plural(g.cats, 'категория', 'категории', 'категорий')}</span></div>
+  const liked = () => API.isLiked(g.id);
+  document.title = `${g.title} — сетка героев Dota 2 · Grid Studio`;
+  $('meta[name="description"]').content = `«${g.title}» от ${g.author}: ${kind.toLowerCase()}, ${num(g.cats)} ${plural(g.cats, 'категория', 'категории', 'категорий')}. Живое превью, скачивание и правка в редакторе Grid Studio.`;
+
+  const fact = (n, label, note = '') => `<div><b>${n}</b><span>${label}</span>${note ? `<small>${note}</small>` : ''}</div>`;
+  box.innerHTML = `
+    <nav class="gp-crumbs" aria-label="Где ты">
+      <a href="workshop.html" id="gpBack">${icon('arrow')}Мастерская</a><i>/</i><a href="workshop.html">Сетки</a><i>/</i><span>${esc(g.title)}</span>
+    </nav>
+    <header class="gp-head">
+      <div class="gp-title">
+        <span class="gp-kind">${icon('grid')}${esc(kind)} · ${num(g.cats)} ${plural(g.cats, 'категория', 'категории', 'категорий')}${g.nsfw ? '<b class="g18">18+</b>' : ''}</span>
+        <h1>${esc(g.title)}</h1>
+        <div class="gp-by">${authorAva(g.user_id, g.author)}<span>от ${author}</span><i>·</i><span>${ago(g.created_at)}</span></div>
       </div>
-      <div class="hint">${esc(API.KINDS[g.kind] || 'Сетка')}${g.heroes ? ` · ${num(g.heroes)} ${plural(g.heroes, 'портрет', 'портрета', 'портретов')} героев` : ''}. Превью — как в игре, без интерфейса Доты.</div>
-      <div class="actions">
-        <a class="btn primary" id="gEdit" href="editor.html?grid=${encodeURIComponent(g.id)}"><span class="ico-box" data-icon="edit"></span>Открыть в редакторе</a>
-        <div class="row">
-          <button class="btn" id="gDl" data-icon="download">Скачать</button>
-          <button class="btn ${API.isLiked(g.id) ? 'on' : ''}" id="gLike" data-icon="heart">${API.isLiked(g.id) ? 'Нравится' : 'Лайк'}</button>
-        </div>
-        <button class="btn ghost sm" id="gCopy" data-icon="copy">Копировать JSON</button>
-        <div class="hint">Скачанный <code>hero_grid_config.json</code> заменит все твои сетки. Чтобы добавить эту к своим — открой её в редакторе, нажми «Открыть JSON» со своим файлом и сделай экспорт.</div>
-        <div class="side-links">
-          <button id="gLink">Скопировать ссылку</button>
-          ${mine ? '<button class="danger" id="gDel">Удалить мою сетку</button>' : adm ? '' : `<button id="gReport">${API.isReported(g.id) ? 'Жалоба отправлена' : 'Пожаловаться'}</button>`}
+      <div class="gp-cta">
+        <a class="btn primary lg" id="gEdit" href="editor.html?grid=${encodeURIComponent(g.id)}">${icon('edit')}Открыть в редакторе</a>
+        <button class="btn lg" id="gDl">${icon('download')}Скачать</button>
+        <button class="btn lg gp-like${liked() ? ' on' : ''}" id="gLike" aria-label="Лайк">${icon('heart')}<span data-likes>${num(g.likes)}</span></button>
+      </div>
+    </header>
+
+    <section class="gp-stage" id="gpStage">
+      <div class="gp-bar">
+        <div class="seg sm" id="gpBg" aria-label="Подложка превью"><i class="seg-ind"></i>${PREVIEW_BG.map(([v, l]) => `<button data-v="${v}" class="${previewBg() === v ? 'on' : ''}">${l}</button>`).join('')}</div>
+        <div class="gp-tools">
+          <div class="seg sm" id="gpZoom" aria-label="Масштаб"><i class="seg-ind"></i><button data-v="1" class="on">1×</button><button data-v="2">2×</button></div>
+          <button class="btn sm" id="gpFull">${icon('ext')}<span>На весь экран</span></button>
         </div>
       </div>
+      <div class="gp-view${hide ? ' hide18' : ''}" id="gpView" data-preview-bg><div class="gp-canvas"><canvas id="gv" aria-label="Превью сетки"></canvas></div>${hide ? nsfwCover() : ''}</div>
+    </section>
+    <p class="gp-cap">Превью — как экран «Герои» в игре: поле 1204 × 612, настоящие портреты, без интерфейса Доты.<span id="gpPan" hidden> В 2× сетку можно таскать мышью.</span></p>
+
+    <div class="gp-body">
+      <div class="gp-main">
+        <section class="gp-block">
+          <h2>Об этой сетке</h2>
+          ${g.description ? `<div class="gp-desc">${esc(g.description)}</div>` : '<p class="gp-none">Автор не добавил описание.</p>'}
+          ${g.tags?.length ? `<div class="gp-tags">${g.tags.map(t => `<a href="workshop.html" data-tag="${esc(t)}">${esc(t)}</a>`).join('')}</div>` : ''}
+        </section>
+        <section class="gp-block">
+          <h2>Что внутри</h2>
+          <div class="gp-facts">
+            ${fact(num(st.cats), plural(st.cats, 'категория', 'категории', 'категорий'), 'всего в файле')}
+            ${fact(num(st.hero), plural(st.hero, 'блок', 'блока', 'блоков'), 'с героями')}
+            ${fact(num(st.label), plural(st.label, 'подпись', 'подписи', 'подписей'), 'текст и символы')}
+            ${fact(num(st.ids), plural(st.ids, 'портрет', 'портрета', 'портретов'), uniq ? `${num(uniq)} ${plural(uniq, 'разный герой', 'разных героя', 'разных героев')}` : 'героев нет')}
+            ${fact(size < 1048576 ? `${Math.max(1, Math.round(size / 1024))} КБ` : mb(size), 'размер файла', 'hero_grid_config.json')}
+          </div>
+        </section>
+        <section class="gp-block">
+          <h2>Как установить</h2>
+          <ol class="gp-steps">
+            <li><b>Скачай файл</b><span>Кнопка «Скачать» наверху — придёт <code>hero_grid_config.json</code>.</span></li>
+            <li><b>Положи в папку игры</b><span>Закрой Доту и скопируй файл с заменой в <code>${esc(STEAM_CFG)}</code>.</span></li>
+            <li><b>Выбери в игре</b><span>«Герои» → сортировка → сетка с названием «${esc(g.title)}».</span></li>
+          </ol>
+          <p class="hint">Файл заменит все твои сетки. Чтобы добавить эту к своим — открой её в редакторе, нажми «Открыть JSON» со своим файлом и сделай экспорт. <a href="guides.html#start">Подробный гайд с картинками</a></p>
+        </section>
+      </div>
+      <aside class="gp-side" id="gpSide"></aside>
     </div>
-  </div>`;
-  applyIcons(root);
-  $('.modal-x', root).onclick = close;
 
-  // живое превью с настоящими портретами, на той же подложке, что выбрана в Мастерской
-  const view = $('.modal-view', root);
+    <section class="gp-more" id="gpAuthor" hidden>
+      <div class="gp-more-head"><h2>Ещё от ${esc(g.author)}</h2>${g.user_id && ACC?.enabled ? `<a class="btn sm" href="profile.html?u=${encodeURIComponent(g.user_id)}">${icon('user')}Профиль автора</a>` : ''}</div>
+      <div class="cards"></div>
+    </section>
+    <section class="gp-more" id="gpSimilar" hidden>
+      <div class="gp-more-head"><h2>Похожие сетки</h2><a class="btn sm" href="workshop.html">${icon('compass')}Вся Мастерская</a></div>
+      <div class="cards"></div>
+    </section>`;
+
+  // ----- превью: подложка, масштаб, весь экран -----
+  const view = $('#gpView'), wrap = $('.gp-canvas', view), stage = $('#gpStage');
   view._view = GridRender.mount($('#gv'), cats, { bg: previewBg() });
+  const segs = () => ['#gpBg', '#gpZoom'].forEach(s => segInd($(s)));
+  requestAnimationFrame(segs); document.fonts?.ready.then(segs); addEventListener('resize', segs);
+  $('#gpBg').onclick = e => {
+    const b = e.target.closest('button'); if (!b) return;
+    $$('#gpBg button').forEach(x => x.classList.toggle('on', x === b)); segInd($('#gpBg')); setPreviewBg(b.dataset.v);
+  };
+  $('#gpZoom').onclick = e => {
+    const b = e.target.closest('button'); if (!b) return;
+    $$('#gpZoom button').forEach(x => x.classList.toggle('on', x === b)); segInd($('#gpZoom'));
+    // увеличиваем к центру того, что сейчас видно
+    const cx = (view.scrollLeft + view.clientWidth / 2) / wrap.offsetWidth, cy = (view.scrollTop + view.clientHeight / 2) / wrap.offsetHeight;
+    view.style.setProperty('--z', b.dataset.v); view.classList.toggle('zoomed', b.dataset.v !== '1'); $('#gpPan').hidden = b.dataset.v === '1';
+    view.scrollLeft = cx * wrap.offsetWidth - view.clientWidth / 2; view.scrollTop = cy * wrap.offsetHeight - view.clientHeight / 2;
+  };
+  // в 2× сетку таскаем мышью
+  view.addEventListener('pointerdown', e => {
+    if (!view.classList.contains('zoomed') || e.button !== 0 || e.pointerType === 'touch' || e.target.closest('.nsfw-cover')) return;
+    const x0 = e.clientX, y0 = e.clientY, l0 = view.scrollLeft, t0 = view.scrollTop;
+    view.setPointerCapture(e.pointerId); view.classList.add('drag');
+    const move = ev => { view.scrollLeft = l0 - (ev.clientX - x0); view.scrollTop = t0 - (ev.clientY - y0); };
+    const up = () => { view.classList.remove('drag'); view.removeEventListener('pointermove', move); };
+    view.addEventListener('pointermove', move); view.addEventListener('pointerup', up, { once: true }); view.addEventListener('pointercancel', up, { once: true });
+  });
+  bindFullscreen(stage, segs);
 
-  const json = () => JSON.stringify({ version: 3, configs: [{ config_name: g.title, categories: cats }] }, null, '\t');
+  // ----- действия -----
   $('#gEdit').onclick = () => API.hit(g.id);
-  $('#gDl').onclick = () => { download('hero_grid_config.json', json()); API.hit(g.id); toast('Файл скачан — положи его в Steam\\userdata\\<ID>\\570\\remote\\cfg', 'ok'); };
-  $('#gCopy').onclick = () => { copyText(json(), 'JSON скопирован'); API.hit(g.id); };
-  $('#gLink').onclick = () => copyText(new URL('workshop.html?id=' + g.id, location.href).href, 'Ссылка скопирована');
+  $('#gDl').onclick = () => { download('hero_grid_config.json', gridJSON(g, cats)); API.hit(g.id); toast('Файл скачан — положи его в Steam\\userdata\\<ID>\\570\\remote\\cfg', 'ok'); };
   const like = $('#gLike');
   like.onclick = async () => {
     like.disabled = true;
@@ -393,26 +498,67 @@ async function openGrid(id, { onChange } = {}) {
       const r = await API.like(g.id);
       g.likes = r.likes;
       like.classList.toggle('on', r.liked);
-      like.lastChild.textContent = r.liked ? 'Нравится' : 'Лайк';
-      $('[data-likes]', root).textContent = num(r.likes);
-      $('[data-likes]', root).nextElementSibling.textContent = plural(r.likes, 'лайк', 'лайка', 'лайков');
-      onChange && onChange(g);
+      $$('[data-likes]', box).forEach(el => { el.textContent = num(r.likes); });
+      const s = $('[data-likes-label]', box); if (s) s.textContent = plural(r.likes, 'лайк', 'лайка', 'лайков');
     } catch (e) { toast(e.message, 'err'); }
     like.disabled = false;
   };
-  const rep = $('#gReport');
-  if (rep) rep.onclick = async () => {
-    if (API.isReported(g.id)) return;
-    if (!confirm('Пожаловаться на эту сетку? После нескольких жалоб она пропадёт из Мастерской до проверки.')) return;
-    try { await API.report(g.id); rep.textContent = 'Жалоба отправлена'; toast('Спасибо, жалоба отправлена', 'ok'); } catch (e) { toast(e.message, 'err'); }
-  };
-  for (const del of $$('#gDel, #aDel', root)) del.onclick = async () => {
-    if (!confirm(`Удалить «${g.title}» из Мастерской? Это нельзя отменить.`)) return;
-    try { await API.remove(g.id); close(); toast('Сетка удалена', 'ok'); onChange && onChange(g, true); } catch (e) { toast(e.message, 'err'); }
-  };
-  bindAdmin(root, 'grid', g, close, onChange);
+  bindBack(/workshop\.html$/);
+  // тег — в Мастерскую с этим тегом
+  box.addEventListener('click', e => {
+    const t = e.target.closest('[data-tag]');
+    if (t) { e.preventDefault(); location.href = 'workshop.html?tag=' + encodeURIComponent(t.dataset.tag); return; }
+    const c = e.target.closest('.gcard[data-id]'); if (c) goGrid(c.dataset.id, e);
+  });
+
+  // ----- панель справа: цифры, админ, ссылка, жалоба / удаление (перерисовывается, когда меняется вход) -----
+  function renderSide() {
+    const mine = API.isMine(g.id, g.user_id), adm = isAdmin(), side = $('#gpSide');
+    side.innerHTML = `
+      ${adm ? adminBox(g, mine) : ''}
+      <div class="gp-stats">
+        <div><b data-likes>${num(g.likes)}</b><span data-likes-label>${plural(g.likes, 'лайк', 'лайка', 'лайков')}</span></div>
+        <div><b>${num(g.downloads)}</b><span>${plural(g.downloads, 'скачивание', 'скачивания', 'скачиваний')}</span></div>
+      </div>
+      <div class="gp-side-acts">
+        <button class="btn block" id="gLink">${icon('link')}Скопировать ссылку</button>
+        <button class="btn block" id="gCopy">${icon('copy')}Копировать JSON</button>
+        ${mine ? `<button class="btn block ghost danger" id="gDel">${icon('trash')}Удалить мою сетку</button>`
+          : adm ? '' : `<button class="btn block ghost" id="gReport"${API.isReported(g.id) ? ' disabled' : ''}>${icon('alert')}${API.isReported(g.id) ? 'Жалоба отправлена' : 'Пожаловаться'}</button>`}
+      </div>
+      <p class="hint">Опубликовано ${new Date(g.created_at).toLocaleDateString('ru', { day: 'numeric', month: 'long', year: 'numeric' })}.</p>`;
+    $('#gLink').onclick = () => copyText(new URL(gridUrl(g.id), location.href).href, 'Ссылка скопирована');
+    $('#gCopy').onclick = () => { copyText(gridJSON(g, cats), 'JSON скопирован'); API.hit(g.id); };
+    const rep = $('#gReport');
+    if (rep) rep.onclick = async () => {
+      if (API.isReported(g.id)) return;
+      if (!confirm('Пожаловаться на эту сетку? После нескольких жалоб она пропадёт из Мастерской до проверки.')) return;
+      try { await API.report(g.id); renderSide(); toast('Спасибо, жалоба отправлена', 'ok'); } catch (e) { toast(e.message, 'err'); }
+    };
+    for (const del of $$('#gDel, #aDel', side)) del.onclick = async () => {
+      if (!confirm(`Удалить «${g.title}» из Мастерской? Это нельзя отменить.`)) return;
+      try { await API.remove(g.id); toast('Сетка удалена', 'ok'); setTimeout(() => { location.href = 'workshop.html'; }, 700); } catch (e) { toast(e.message, 'err'); }
+    };
+    bindAdmin(side, 'grid', g, renderSide);
+  }
+  renderSide();
+  ACC?.onChange(renderSide);
+
+  // ----- ещё от автора и похожие (по первому тегу, а без тегов — популярные) -----
+  const fill = (sec, items) => { if (!items.length) return; $('.cards', sec).innerHTML = items.map(cardHTML).join(''); sec.hidden = false; };
+  const sameAuthor = x => g.user_id ? x.user_id === g.user_id : x.author === g.author;
+  if (g.user_id && ACC?.enabled) ACC.userGrids(g.user_id).then(list => fill($('#gpAuthor'), list.filter(x => x.id !== g.id).slice(0, 3))).catch(() => {});
+  (async () => {
+    let items = [];
+    for (const tag of [g.tags?.[0] || '', '']) {
+      const r = await API.list({ tag, sort: 'popular', limit: 12 }).catch(() => ({ items: [] }));
+      items = r.items.filter(x => x.id !== g.id && !sameAuthor(x));
+      if (items.length >= 3 || !tag) break;
+    }
+    fill($('#gpSimilar'), items.slice(0, 6));
+  })();
 }
-// админу в окне сетки или фона: сколько жалоб, скрыто ли, и кнопки «Скрыть / Вернуть», «Удалить»
+// админу на странице сетки или фона: сколько жалоб, скрыто ли, и кнопки «Скрыть / Вернуть», «Удалить»
 // у фонов ещё «На главную»: отмеченный фон идёт фоном первого экрана сайта (без 18+ и скрытых)
 const admState = x => `${x.hidden ? 'Скрыто из Мастерской' : 'Видно всем'}${x.featured ? ' · на главной' : ''}${+x.reports ? ` · ${x.reports} ${plural(+x.reports, 'жалоба', 'жалобы', 'жалоб')}` : ''}`;
 function adminBox(x, mine, kind = 'grid') {
@@ -425,7 +571,7 @@ function adminBox(x, mine, kind = 'grid') {
       ${mine ? '' : `<button class="btn sm ghost danger" id="aDel">${icon('trash')}Удалить</button>`}</span>
   </div>`;
 }
-function bindAdmin(root, kind, x, close, onChange) {
+function bindAdmin(root, kind, x, onChange) {
   const f = $('#aFeat', root);
   if (f) f.onclick = async () => {
     f.disabled = true;
@@ -444,16 +590,10 @@ function bindAdmin(root, kind, x, close, onChange) {
     try {
       await API.admin.moderate(kind, x.id, !x.hidden);
       x.hidden = !x.hidden; if (!x.hidden) x.reports = 0;
-      close(); toast(x.hidden ? 'Скрыто из Мастерской' : 'Снова видно всем', 'ok');
+      toast(x.hidden ? 'Скрыто из Мастерской' : 'Снова видно всем', 'ok');
       onChange && onChange(x, x.hidden);
     } catch (e) { toast(e.message, 'err'); b.disabled = false; }
   };
-}
-function setUrlId(id) {
-  if (PAGE !== 'workshop') return;
-  const u = new URL(location.href);
-  id ? u.searchParams.set('id', id) : u.searchParams.delete('id');
-  history.replaceState(null, '', u);
 }
 
 // ---------- герои ----------
@@ -660,15 +800,14 @@ function initHome() {
     if (pool.length) {
       const list = big.length ? big : pool, g = list[Math.floor(Math.random() * list.length)], rg = $('#randomGrid');
       laptopGrid(g);
-      rg.href = 'workshop.html?id=' + encodeURIComponent(g.id);
+      rg.href = gridUrl(g.id);
       rg.innerHTML = `<span class="rg-likes">${icon('heart')}${num(g.likes)}</span><b>«${esc(g.title)}» — ${esc(g.author)}</b><span class="rg-note">случайная сетка из Мастерской</span>`;
       rg.hidden = false;
     }
   }).catch(() => { box.closest('.section').hidden = true; $('#catNum').textContent = '∞'; setCatCount(0); });
 
-  // сетка открывается окном прямо здесь — как в Мастерской, без перехода на другую страницу
-  box.onclick = e => { const c = e.target.closest('.gcard[data-id]'); if (c) openGrid(c.dataset.id); };
-  $('#randomGrid').onclick = e => { const id = new URL(e.currentTarget.href).searchParams.get('id'); if (id) { e.preventDefault(); openGrid(id); } };
+  // сетка открывается своей страницей
+  box.onclick = e => { const c = e.target.closest('.gcard[data-id]'); if (c) goGrid(c.dataset.id, e); };
   heroBackdrop();
 }
 
@@ -709,7 +848,7 @@ function heroBackdrop() {
     el.src = video || b.kind !== 'video' ? b.file : b.poster;
     box.append(el);
     const credit = $('#heroCredit');
-    credit.href = 'workshop.html?bg=' + encodeURIComponent(b.id);
+    credit.href = bgPageUrl(b.id);
     credit.innerHTML = `${icon('image')}<span>Фон: «${esc(b.title)}» — ${esc(b.author || 'Игрок')}</span>`;
     credit.hidden = false;
   });
@@ -818,7 +957,10 @@ function initWorkshop() {
   }
   const qs = new URLSearchParams(location.search);
   const PAGE_SIZE = 24;
-  const f = { tab: qs.has('backgrounds') || qs.has('bg') ? 'bg' : 'grids', q: '', tag: '', sort: 'popular', aspect: '' };
+  // старые ссылки на сетку и фон (workshop.html?id=… / ?bg=…, в том числе из «Каталога») ведут на их страницы
+  if (qs.get('id')) { location.replace(gridUrl(qs.get('id'))); return; }
+  if (qs.get('bg')) { location.replace(bgPageUrl(qs.get('bg'))); return; }
+  const f = { tab: qs.has('backgrounds') || qs.has('bg') ? 'bg' : 'grids', q: '', tag: qs.get('tag') || '', sort: 'popular', aspect: '' };
   let offset = 0, total = 0, seq = 0;
   const cards = $('#cards'), more = $('#more');
   $('#demoNote').hidden = API.remote;
@@ -910,50 +1052,21 @@ function initWorkshop() {
   $('#wsCreate').onclick = e => { if (f.tab === 'bg') { e.preventDefault(); openBgUpload(() => { f.sort = 'new'; renderControls(); load(); }); } };
 
   // ----- карточки -----
-  const setCount = () => { $('#count').textContent = `${f.tab === 'bg' ? 'Фонов' : 'Сеток'}: ${num(total)} · ${SORT_NOTE[f.sort]}`; };
-  const onChange = (g, removed) => {
-    const c = $(`[data-id="${CSS.escape(g.id)}"], [data-bg="${CSS.escape(g.id)}"]`, cards); if (!c) return;
-    if (removed) { c.remove(); total--; setCount(); if (!$('.gcard, .bcard', cards)) cards.innerHTML = emptyHTML(); return; }
-    const l = $('[data-likes]', c); if (!l) return;
-    l.classList.toggle('liked', f.tab === 'bg' ? API.bg.isLiked(g.id) : API.isLiked(g.id)); l.lastChild.textContent = num(g.likes);
-  };
   cards.onclick = e => {
     if (e.target.closest('[data-act="upload"]')) { openBgUpload(() => load()); return; }
-    const like = e.target.closest('[data-bg-like]');
-    if (like) {
-      e.stopPropagation();
-      const id = like.dataset.bgLike;
-      like.disabled = true;
-      API.bg.like(id).then(r => { like.classList.toggle('liked', r.liked); like.lastChild.textContent = num(r.likes); }).catch(er => toast(er.message, 'err')).finally(() => { like.disabled = false; });
-      return;
-    }
+    if (bgLikeClick(e)) return;
     const b = e.target.closest('.bcard[data-bg]');
-    if (b) { openBg(b.dataset.bg, { onChange }); return; }
+    if (b) { goBg(b.dataset.bg, e); return; }
     const c = e.target.closest('.gcard[data-id]');
-    if (c) openGrid(c.dataset.id, { onChange });
+    if (c) goGrid(c.dataset.id, e);
   };
-  // фоны: видео играет, пока курсор над карточкой; GIF — тоже оживает только при наведении
-  cards.addEventListener('pointerover', e => {
-    const pic = e.target.closest('.bpic'); if (!pic || pic.dataset.on) return;
-    pic.dataset.on = '1';
-    const v = $('video', pic);
-    if (v) { if (!v.src) v.src = v.dataset.src; v.play().then(() => pic.classList.add('playing')).catch(() => {}); }
-    const gif = $('img[data-gif]', pic); if (gif) { gif.src = gif.dataset.gif; }
-    pic.addEventListener('pointerleave', () => {
-      delete pic.dataset.on; pic.classList.remove('playing');
-      if (v) v.pause();
-      if (gif) gif.src = gif.dataset.poster;
-    }, { once: true });
-  });
+  bgHover(cards);
 
   renderControls();
   load();
-  const id = qs.get('id'), bgId = qs.get('bg');
-  if (id) openGrid(id, { onChange });
-  if (bgId) openBg(bgId, { onChange });
 }
 
-// ---------- фоны: карточка, окно, загрузка ----------
+// ---------- фоны: карточка, страница, загрузка ----------
 const secs = s => s ? `${(Math.round(s * 10) / 10).toLocaleString('ru')} с` : '';
 const mb = n => `${(n / 1048576).toLocaleString('ru', { maximumFractionDigits: 1 })} МБ`;
 const bgName = b => `${String(b.title || 'background').replace(/[\\/:*?"<>|]+/g, ' ').trim().slice(0, 50) || 'background'}.${String(b.file).split('.').pop()}`;
@@ -969,7 +1082,7 @@ function bgCardHTML(b, k = 0) {
       ${hide ? nsfwCover() : ''}
     </div>
     <div class="bbody">
-      <b class="btitle" title="${esc(b.title)}">${esc(b.title)}</b>
+      <a class="btitle" href="${bgPageUrl(b.id)}" title="${esc(b.title)}">${esc(b.title)}</a>
       <span class="bby">${authorAva(b.user_id, b.author || 'Игрок')}<span>${esc(b.author || 'Игрок')} · ${ago(b.created_at)}</span></span>
       <div class="bacts">
         <button class="blike${API.bg.isLiked(b.id) ? ' liked' : ''}" data-bg-like="${esc(b.id)}" data-likes aria-label="Лайк">${icon('heart')}${num(b.likes)}</button>
@@ -978,7 +1091,7 @@ function bgCardHTML(b, k = 0) {
     </div>
   </article>`;
 }
-// лайк на карточке фона вне Мастерской (профиль): true — клик обработан
+// лайк на карточке фона: true — клик обработан
 function bgLikeClick(e) {
   const like = e.target.closest('[data-bg-like]'); if (!like) return false;
   e.preventDefault(); e.stopPropagation();
@@ -986,85 +1099,203 @@ function bgLikeClick(e) {
   API.bg.like(like.dataset.bgLike).then(r => { like.classList.toggle('liked', r.liked); like.lastChild.textContent = num(r.likes); }).catch(er => toast(er.message, 'err')).finally(() => { like.disabled = false; });
   return true;
 }
-function setUrlBg(id) {
-  if (PAGE !== 'workshop') return;
-  const u = new URL(location.href);
-  id ? u.searchParams.set('bg', id) : u.searchParams.delete('bg');
-  history.replaceState(null, '', u);
+// ---------- страница фона (bg.html?id=…) ----------
+// Как у сеток: фон открывается своей страницей. Превью — сам файл целиком или 16:9 со схемой главного меню Доты поверх.
+const DOTA_MENU = `<div class="dm" aria-hidden="true">
+  <div class="dm-top"><i class="dm-logo"></i><span class="on">ГЕРОИ</span><span>АРСЕНАЛ</span><span>ПРОСМОТР</span><span>ИГРОТЕКА</span><b></b><i class="dm-ico"></i><i class="dm-ico"></i><i class="dm-ava"></i></div>
+  <div class="dm-friends"><div class="dm-me"><i></i><span><b></b><s></s></span></div><p></p><div class="dm-f"><i></i><s></s></div><div class="dm-f"><i></i><s></s></div><div class="dm-f"><i></i><s></s></div><div class="dm-f off"><i></i><s></s></div><div class="dm-f off"><i></i><s></s></div></div>
+  <div class="dm-news"><div class="dm-card big"><span>СОБЫТИЕ</span></div><div class="dm-card"><span>НОВОСТИ</span></div></div>
+  <div class="dm-chat"></div>
+  <div class="dm-play">ИГРАТЬ</div>
+</div>`;
+// фоны в карточках: видео играет, пока курсор над карточкой; GIF — тоже оживает только при наведении
+function bgHover(box) {
+  box.addEventListener('pointerover', e => {
+    const pic = e.target.closest('.bpic'); if (!pic || pic.dataset.on) return;
+    pic.dataset.on = '1';
+    const v = $('video', pic);
+    if (v) { if (!v.src) v.src = v.dataset.src; v.play().then(() => pic.classList.add('playing')).catch(() => {}); }
+    const gif = $('img[data-gif]', pic); if (gif) { gif.src = gif.dataset.gif; }
+    pic.addEventListener('pointerleave', () => {
+      delete pic.dataset.on; pic.classList.remove('playing');
+      if (v) v.pause();
+      if (gif) gif.src = gif.dataset.poster;
+    }, { once: true });
+  });
 }
-async function openBg(id, { onChange } = {}) {
-  const root = $('#modalRoot');
-  root.innerHTML = `<div class="modal"><div class="modal-view"><span class="loading">Загружаю фон…</span></div><div class="modal-side"><span class="loading"> </span></div></div>`;
-  setUrlBg(id);
-  let alive = true;
-  const close = () => { alive = false; root.innerHTML = ''; setUrlBg(null); document.removeEventListener('keydown', onKey); };
-  const onKey = e => { if (e.key === 'Escape') close(); };
-  document.addEventListener('keydown', onKey);
-  root.onclick = e => { if (e.target === root) close(); };
+
+async function initBgPage() {
+  const box = $('#gp'), id = new URLSearchParams(location.search).get('id');
+  const back = 'workshop.html?backgrounds';
+  if (!id) return pageFail(box, 'Фон не выбран', 'В ссылке нет номера фона — найди нужный в Мастерской.', back);
   let b;
-  try { b = await API.bg.get(id); } catch (e) { if (alive) { close(); toast(e.message, 'err'); } return; }
-  if (!alive) return;
-  const mine = API.bg.isMine(b), hide = b.nsfw && !API.adult(), adm = isAdmin();
-  const author = b.user_id && ACC?.enabled ? `<a href="profile.html?u=${encodeURIComponent(b.user_id)}">${esc(b.author)}</a>` : `<b>${esc(b.author)}</b>`;
-  const media = b.kind === 'video'
-    ? `<video src="${esc(b.file)}" poster="${esc(b.poster)}" muted loop playsinline autoplay disablepictureinpicture controlslist="nodownload nofullscreen noplaybackrate"></video>`
+  try { [b] = await Promise.all([API.bg.get(id), ACC?.enabled ? ACC.ready().catch(() => {}) : null]); }
+  catch (e) { document.title = 'Фон не найден · Grid Studio'; return pageFail(box, 'Фон не найден', e.message, back); }
+
+  const video = b.kind === 'video', type = video ? 'Видео' : /\.gif$/i.test(b.file) ? 'GIF' : 'Картинка';
+  const hide = b.nsfw && !API.adult(), aspect = b.aspect === 'other' ? `${b.width}×${b.height}` : b.aspect;
+  const author = b.user_id && ACC?.enabled ? `<a href="profile.html?u=${encodeURIComponent(b.user_id)}">${esc(b.author || 'Игрок')}</a>` : `<b>${esc(b.author || 'Игрок')}</b>`;
+  document.title = `${b.title} — фон главного меню Dota 2 · Grid Studio`;
+  $('meta[name="description"]').content = `«${b.title}» — ${type.toLowerCase()} для главного меню Dota 2, ${aspect}. Посмотри в схеме меню, скачай файл или собери фон для игры в Grid Studio.`;
+  const media = video
+    ? `<video src="${esc(b.file)}" poster="${esc(b.poster)}" muted loop playsinline autoplay disablepictureinpicture></video>`
     : `<img src="${esc(b.file)}" alt="${esc(b.title)}">`;
-  root.innerHTML = `<div class="modal bg-modal" role="dialog" aria-label="${esc(b.title)}">
-    <button class="modal-x" data-icon="x" aria-label="Закрыть"></button>
-    <div class="modal-view bg-view${hide ? ' hide18' : ''}">${media}${hide ? nsfwCover() : ''}</div>
-    <div class="modal-side">
-      <div><h2>${esc(b.title)}</h2><div class="by">${authorAva(b.user_id, b.author)}от ${author} · ${ago(b.created_at)}</div></div>
-      ${adm ? adminBox(b, mine, 'bg') : ''}
-      ${tagsHTML([...(b.nsfw ? ['18+'] : []), ...(b.tags || [])], 9)}
-      <div class="stats">
-        <div><b data-likes>${num(b.likes)}</b><span>${plural(b.likes, 'лайк', 'лайка', 'лайков')}</span></div>
-        <div><b>${num(b.downloads)}</b><span>скачиваний</span></div>
-        <div><b>${esc(b.aspect === 'other' ? '—' : b.aspect)}</b><span>экран</span></div>
+  const fact = (n, label, note = '') => `<div><b>${n}</b><span>${label}</span>${note ? `<small>${note}</small>` : ''}</div>`;
+
+  box.innerHTML = `
+    <nav class="gp-crumbs" aria-label="Где ты">
+      <a href="${back}" id="gpBack">${icon('arrow')}Мастерская</a><i>/</i><a href="${back}">Фоны</a><i>/</i><span>${esc(b.title)}</span>
+    </nav>
+    <header class="gp-head">
+      <div class="gp-title">
+        <span class="gp-kind">${icon(video ? 'play' : 'image')}${type} · ${esc(aspect)}${b.duration ? ' · ' + secs(b.duration) : ''}${b.nsfw ? '<b class="g18">18+</b>' : ''}</span>
+        <h1>${esc(b.title)}</h1>
+        <div class="gp-by">${authorAva(b.user_id, b.author || 'Игрок')}<span>от ${author}</span><i>·</i><span>${ago(b.created_at)}</span></div>
       </div>
-      <div class="hint">${b.kind === 'video' ? 'Видео' : /\.gif$/i.test(b.file) ? 'GIF' : 'Картинка'} · ${num(b.width)}×${num(b.height)}${b.duration ? ' · ' + secs(b.duration) : ''} · ${mb(b.size)}</div>
-      <div class="actions">
-        <a class="btn primary" id="bDota" href="background.html?bg=${encodeURIComponent(b.id)}"><span class="ico-box" data-icon="download"></span>Поставить в Dota</a>
-        <div class="row">
-          <a class="btn" id="bDl" href="${esc(bgDlUrl(b))}" download data-icon="file">Файл</a>
-          <button class="btn ${API.bg.isLiked(b.id) ? 'on' : ''}" id="bLike" data-icon="heart">${API.bg.isLiked(b.id) ? 'Нравится' : 'Лайк'}</button>
-        </div>
-        <button class="btn sm block" id="bHow" data-icon="book">Как установить</button>
-        <div class="hint">«Поставить в Dota» откроет сборщик: превью меню и твоей сетки поверх фона, размытие, затемнение — и файл <code>pak02_dir.vpk</code> для игры. «Файл» — исходная картинка или видео.</div>
-        <div class="side-links">
-          <button id="bLink">Скопировать ссылку</button>
-          ${mine ? '<button class="danger" id="bDel">Удалить мой фон</button>' : adm ? '' : `<button id="bReport">${API.bg.isReported(b.id) ? 'Жалоба отправлена' : 'Пожаловаться'}</button>`}
+      <div class="gp-cta">
+        <a class="btn primary lg" href="background.html?bg=${encodeURIComponent(b.id)}">${icon('download')}Поставить в Dota</a>
+        <a class="btn lg" id="bDl" href="${esc(bgDlUrl(b))}" download>${icon('file')}Файл</a>
+        <button class="btn lg gp-like${API.bg.isLiked(b.id) ? ' on' : ''}" id="bLike" aria-label="Лайк">${icon('heart')}<span data-likes>${num(b.likes)}</span></button>
+      </div>
+    </header>
+
+    <section class="gp-stage" id="gpStage">
+      <div class="gp-bar">
+        <div class="seg sm" id="bpMode" aria-label="Как показать"><i class="seg-ind"></i><button data-v="file" class="on">Файл целиком</button><button data-v="menu">В меню Доты</button></div>
+        <div class="gp-tools">
+          ${video ? `<button class="btn sm" id="bpPlay">${icon('pause')}<span>Пауза</span></button>` : ''}
+          <button class="btn sm" id="gpFull">${icon('ext')}<span>На весь экран</span></button>
         </div>
       </div>
+      <div class="gp-view bp-view${hide ? ' hide18' : ''}" id="bpView" style="--ar0: ${+b.width || 16} / ${+b.height || 9}"><div class="bp-screen">${media}${DOTA_MENU}</div>${hide ? nsfwCover() : ''}</div>
+    </section>
+    <p class="gp-cap" id="bpCap">Файл как есть — ${num(b.width)}×${num(b.height)}. «В меню Доты» покажет схему главного экрана поверх фона.</p>
+
+    <div class="gp-body">
+      <div class="gp-main">
+        <section class="gp-block">
+          <h2>О фоне</h2>
+          <div class="gp-facts">
+            ${fact(type, 'тип файла', video ? 'без звука, по кругу' : /GIF/.test(type) ? 'анимация' : 'статичный')}
+            ${fact(`${num(b.width)}×${num(b.height)}`, 'разрешение', b.height >= 2160 ? '4K' : b.height >= 1440 ? '2K' : b.height >= 1080 ? 'Full HD' : '')}
+            ${fact(esc(b.aspect === 'other' ? '—' : b.aspect), 'экран', b.aspect === 'other' ? 'нестандартные пропорции' : 'пропорции')}
+            ${video ? fact(secs(b.duration) || '—', 'длительность') : ''}
+            ${fact(mb(b.size), 'размер файла')}
+          </div>
+          ${b.tags?.length ? `<div class="gp-tags">${b.tags.map(t => `<a href="${back}" data-tag="${esc(t)}">${esc(t)}</a>`).join('')}</div>` : ''}
+        </section>
+        <section class="gp-block">
+          <h2>Как поставить в Dota</h2>
+          <ol class="gp-steps">
+            <li><b>Открой сборщик</b><span>Кнопка «Поставить в Dota»: превью меню и твоей сетки поверх фона, размытие и затемнение.</span></li>
+            <li><b>Собери файл</b><span>Нажми «Собрать фон» — придёт <code>pak02_dir.vpk</code>.</span></li>
+            <li><b>Положи в игру</b><span>В папку <code>dota 2 beta\\game\\dota_russian</code> и перезапусти Доту.</span></li>
+          </ol>
+          <details class="gp-details"><summary>Подробно, по шагам</summary><div class="db-body">${bgSteps()}</div></details>
+        </section>
+      </div>
+      <aside class="gp-side" id="gpSide"></aside>
     </div>
-  </div>`;
-  applyIcons(root);
-  $('.modal-x', root).onclick = close;
+
+    <section class="gp-more" id="gpAuthor" hidden>
+      <div class="gp-more-head"><h2>Ещё от ${esc(b.author || 'автора')}</h2>${b.user_id && ACC?.enabled ? `<a class="btn sm" href="profile.html?u=${encodeURIComponent(b.user_id)}">${icon('user')}Профиль автора</a>` : ''}</div>
+      <div class="cards bcards"></div>
+    </section>
+    <section class="gp-more" id="gpSimilar" hidden>
+      <div class="gp-more-head"><h2>Похожие фоны</h2><a class="btn sm" href="${back}">${icon('compass')}Все фоны</a></div>
+      <div class="cards bcards"></div>
+    </section>`;
+  fillMenuDate(box);
+
+  // ----- превью: файл целиком или в меню Доты, пауза, весь экран -----
+  const view = $('#bpView'), stage = $('#gpStage'), v = $('video', view);
+  const segs = () => segInd($('#bpMode'));
+  requestAnimationFrame(segs); document.fonts?.ready.then(segs); addEventListener('resize', segs);
+  $('#bpMode').onclick = e => {
+    const btn = e.target.closest('button'); if (!btn) return;
+    $$('#bpMode button').forEach(x => x.classList.toggle('on', x === btn)); segs();
+    const menu = btn.dataset.v === 'menu';
+    view.classList.toggle('menu', menu);
+    $('#bpCap').textContent = menu ? 'Экран 16:9 со схемой главного меню Доты: так фон ляжет в игре. С твоей сеткой героев и настройками — в сборщике «Поставить в Dota».'
+      : `Файл как есть — ${num(b.width)}×${num(b.height)}. «В меню Доты» покажет схему главного экрана поверх фона.`;
+  };
+  const play = $('#bpPlay');
+  if (play && v) {
+    const sync = () => { play.innerHTML = `${icon(v.paused ? 'play' : 'pause')}<span>${v.paused ? 'Играть' : 'Пауза'}</span>`; };
+    play.onclick = () => { v.paused ? v.play().catch(() => {}) : v.pause(); };
+    v.addEventListener('play', sync); v.addEventListener('pause', sync);
+    // при «уменьшении движения» видео стоит, пока не нажмут «Играть»
+    if (matchMedia('(prefers-reduced-motion: reduce)').matches) { v.removeAttribute('autoplay'); v.pause(); }
+    sync();
+  }
+  bindFullscreen(stage, segs);
+
+  // ----- действия -----
   $('#bDl').onclick = () => API.bg.hit(b.id);
-  $('#bHow').onclick = () => openHowTo('bg');
-  $('#bLink').onclick = () => copyText(new URL('workshop.html?bg=' + b.id, location.href).href, 'Ссылка скопирована');
   const like = $('#bLike');
   like.onclick = async () => {
     like.disabled = true;
     try {
       const r = await API.bg.like(b.id);
       b.likes = r.likes;
-      like.classList.toggle('on', r.liked); like.lastChild.textContent = r.liked ? 'Нравится' : 'Лайк';
-      $('[data-likes]', root).textContent = num(r.likes);
-      onChange && onChange(b);
+      like.classList.toggle('on', r.liked);
+      $$('[data-likes]', box).forEach(el => { el.textContent = num(r.likes); });
+      const s = $('[data-likes-label]', box); if (s) s.textContent = plural(r.likes, 'лайк', 'лайка', 'лайков');
     } catch (e) { toast(e.message, 'err'); }
     like.disabled = false;
   };
-  const rep = $('#bReport');
-  if (rep) rep.onclick = async () => {
-    if (API.bg.isReported(b.id)) return;
-    if (!confirm('Пожаловаться на этот фон? После нескольких жалоб он пропадёт из Мастерской до проверки.')) return;
-    try { await API.bg.report(b.id); rep.textContent = 'Жалоба отправлена'; toast('Спасибо, жалоба отправлена', 'ok'); } catch (e) { toast(e.message, 'err'); }
-  };
-  for (const del of $$('#bDel, #aDel', root)) del.onclick = async () => {
-    if (!confirm(`Удалить «${b.title}» из Мастерской? Файл сотрётся, это нельзя отменить.`)) return;
-    try { await API.bg.remove(b.id); close(); toast('Фон удалён', 'ok'); onChange && onChange(b, true); } catch (e) { toast(e.message, 'err'); }
-  };
-  bindAdmin(root, 'bg', b, close, onChange);
+  bindBack(/workshop\.html$/);
+  box.addEventListener('click', e => {
+    const t = e.target.closest('[data-tag]');
+    if (t) { e.preventDefault(); location.href = back + '&tag=' + encodeURIComponent(t.dataset.tag); return; }
+    if (bgLikeClick(e)) return;
+    const c = e.target.closest('.bcard[data-bg]'); if (c) goBg(c.dataset.bg, e);
+  });
+
+  // ----- панель справа -----
+  function renderSide() {
+    const mine = API.bg.isMine(b), adm = isAdmin(), side = $('#gpSide'), rep = API.bg.isReported(b.id);
+    side.innerHTML = `
+      ${adm ? adminBox(b, mine, 'bg') : ''}
+      <div class="gp-stats">
+        <div><b data-likes>${num(b.likes)}</b><span data-likes-label>${plural(b.likes, 'лайк', 'лайка', 'лайков')}</span></div>
+        <div><b>${num(b.downloads)}</b><span>${plural(b.downloads, 'скачивание', 'скачивания', 'скачиваний')}</span></div>
+      </div>
+      <div class="gp-side-acts">
+        <button class="btn block" id="bLink">${icon('link')}Скопировать ссылку</button>
+        <a class="btn block" href="background.html?bg=${encodeURIComponent(b.id)}">${icon('grid')}Примерить со своей сеткой</a>
+        ${mine ? `<button class="btn block ghost danger" id="bDel">${icon('trash')}Удалить мой фон</button>`
+          : adm ? '' : `<button class="btn block ghost" id="bReport"${rep ? ' disabled' : ''}>${icon('alert')}${rep ? 'Жалоба отправлена' : 'Пожаловаться'}</button>`}
+      </div>
+      <p class="hint">Опубликован ${new Date(b.created_at).toLocaleDateString('ru', { day: 'numeric', month: 'long', year: 'numeric' })}<br>«Файл» — исходная картинка или видео, для игры его собирает сборщик.</p>`;
+    $('#bLink').onclick = () => copyText(new URL(bgPageUrl(b.id), location.href).href, 'Ссылка скопирована');
+    const r = $('#bReport');
+    if (r) r.onclick = async () => {
+      if (API.bg.isReported(b.id)) return;
+      if (!confirm('Пожаловаться на этот фон? После нескольких жалоб он пропадёт из Мастерской до проверки.')) return;
+      try { await API.bg.report(b.id); renderSide(); toast('Спасибо, жалоба отправлена', 'ok'); } catch (e) { toast(e.message, 'err'); }
+    };
+    for (const del of $$('#bDel, #aDel', side)) del.onclick = async () => {
+      if (!confirm(`Удалить «${b.title}» из Мастерской? Файл сотрётся, это нельзя отменить.`)) return;
+      try { await API.bg.remove(b.id); toast('Фон удалён', 'ok'); setTimeout(() => { location.href = back; }, 700); } catch (e) { toast(e.message, 'err'); }
+    };
+    bindAdmin(side, 'bg', b, renderSide);
+  }
+  renderSide();
+  ACC?.onChange(renderSide);
+
+  // ----- ещё от автора и похожие (по первому тегу, а без тегов — популярные) -----
+  const fill = (sec, items) => { if (!items.length) return; const c = $('.cards', sec); c.innerHTML = items.map((x, i) => bgCardHTML(x, i)).join(''); bgHover(c); sec.hidden = false; };
+  if (b.user_id) API.bg.list({ userId: b.user_id, sort: 'new', limit: 5 }).then(r => fill($('#gpAuthor'), r.items.filter(x => x.id !== b.id).slice(0, 4))).catch(() => {});
+  (async () => {
+    let items = [];
+    for (const tag of [b.tags?.[0] || '', '']) {
+      const r = await API.bg.list({ tag, sort: 'popular', limit: 12 }).catch(() => ({ items: [] }));
+      items = r.items.filter(x => x.id !== b.id && (!b.user_id || x.user_id !== b.user_id));
+      if (items.length >= 4 || !tag) break;
+    }
+    fill($('#gpSimilar'), items.slice(0, 8));
+  })();
 }
 
 // постер и описание файла фона: размеры, длительность, пропорции — считаем в браузере
@@ -1635,16 +1866,15 @@ async function renderMyProfile(box) {
     if (tab === 'mod') {
       // в модерации после любого действия просто перечитываем список
       const g = e.target.closest('.gcard[data-id]'), b = e.target.closest('.bcard[data-bg]');
-      const onChange = () => loadQueue();
-      if (b) { e.preventDefault(); openBg(b.dataset.bg, { onChange }); }
-      else if (g) openGrid(g.dataset.id, { onChange });
+      if (b) goBg(b.dataset.bg, e);
+      else if (g) goGrid(g.dataset.id, e);
       return;
     }
     if (tab === 'pub' && bgLikeClick(e)) return;
     const bgc = e.target.closest('.bcard[data-bg]');
-    if (bgc && tab === 'pub') { e.preventDefault(); openBg(bgc.dataset.bg, { onChange: (b, removed) => { if (removed) { pubBg = pubBg.filter(x => x.id !== b.id); draw(); } } }); return; }
+    if (bgc && tab === 'pub') { goBg(bgc.dataset.bg, e); return; }
     const c = e.target.closest('.gcard[data-id]');
-    if (c && tab !== 'works') openGrid(c.dataset.id, { onChange: (g, removed) => { if (removed) { pub = pub.filter(x => x.id !== g.id); draw(); head(); } } });
+    if (c && tab !== 'works') goGrid(c.dataset.id, e);
   };
   try {
     [works, pub] = await Promise.all([ACC.projects.list(), ACC.userGrids(ACC.user().id)]);
@@ -1677,8 +1907,8 @@ async function renderPublicProfile(box, id) {
     $('#pfShare').onclick = e => copyText(e.currentTarget.dataset.copy, 'Ссылка на профиль скопирована');
     $('#pfList').onclick = e => {
       if (bgLikeClick(e)) return;
-      const b = e.target.closest('.bcard[data-bg]'); if (b) { e.preventDefault(); openBg(b.dataset.bg); return; }
-      const c = e.target.closest('.gcard[data-id]'); if (c) openGrid(c.dataset.id);
+      const b = e.target.closest('.bcard[data-bg]'); if (b) { goBg(b.dataset.bg, e); return; }
+      const c = e.target.closest('.gcard[data-id]'); if (c) goGrid(c.dataset.id, e);
     };
     for (const b of $$('[data-clear]', box)) b.onclick = async () => {
       const what = b.dataset.clear === 'banner' ? 'баннер' : 'аватар';
@@ -1702,10 +1932,12 @@ function reveal(root = document) {
 }
 if (PAGE === 'home') initHome();
 if (PAGE === 'workshop') initWorkshop();
+if (PAGE === 'grid') initGridPage();
+if (PAGE === 'bg') initBgPage();
 if (PAGE === 'guides') initGuides();
 if (PAGE === 'profile') initProfile();
 reveal();
 // профиль подтягивается в фоне — меню обновится само
 if (ACC?.enabled && PAGE !== 'profile') ACC.ready();
 // число сеток в меню на страницах, где Мастерская сама его не грузит
-if (PAGE === 'guides' || PAGE === 'game' || PAGE === 'profile') API.list({ limit: 1 }).then(r => setCatCount(r.total)).catch(() => {});
+if (PAGE === 'guides' || PAGE === 'game' || PAGE === 'profile' || PAGE === 'grid' || PAGE === 'bg') API.list({ limit: 1 }).then(r => setCatCount(r.total)).catch(() => {});
