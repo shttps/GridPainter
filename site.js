@@ -597,13 +597,13 @@ async function initGridPage() {
     </nav>
     <header class="gp-head">
       <div class="gp-title">
-        <span class="gp-kind">${icon('grid')}Сетка героев <i> / </i>${esc(kind)}${g.nsfw ? '<b class="g18">18+</b>' : ''}</span>
+        <span class="gp-kind">${icon('grid')}${esc(kind)} · ${num(g.cats)} ${plural(g.cats, 'категория', 'категории', 'категорий')}${g.nsfw ? '<b class="g18">18+</b>' : ''}</span>
         <h1>${esc(g.title)}</h1>
         <div class="gp-by">${authorAva(g.user_id, g.author)}<span>от ${author}</span><i>·</i><span>${ago(g.created_at)}</span></div>
       </div>
       <div class="gp-cta">
-        <a class="btn lg" id="gEdit" href="editor.html?grid=${encodeURIComponent(g.id)}">${icon('edit')}В редактор</a>
-        <button class="btn primary lg" id="gDl">${icon('download')}Скачать сетку</button>
+        <a class="btn primary lg" id="gEdit" href="editor.html?grid=${encodeURIComponent(g.id)}">${icon('edit')}Открыть в редакторе</a>
+        <button class="btn lg" id="gDl">${icon('download')}Скачать</button>
         <button class="btn lg gp-like${liked() ? ' on' : ''}" id="gLike" aria-label="Лайк">${icon('heart')}<span data-likes>${num(g.likes)}</span></button>
       </div>
     </header>
@@ -618,7 +618,7 @@ async function initGridPage() {
       </div>
       <div class="gp-view${hide ? ' hide18' : ''}" id="gpView" data-preview-bg><div class="gp-canvas"><canvas id="gv" aria-label="Превью сетки"></canvas></div>${hide ? nsfwCover() : ''}</div>
     </section>
-    <p class="gp-cap"><span class="gp-live-dot" aria-hidden="true"></span>Превью в игре<span id="gpPan" hidden> · Перетаскивай сетку мышью</span><span class="gp-cap-size">1204 × 612</span></p>
+    <p class="gp-cap">Превью — как экран «Герои» в игре: поле 1204 × 612, настоящие портреты, без интерфейса Доты.<span id="gpPan" hidden> В 2× сетку можно таскать мышью.</span></p>
 
     <div class="gp-body">
       <div class="gp-main">
@@ -627,8 +627,8 @@ async function initGridPage() {
           ${g.description ? `<div class="gp-desc">${esc(g.description)}</div>` : '<p class="gp-none">Автор не добавил описание.</p>'}
           ${g.tags?.length ? `<div class="gp-tags">${g.tags.map(t => `<a href="workshop.html" data-tag="${esc(t)}">${esc(t)}</a>`).join('')}</div>` : ''}
         </section>
-        <details class="gp-block gp-fold">
-          <summary>Что внутри <span>Состав и размер файла</span></summary>
+        <section class="gp-block">
+          <h2>Что внутри</h2>
           <div class="gp-facts">
             ${fact(num(st.cats), plural(st.cats, 'категория', 'категории', 'категорий'), 'всего в файле')}
             ${fact(num(st.hero), plural(st.hero, 'блок', 'блока', 'блоков'), 'с героями')}
@@ -636,16 +636,16 @@ async function initGridPage() {
             ${fact(num(st.ids), plural(st.ids, 'портрет', 'портрета', 'портретов'), uniq ? `${num(uniq)} ${plural(uniq, 'разный герой', 'разных героя', 'разных героев')}` : 'героев нет')}
             ${fact(size < 1048576 ? `${Math.max(1, Math.round(size / 1024))} КБ` : mb(size), 'размер файла', 'hero_grid_config.json')}
           </div>
-        </details>
-        <details class="gp-block gp-fold">
-          <summary>Как установить <span>Три простых шага</span></summary>
+        </section>
+        <section class="gp-block">
+          <h2>Как установить</h2>
           <ol class="gp-steps">
             <li><b>Скачай файл</b><span>Кнопка «Скачать» наверху — придёт <code>hero_grid_config.json</code>.</span></li>
             <li><b>Положи в папку игры</b><span>Закрой Доту и скопируй файл с заменой в <code>${esc(STEAM_CFG)}</code>.</span></li>
             <li><b>Выбери в игре</b><span>«Герои» → сортировка → сетка с названием «${esc(g.title)}».</span></li>
           </ol>
           <p class="hint">Файл заменит все твои сетки. Чтобы добавить эту к своим — открой её в редакторе, нажми «Открыть JSON» со своим файлом и сделай экспорт. <a href="guides.html#start">Подробный гайд с картинками</a></p>
-        </details>
+        </section>
       </div>
       <aside class="gp-side" id="gpSide"></aside>
     </div>
@@ -661,37 +661,12 @@ async function initGridPage() {
 
   // ----- превью: подложка, масштаб, весь экран -----
   const view = $('#gpView'), wrap = $('.gp-canvas', view), stage = $('#gpStage');
-  const gridMotion = matchMedia('(prefers-reduced-motion: reduce)');
-  const gridAnimations = new Set();
-  const animateGrid = (el, frames, duration = 450) => {
-    if (gridMotion.matches || !el.animate) return;
-    const animation = el.animate(frames, { duration, easing: 'cubic-bezier(.2,.8,.2,1)' });
-    gridAnimations.add(animation);
-    animation.onfinish = animation.oncancel = () => gridAnimations.delete(animation);
-    return animation;
-  };
-  gridMotion.addEventListener('change', () => { if (gridMotion.matches) for (const animation of gridAnimations) animation.cancel(); });
-  if ('IntersectionObserver' in window) {
-    const reveal = new IntersectionObserver(entries => {
-      for (const entry of entries) if (entry.isIntersecting) {
-        reveal.unobserve(entry.target);
-        animateGrid(entry.target, [{ opacity: .25, transform: 'translateY(20px)' }, { opacity: 1, transform: 'translateY(0)' }], 650);
-      }
-    }, { threshold: .08 });
-    $$('.gp-block, .gp-side, .gp-more', box).forEach(el => reveal.observe(el));
-  }
-  let previewAnimation;
-  const animatePreview = () => {
-    previewAnimation?.cancel();
-    previewAnimation = animateGrid(view, [{ opacity: .6 }, { opacity: 1 }], 320);
-  };
   view._view = GridRender.mount($('#gv'), cats, { bg: previewBg() });
   const segs = () => ['#gpBg', '#gpZoom'].forEach(s => segInd($(s)));
   requestAnimationFrame(segs); document.fonts?.ready.then(segs); addEventListener('resize', segs);
   $('#gpBg').onclick = e => {
     const b = e.target.closest('button'); if (!b) return;
     $$('#gpBg button').forEach(x => x.classList.toggle('on', x === b)); segInd($('#gpBg')); setPreviewBg(b.dataset.v);
-    animatePreview();
   };
   $('#gpZoom').onclick = e => {
     const b = e.target.closest('button'); if (!b) return;
@@ -700,7 +675,6 @@ async function initGridPage() {
     const cx = (view.scrollLeft + view.clientWidth / 2) / wrap.offsetWidth, cy = (view.scrollTop + view.clientHeight / 2) / wrap.offsetHeight;
     view.style.setProperty('--z', b.dataset.v); view.classList.toggle('zoomed', b.dataset.v !== '1'); $('#gpPan').hidden = b.dataset.v === '1';
     view.scrollLeft = cx * wrap.offsetWidth - view.clientWidth / 2; view.scrollTop = cy * wrap.offsetHeight - view.clientHeight / 2;
-    animatePreview();
   };
   // в 2× сетку таскаем мышью
   view.addEventListener('pointerdown', e => {
