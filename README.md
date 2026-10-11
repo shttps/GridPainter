@@ -24,7 +24,7 @@
 </p>
 
 <p align="center">
-  <img src="docs/demo.gif" width="720" alt="Рисунок в редакторе и тот же рисунок в Dota 2">
+  <img src="docs/tour.gif" width="800" alt="Главная, Мастерская с сетками и фоны меню — Grid Studio">
 </p>
 
 ## Что это
@@ -40,6 +40,16 @@
 | Редактор | В игре |
 |:---:|:---:|
 | <img src="docs/editor.webp" alt="Редактор Dota 2 Grid Studio"> | <img src="docs/ingame.webp" alt="Тот же арт в Dota 2"> |
+
+## Сайт
+
+| Главная | Мастерская |
+|:---:|:---:|
+| <img src="docs/home.webp" alt="Главная Grid Studio"> | <img src="docs/workshop.webp" alt="Мастерская: сетки героев"> |
+
+<p align="center">
+  <img src="docs/workshop-bg.webp" width="640" alt="Мастерская: фоны главного меню">
+</p>
 
 ## Возможности
 
