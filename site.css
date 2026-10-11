@@ -463,9 +463,21 @@ body[data-page="workshop"]::before { content: ""; position: absolute; z-index: -
 .hide18 .gthumb > :not(.nsfw-cover):not(.gmine):not(.g18), .hide18 .bpic > :not(.nsfw-cover), .hide18.bg-view > :not(.nsfw-cover), .hide18.modal-view > :not(.nsfw-cover), .hide18.gp-view > :not(.nsfw-cover) { filter: blur(22px) saturate(.6); }
 /* показали — плашка «18+ Нажми» больше не нужна */
 :is(.gcard, .bcard, .modal-view, .gp-view):not(.hide18) .nsfw-cover { display: none; }
-.nsfw-cover { position: absolute; inset: 0; z-index: 2; display: grid; place-content: center; justify-items: center; gap: 6px; background: oklch(0.12 0.01 30 / .45); color: #fff; text-align: center; cursor: pointer; }
-.nsfw-cover b { padding: 4px 12px; border-radius: 9px; background: oklch(0.6 0.2 25); font: 800 16px var(--mono); }
-.nsfw-cover span { color: oklch(0.92 0.01 60); font-size: 13px; }
+.nsfw-cover { position: absolute; inset: 0; z-index: 2; display: grid; place-items: center; background: oklch(0.12 0.01 30 / .3); color: #fff; cursor: pointer; overflow: hidden; }
+.spoiler-fx { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+.nsfw-cover b { position: relative; padding: 6px 15px; border-radius: 999px; background: #0009; -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); box-shadow: inset 0 0 0 1px #ffffff2e; font: 800 15px var(--mono); letter-spacing: .04em; transition: transform .25s var(--ease), background .25s; }
+.nsfw-cover:hover b { transform: scale(1.08); background: oklch(0.6 0.2 25 / .85); }
+/* окно «мне есть 18» */
+.modal.sheet:has(.adult-dlg) { width: min(360px, 100%); }
+.adult-dlg { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 34px 26px 24px; text-align: center; }
+.ad-badge { display: grid; place-items: center; width: 64px; height: 64px; border-radius: 50%; background: oklch(0.6 0.2 25); box-shadow: 0 0 0 6px oklch(0.6 0.2 25 / .16), 0 10px 30px -8px oklch(0.6 0.2 25 / .7); color: #fff; font: 800 20px var(--mono); }
+.adult-dlg h2 { margin: 14px 0 0; font-size: 21px; letter-spacing: -.02em; }
+.adult-dlg p { margin: 0 0 8px; color: var(--muted); font-size: 14px; line-height: 1.55; }
+.ad-row { display: grid; grid-template-columns: 1fr 1.3fr; gap: 8px; width: 100%; }
+.ad-row .btn { justify-content: center; }
+.ad-remember { display: inline-flex; align-items: center; gap: 8px; margin-top: 8px; color: var(--muted); font-size: 12.5px; cursor: pointer; }
+.ad-remember input { accent-color: var(--accent); }
+.ad-remember:hover { color: var(--ink-2); }
 
 /* карточки фонов */
 .bcards { grid-template-columns: repeat(auto-fill, minmax(270px, 1fr)); }

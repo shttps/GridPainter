@@ -387,7 +387,53 @@ function openSupport() {
 // Превью — живой холст (GridRender.mount) с настоящими портретами: сетка подгружается, когда карточка доезжает до экрана.
 // 18+ — карточка размыта, пока не нажмёшь (или не ответишь «мне есть 18, не спрашивать»).
 const tagsHTML = (tags, n = 3) => tags?.length ? `<span class="gtags">${tags.slice(0, n).map(t => `<i>${esc(t)}</i>`).join('')}${tags.length > n ? `<i>+${tags.length - n}</i>` : ''}</span>` : '';
-const nsfwCover = () => `<span class="nsfw-cover"><b>18+</b><span>Нажми, чтобы показать</span></span>`;
+const nsfwCover = () => `<span class="nsfw-cover" role="button" aria-label="Работа 18+, нажми, чтобы показать"><canvas class="spoiler-fx" aria-hidden="true"></canvas><b>18+</b></span>`;
+
+// Спойлер как в Telegram: работа размыта, а поверх неё мерцает «пыль». Один общий цикл рисует пыль только на видимых плашках.
+const spoilers = new Map();                                    // canvas → состояние
+let spRaf = 0, spLast = 0;
+function fillSpoilers() {
+  for (const cv of $$('.spoiler-fx:not([data-sp])')) {
+    cv.dataset.sp = '1';
+    const st = { cv, c: cv.getContext('2d'), ps: [], seen: false, t: Math.random() * 10 };
+    const fit = () => {
+      const d = Math.min(2, devicePixelRatio || 1), w = cv.clientWidth, h = cv.clientHeight; if (!w || !h) return;
+      cv.width = Math.round(w * d); cv.height = Math.round(h * d); st.d = d;
+      const n = Math.max(140, Math.min(1800, Math.round(w * h / 240)));
+      st.ps = Array.from({ length: n }, () => ({ x: Math.random() * cv.width, y: Math.random() * cv.height, a: Math.random() * 6.28, sp: .6 + Math.random() * 1.6, dir: Math.random() * 6.28 }));
+      if (matchMedia('(prefers-reduced-motion: reduce)').matches) drawSpoiler(st, 0);
+    };
+    new ResizeObserver(fit).observe(cv);
+    new IntersectionObserver(es => {
+      st.seen = es.some(e => e.isIntersecting);
+      st.seen ? spoilers.set(cv, st) : spoilers.delete(cv);
+      if (spoilers.size && !spRaf && !matchMedia('(prefers-reduced-motion: reduce)').matches) spRaf = requestAnimationFrame(spoilerTick);
+    }).observe(cv);
+  }
+}
+function spoilerTick(now) {
+  spRaf = 0;
+  if (!spoilers.size) return;
+  if (now - spLast > 32) {
+    const dt = Math.min(.1, (now - spLast) / 1000); spLast = now;
+    for (const st of spoilers.values()) drawSpoiler(st, dt);
+  }
+  spRaf = requestAnimationFrame(spoilerTick);
+}
+function drawSpoiler(st, dt) {
+  const { c, cv, ps, d } = st; if (!ps.length) return;
+  st.t += dt; c.clearRect(0, 0, cv.width, cv.height);
+  const px = Math.max(1.3, 1.5 * d), levels = [[.4, []], [.7, []], [1, []]];
+  for (const p of ps) {
+    p.dir += (Math.random() - .5) * .5 * dt * 6;
+    p.x += Math.cos(p.dir) * p.sp * 14 * dt * d; p.y += Math.sin(p.dir) * p.sp * 14 * dt * d;
+    if (p.x < 0) p.x += cv.width; else if (p.x > cv.width) p.x -= cv.width;
+    if (p.y < 0) p.y += cv.height; else if (p.y > cv.height) p.y -= cv.height;
+    const k = Math.abs(Math.sin(st.t * p.sp * 2.2 + p.a));
+    levels[k > .78 ? 2 : k > .4 ? 1 : 0][1].push(p);
+  }
+  for (const [al, list] of levels) { c.fillStyle = `rgba(255,255,255,${al})`; for (const p of list) c.fillRect(p.x, p.y, px, px); }
+}
 // что внутри сетки — строкой под карточкой: «ASCII · 11 909 категорий» или «Мозаика · 1 903 кат. · 82 героя»
 function gridFacts(g) {
   const kind = API.KINDS[g.kind] || 'Сетка';
@@ -438,7 +484,7 @@ async function hydrate(el) {
 function watchLive() {
   for (const el of $$('.gthumb[data-live]:not([data-seen])')) { el.dataset.seen = '1'; liveIO ? liveIO.observe(el) : hydrate(el); }
 }
-new MutationObserver(() => { watchLive(); fillAvatars(); }).observe(document.body, { childList: true, subtree: true });
+new MutationObserver(() => { watchLive(); fillAvatars(); fillSpoilers(); }).observe(document.body, { childList: true, subtree: true });
 
 // 18+: клик по размытой карточке сначала спрашивает — до того, как сработает открытие окна
 document.addEventListener('click', e => {
@@ -466,14 +512,16 @@ document.addEventListener('keydown', e => {
   if (e.key === 'Enter' && e.target.matches?.('.gcard[data-id], .bcard[data-bg]')) e.target.click();
 });
 function askAdult(onShow) {
-  const m = openSheet(`<div class="sh-body"><div class="sh-ico sh-18">18+</div><h2>Работа для взрослых</h2>
-    <p>Автор пометил её как 18+. Показать?</p>
-    <div class="sh-actions"><button class="btn primary block" data-adult="once">Показать</button>
-      <button class="btn block" data-adult="always">Мне есть 18 — больше не спрашивать</button></div></div>`);
+  const m = openSheet(`<div class="adult-dlg"><span class="ad-badge">18+</span><h2>Только для взрослых</h2>
+    <p>Автор отметил эту работу как 18+. Тебе уже есть 18 лет?</p>
+    <div class="ad-row"><button class="btn" data-adult="no">Не сейчас</button><button class="btn primary" data-adult="yes">Мне есть 18</button></div>
+    <label class="ad-remember"><input type="checkbox" id="adRem"><span>Больше не спрашивать</span></label></div>`);
   m.root.addEventListener('click', ev => {
     const b = ev.target.closest('[data-adult]'); if (!b) return;
-    if (b.dataset.adult === 'always') { API.setAdult(true); $$('.hide18').forEach(c => c.classList.remove('hide18')); }
-    m.close(); onShow();
+    m.close();
+    if (b.dataset.adult === 'no') return;
+    if ($('#adRem', m.root)?.checked) { API.setAdult(true); $$('.hide18').forEach(c => c.classList.remove('hide18')); }
+    onShow();
   });
 }
 
