@@ -8,7 +8,7 @@
   const HEROES = window.HEROES || [], ARTS = window.GAME_ARTS;
   const BY_ID = new Map(HEROES.map(h => [h.id, h]));
   const POOL = HEROES.filter(h => ARTS.d[h.id]);
-  const TRIES = 6, COLS = [16, 20, 25, 31, 39, 48];
+  const TRIES = 6, COLS = [28, 34, 40, 46, 52, 56];   // данные портрета — 56 колонок, больше нет смысла
   const RAMP = ' .:-=+*#%@';
   const ATTR = { str: 'Сила', agi: 'Ловкость', int: 'Интеллект', all: 'Универсал' };
   const ROLE_RU = { Carry: 'Керри', Support: 'Саппорт', Nuker: 'Нюкер', Disabler: 'Контроль', Jungler: 'Лесник', Durable: 'Танк', Escape: 'Побег', Pusher: 'Пушер', Initiator: 'Инициатор' };
@@ -25,7 +25,11 @@
     const lum = new Uint8Array(ARTS.w * ARTS.h), col = new Uint8Array(cb.length);
     for (let i = 0; i < lb.length; i++) { const b = lb.charCodeAt(i); lum[i * 2] = (b >> 4) * 17; lum[i * 2 + 1] = (b & 15) * 17; }
     for (let i = 0; i < cb.length; i++) col[i] = cb.charCodeAt(i);
-    a = { lum, col, ranged: d.m[0] === 1, roles: ARTS.roles.filter((_, k) => d.m[1] >> k & 1) };
+    // автоуровни: растягиваем яркость между 4-м и 97-м процентилем — портрет не тонет в одной серой каше
+    const hist = new Uint32Array(256); for (const v of lum) hist[v]++;
+    let acc = 0, lo = 0, hi = 255; const n = lum.length;
+    for (let v = 0; v < 256; v++) { acc += hist[v]; if (acc < n * 0.04) lo = v; if (acc < n * 0.97) hi = v; }
+    a = { lo, span: Math.max(40, hi - lo), lum, col, ranged: d.m[0] === 1, roles: ARTS.roles.filter((_, k) => d.m[1] >> k & 1) };
     cache.set(id, a);
     return a;
   }
@@ -37,7 +41,7 @@
   let shown = null, anim = 0, colored = load('gs.game.color', true);
   // сетка символов cols × rows: клетка вдвое выше, чем шире (как у моноширинного шрифта)
   function asciiGrid(id, cols) {
-    const { lum, col } = art(id), W = ARTS.w, H = ARTS.h, CW = ARTS.cw, CH = ARTS.ch;
+    const { lum, col, lo, span } = art(id), W = ARTS.w, H = ARTS.h, CW = ARTS.cw, CH = ARTS.ch;
     const rows = Math.max(4, Math.round(cols * (H / W) / 2)), cw = W / cols, ch = H / rows, out = [];
     // цвет клетки — билинейно из сетки цветов 14×24
     const colorAt = (u, v) => {
@@ -51,8 +55,8 @@
         let sum = 0, n = 0;
         for (let y = Math.floor(r * ch); y < Math.max(Math.floor(r * ch) + 1, Math.floor((r + 1) * ch)); y++)
           for (let x = Math.floor(c * cw); x < Math.max(Math.floor(c * cw) + 1, Math.floor((c + 1) * cw)); x++) { sum += lum[y * W + x]; n++; }
-        const v = sum / n / 255, k = Math.min(RAMP.length - 1, Math.round(v ** 0.85 * (RAMP.length - 1)));
-        line.push({ ch: RAMP[k], k: k / (RAMP.length - 1), rgb: colorAt((c + 0.5) / cols, (r + 0.5) / rows) });
+        const v = clamp((sum / n - lo) / span, 0, 1), k = Math.min(RAMP.length - 1, Math.round(v ** 0.8 * (RAMP.length - 1)));
+        line.push({ ch: RAMP[k], k: k / (RAMP.length - 1), v, rgb: colorAt((c + 0.5) / cols, (r + 0.5) / rows) });
       }
       out.push(line);
     }
@@ -85,12 +89,15 @@
       // до конца анимации часть клеток ещё «перебирается»
       if (t < 1 && chr !== ' ' && Math.random() > t) chr = RAMP[1 + Math.floor(Math.random() * (RAMP.length - 1))];
       // пустая клетка в цветном режиме — блёклая точка её цвета: так читаются цветовые пятна портрета
-      if (chr === ' ') { if (!colored) continue; chr = '·'; }
+      if (chr === ' ' && !colored) continue;
       const k = cell.k;
       if (colored) {
-        // цвет портрета, тёмные цвета осветлены — иначе на тёмном фоне их не видно
-        const [R, G, B] = cell.rgb, m = Math.max(R, G, B, 1), f = Math.min(2.6, Math.max(1, 170 / m));
-        ctx.fillStyle = `rgba(${Math.min(255, R * f)},${Math.min(255, G * f)},${Math.min(255, B * f)},${cell.ch === ' ' ? 0.28 : 0.6 + 0.4 * k})`;
+        // подложка — цвет портрета, промодулированный его яркостью: получается настоящий пиксель-арт, героя видно издалека
+        const [R, G, B] = cell.rgb, m = Math.max(R, G, B, 1), b = 255 * (0.1 + 0.95 * cell.v ** 0.9);
+        ctx.fillStyle = `rgb(${Math.min(255, R / m * b)},${Math.min(255, G / m * b)},${Math.min(255, B / m * b)})`;
+        ctx.fillRect(c * cw - 0.3, r * ch - 0.3, cw + 0.6, ch + 0.6);
+        if (cell.ch === ' ') continue;
+        ctx.fillStyle = cell.v > 0.55 ? `rgba(20,12,6,${0.2 + 0.3 * k})` : `rgba(255,240,220,${0.15 + 0.3 * k})`;   // символы — тонкой фактурой поверх
       } else ctx.fillStyle = `rgba(${Math.round(150 + 80 * k)},${Math.round(165 + 70 * k)},${Math.round(190 + 55 * k)},${0.55 + 0.45 * k})`;
       ctx.fillText(chr, (c + 0.5) * cw, (r + 0.5) * ch);
     }
