@@ -23,19 +23,19 @@
   const seg = (box, value, on) => {
     const set = v => { $$('button', box).forEach(b => b.classList.toggle('on', b.dataset.v === v)); segInd(box); };
     set(value);
-    box.onclick = e => { const b = e.target.closest('button'); if (!b || st.busy) return; set(b.dataset.v); on(b.dataset.v); };
+    box.onclick = e => { const b = e.target.closest('button'); if (!b || st.busy) return; if (on(b.dataset.v) !== false) set(b.dataset.v); };
   };
   const relayout = () => ['#bgbTabs', '#bgbScreens', '#bgbFit', '#bgbGrid'].forEach(s => segInd($(s)));
   document.fonts?.ready.then(relayout); addEventListener('resize', relayout);
   seg($('#bgbTabs'), st.tab, v => { st.tab = v; showTab(); });
   seg($('#bgbScreens'), st.screen, v => { st.screen = v; saveTimer(); fitScreen(); });
   seg($('#bgbFit'), st.look.fit, v => { st.look.fit = v; $('#bgbFitNote').textContent = v === 'cover' ? 'края обрежутся, без чёрных полос' : 'вся картинка, по бокам чёрное'; saveTimer(); paint(); });
-  seg($('#bgbGrid'), st.grid, v => { st.grid = v; saveTimer(); loadGrid(); });
+  seg($('#bgbGrid'), st.grid, v => { if (v === 'workshop') { openGridPicker(); return false; } st.grid = v; saveTimer(); loadGrid(); });
   $('#bgbFitNote').textContent = st.look.fit === 'cover' ? 'края обрежутся, без чёрных полос' : 'вся картинка, по бокам чёрное';
   const pct = v => v ? Math.round(v * 100) + ' %' : 'нет';
   for (const k of ['blur', 'dim']) {
     const r = $(k === 'blur' ? '#bgbBlur' : '#bgbDim'), out = $(k === 'blur' ? '#bgbBlurV' : '#bgbDimV');
-    r.oninput = () => { st.look[k] = +r.value; out.textContent = pct(+r.value); paint(); };
+    r.oninput = () => { st.look[k] = +r.value; out.textContent = pct(+r.value); r.style.setProperty('--range-fill', `${+r.value * 100}%`); paint(); };
   }
   const clean = $('#bgbClean');
   clean.checked = st.clean;
@@ -57,11 +57,12 @@
   new ResizeObserver(() => { resize(); paint(); }).observe(screenBox);
   function showTab() {
     $('#bgbMenu').hidden = st.tab !== 'menu';
+    $('#bgbDrop').hidden = st.tab === 'grid';
     $('.bgb-gridpick').classList.toggle('dim', st.tab !== 'grid');
     $('#bgbCap').textContent = st.tab === 'menu'
       ? 'Главное меню Доты с выбранными пропорциями экрана — схема, как ляжет фон.'
       : `Под сеткой — фон главного меню: в Доте у экрана «Герои» своего фона нет, игра только затемняет фон меню.${st.gridName ? ` Сетка: «${st.gridName}».` : ''}`;
-    if (st.tab === 'grid' && !st.cats && st.grid !== 'none') loadGrid();
+    if (st.tab === 'grid' && !st.cats && !st.gridNote && st.grid !== 'none') loadGrid();
     paint();
   }
 
@@ -114,7 +115,50 @@
       : { category_name: e.name, x_position: r6(e.x), y_position: r6(e.y), width: 0, height: 0, hero_ids: [] }) };
   }
   let workshopPick = null;
+  let gridRequest = 0;
+  function openGridPicker() {
+    const m = openSheet(`<div class="sh-body bgb-picker"><span class="bgb-eyebrow">СЕТКА ДЛЯ ПРЕВЬЮ</span><h2>Выбери из Мастерской</h2><p>Нажми на сетку, чтобы примерить её к своему фону.</p><form class="bgb-picker-search"><input class="input" type="search" aria-label="Название сетки или автор" placeholder="Название сетки или автор"><button class="btn" type="submit">Найти</button></form><p class="bgb-picker-status" role="status" aria-live="polite"></p><div class="bgb-picker-list"></div><button class="btn block bgb-picker-more" hidden>Показать ещё</button></div>`);
+    m.root.setAttribute('aria-label', 'Выбор сетки из Мастерской');
+    const list = $('.bgb-picker-list', m.root), status = $('.bgb-picker-status', m.root), more = $('.bgb-picker-more', m.root), input = $('input', m.root);
+    let request = 0, offset = 0, query = '', choosing = false;
+    const itemsById = new Map();
+    async function fetchPage(reset) {
+      const current = ++request;
+      if (reset) { offset = 0; list.innerHTML = ''; itemsById.clear(); }
+      more.hidden = true; status.textContent = 'Загружаем сетки…';
+      try {
+        const result = await API.list({ q: query, sort: 'popular', offset, limit: 12 });
+        if (current !== request || !m.root.isConnected) return;
+        offset += result.items.length;
+        const items = result.items.filter(g => !g.nsfw || API.adult());
+        items.forEach(g => itemsById.set(g.id, g));
+        list.insertAdjacentHTML('beforeend', items.map(g => `<button class="bgb-picker-card" data-pick="${esc(g.id)}" aria-label="Выбрать: ${esc(g.title)}"><span class="gthumb" data-live="${esc(g.id)}"><canvas aria-hidden="true"></canvas><span class="g-load">Загружаем превью…</span></span><span class="bgb-picker-name">${esc(g.title)}</span><small>${esc(g.author)}</small>${workshopPick?.id === g.id ? '<span class="bgb-picker-selected">Выбрана</span>' : ''}</button>`).join(''));
+        more.hidden = offset >= result.total || !result.items.length;
+        status.textContent = itemsById.size ? 'Выбери сетку для предпросмотра' : 'Сетки не найдены. Попробуй другой запрос.';
+      } catch { if (current === request && m.root.isConnected) { status.textContent = 'Не удалось загрузить сетки. Попробуй ещё раз.'; more.textContent = 'Повторить'; more.hidden = false; } }
+    }
+    $('form', m.root).onsubmit = e => { e.preventDefault(); if (choosing) return; query = input.value.trim(); more.textContent = 'Показать ещё'; fetchPage(true); };
+    more.onclick = () => { if (!choosing) fetchPage(false); };
+    list.onclick = async e => {
+      const button = e.target.closest('[data-pick]');
+      if (!button || choosing) return;
+      const selected = itemsById.get(button.dataset.pick);
+      choosing = true; status.textContent = 'Открываем выбранную сетку…'; list.setAttribute('aria-busy', 'true');
+      try {
+        const cfg = await API.config(selected.id);
+        if (!m.root.isConnected) return;
+        if (!cfg?.categories?.length) throw new Error('Эта сетка пустая или недоступна. Выбери другую.');
+        ++gridRequest; workshopPick = selected; st.grid = 'workshop'; st.cats = cfg.categories; st.gridName = selected.title; st.gridNote = ''; st.tab = 'grid';
+        for (const [id, value] of [['#bgbGrid', 'workshop'], ['#bgbTabs', 'grid']]) { $$('button', $(id)).forEach(b => b.classList.toggle('on', b.dataset.v === value)); segInd($(id)); }
+        $('#bgbGridNote').textContent = `«${selected.title}» — ${selected.author}. Нажми «Из Мастерской», чтобы выбрать другую.`;
+        saveTimer(); showTab(); m.close(); $('#bgbTabs button[data-v="grid"]').focus();
+      } catch (e) { status.textContent = e.message || 'Не удалось открыть сетку. Попробуй ещё раз.'; }
+      finally { choosing = false; list.removeAttribute('aria-busy'); }
+    };
+    input.focus(); fetchPage(true);
+  }
   async function loadGrid() {
+    const current = ++gridRequest;
     st.cats = null; st.gridName = ''; st.gridNote = '';
     const note = $('#bgbGridNote');
     if (st.grid === 'none') { note.textContent = 'Только фон, как пустой экран «Герои».'; showCap(); return; }
@@ -122,18 +166,21 @@
       const g = editorGrid();
       if (g) { st.cats = g.cats; st.gridName = g.name; note.innerHTML = `«${esc(g.name)}» — то, что сейчас открыто в <a href="editor.html">редакторе</a>.`; showCap(); return; }
       note.innerHTML = 'В <a href="editor.html">редакторе</a> пусто — показываю сетку из Мастерской.';
-    } else note.textContent = 'Случайная популярная сетка из Мастерской.';
+    } else if (!workshopPick) { st.gridNote = 'Нажми «Из Мастерской», чтобы выбрать сетку.'; note.textContent = st.gridNote; paint(); return; }
+    st.gridNote = 'Загружаю сетку…';
     try {
       if (!workshopPick) {
         const { items } = await API.list({ limit: 24 });
+        if (current !== gridRequest) return;
         const pool = items.filter(g => !g.nsfw && g.cats >= 200);
         workshopPick = (pool.length ? pool : items)[Math.floor(Math.random() * Math.max(1, (pool.length ? pool : items).length))] || null;
       }
       if (!workshopPick) { st.gridNote = 'В Мастерской пока нет сеток'; paint(); return; }
       const cfg = await API.config(workshopPick.id);
+      if (current !== gridRequest) return;
       st.cats = cfg?.categories || []; st.gridName = workshopPick.title;
       note.innerHTML = `${st.grid === 'editor' ? 'В <a href="editor.html">редакторе</a> пусто — показываю ' : ''}«${esc(workshopPick.title)}» — ${esc(workshopPick.author)}, из <a href="grid.html?id=${encodeURIComponent(workshopPick.id)}">Мастерской</a>.`;
-    } catch { st.gridNote = 'Мастерская не ответила'; }
+    } catch { if (current !== gridRequest) return; st.gridNote = 'Мастерская не ответила'; }
     showCap();
   }
   const showCap = () => { if (st.tab === 'grid') showTab(); else paint(); };
@@ -159,6 +206,7 @@
     // GIF в <img> анимируется сам — перерисовываем его постоянно, как видео
     if (kind === 'gif') { const tick = () => { if (st.el !== el) return; paint(); setTimeout(() => requestAnimationFrame(tick), 60); }; tick(); }
     $('#bgbDrop').classList.add('has');
+    screenBox.classList.add('has-media');
     $('#bgbBuild').disabled = false;
     $('#bgbPublish').hidden = !!bg;
     $('#bgbSrc').innerHTML = bg ? `${icon('compass')}«${esc(bg.title)}» из <a href="bg.html?id=${encodeURIComponent(bg.id)}">Мастерской</a>` : `${icon('file')}${esc(name.length > 40 ? name.slice(0, 38) + '…' : name)} · ${mb(blob.size)}`;

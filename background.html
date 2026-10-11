@@ -13,13 +13,19 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600;700&family=Unbounded:wght@500;600;700&display=swap">
 <link rel="stylesheet" href="site.css?v=50">
+<link rel="stylesheet" href="background.css?v=2">
 </head>
 <body data-page="background">
 
 <!-- слева превью: экран Доты с фоном и меню или сеткой героев поверх; справа настройки и сборка -->
 <main class="bgb">
+  <header class="bgb-heading">
+    <div><span class="bgb-eyebrow">GRID STUDIO / ПЕРСОНАЛИЗАЦИЯ</span><h1>Твоё меню. <em>Твоя атмосфера.</em></h1><p>Преврати главный экран Доты в место, куда хочется возвращаться.</p></div>
+    <span class="bgb-heading-tag"><i></i> Картинки · GIF · Видео</span>
+  </header>
   <section class="bgb-stage">
     <div class="bgb-top">
+      <span class="bgb-preview-label"><i></i> ПРЕДПРОСМОТР</span>
       <div class="seg sm" id="bgbTabs" role="tablist" aria-label="Что показать в превью"><i class="seg-ind"></i><button data-v="menu" class="on">Меню</button><button data-v="grid">Сетка героев</button></div>
       <span class="bgb-src" id="bgbSrc"></span>
     </div>
@@ -35,8 +41,7 @@
       </div>
       <label class="bgb-drop" id="bgbDrop">
         <input type="file" id="bgbFile" accept="image/png,image/jpeg,image/webp,image/gif,video/mp4,video/webm" hidden>
-        <span class="bgb-drop-in"><span data-icon="plus"></span><b>Перетащи сюда картинку, GIF или видео</b><small>или нажми, чтобы выбрать файл</small></span>
-        <span class="bgb-where">Где взять: <a href="workshop.html?backgrounds">Готовые в Мастерской</a><a href="https://motionbgs.com/" target="_blank" rel="noopener">MotionBGs</a><a href="https://moewalls.com/" target="_blank" rel="noopener">MoeWalls</a><a href="https://pixabay.com/videos/" target="_blank" rel="noopener">Pixabay</a></span>
+        <span class="bgb-drop-in"><span class="bgb-upload-icon" data-icon="upload"></span><span class="bgb-drop-kicker">НАЧНИ С ЧЕГО-ТО СВОЕГО</span><b>Добавь настроение в игру</b><small>Перетащи картинку, GIF или видео сюда</small><span class="bgb-drop-cta">Выбрать файл <span aria-hidden="true">↗</span></span><span class="bgb-formats">PNG · JPG · WEBP · GIF · MP4 · WEBM</span></span>
       </label>
       <div class="bgb-loading" id="bgbLoading" hidden><div class="up-bar"><i></i></div><span>Загружаю фон…</span></div>
     </div>
@@ -46,11 +51,12 @@
       <span class="bgb-time" id="bgbTime">0:00–0:30</span>
     </div>
     <p class="bgb-cap" id="bgbCap">Главное меню Доты с выбранными пропорциями экрана — схема, как ляжет фон.</p>
+    <div class="bgb-discover"><div><span data-icon="compass"></span><b>В поисках вдохновения?</b><small>Найди фон под своё настроение</small></div><div class="bgb-where"><a href="workshop.html?backgrounds">Мастерская <span aria-hidden="true">↗</span></a><a href="https://motionbgs.com/" target="_blank" rel="noopener">MotionBGs ↗</a><a href="https://moewalls.com/" target="_blank" rel="noopener">MoeWalls ↗</a><a href="https://pixabay.com/videos/" target="_blank" rel="noopener">Pixabay ↗</a></div></div>
   </section>
 
   <aside class="bgb-panel">
-    <h1>Фон меню</h1>
-    <p class="bgb-lead">Картинка, GIF или видео на главный экран Доты. В игре фон виден и под сеткой героев — смотри вкладку «Сетка героев».</p>
+    <div class="bgb-panel-title"><span class="bgb-eyebrow">ПОД ТВОЙ ЭКРАН</span><h2>Настройки фона <span data-icon="image"></span></h2></div>
+    <p class="bgb-lead">Пара штрихов — и всё как ты любишь.</p>
 
     <div class="bgb-f"><span>Файл</span>
       <button class="btn block" id="bgbPick" data-icon="upload">Выбрать файл</button>
@@ -63,7 +69,7 @@
       <label class="bgb-f"><span>Размытие <em id="bgbBlurV">нет</em></span><input type="range" id="bgbBlur" min="0" max="1" step="0.05" value="0"></label>
       <label class="bgb-f"><span>Затемнение <em id="bgbDimV">нет</em></span><input type="range" id="bgbDim" min="0" max="1" step="0.05" value="0"></label>
     </div>
-    <label class="check"><input type="checkbox" id="bgbClean"><span><b>Убрать новости справа</b> — колонка Valve на главной не закроет фон</span></label>
+    <label class="check bgb-clean"><input type="checkbox" id="bgbClean"><span><b>Только твой фон</b><small>Скрыть новости Valve справа</small></span></label>
     <div class="bgb-f bgb-gridpick"><span>Сетка в превью</span>
       <div class="seg sm" id="bgbGrid"><i class="seg-ind"></i><button data-v="editor">Из редактора</button><button data-v="workshop">Из Мастерской</button><button data-v="none">Без сетки</button></div>
       <small class="hint" id="bgbGridNote"></small>
@@ -87,6 +93,6 @@
 <script src="catalog-api.js?v=39"></script>
 <script src="dotabg.js?v=37"></script>
 <script src="site.js?v=57"></script>
-<script src="background.js?v=39"></script>
+<script src="background.js?v=41"></script>
 </body>
 </html>
