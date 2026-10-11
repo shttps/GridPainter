@@ -460,7 +460,7 @@ body[data-page="workshop"]::before { content: ""; position: absolute; z-index: -
 .gtags { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 7px; }
 .gtags i { padding: 2px 8px; border-radius: 6px; background: var(--card-2); color: var(--ink-2); font: 500 11.5px var(--font); font-style: normal; }
 /* 18+: размыто, пока не нажали */
-.hide18 .gthumb > :not(.nsfw-cover):not(.gmine):not(.g18), .hide18 .bpic > :not(.nsfw-cover), .hide18.bg-view > :not(.nsfw-cover), .hide18.modal-view > :not(.nsfw-cover), .hide18.gp-view > :not(.nsfw-cover) { filter: blur(22px) saturate(.6); }
+.hide18 .gthumb > :not(.nsfw-cover):not(.gmine):not(.g18), .hide18 .bpic > :not(.nsfw-cover), .hide18.bg-view > :not(.nsfw-cover), .hide18.modal-view > :not(.nsfw-cover), .hide18.gp-view > :not(.nsfw-cover) { filter: blur(9px) saturate(.75); }
 /* показали — плашка «18+ Нажми» больше не нужна */
 :is(.gcard, .bcard, .modal-view, .gp-view):not(.hide18) .nsfw-cover { display: none; }
 .nsfw-cover { position: absolute; inset: 0; z-index: 2; display: grid; place-items: center; background: oklch(0.12 0.01 30 / .3); color: #fff; cursor: pointer; overflow: hidden; }

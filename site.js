@@ -399,7 +399,7 @@ function fillSpoilers() {
     const fit = () => {
       const d = Math.min(2, devicePixelRatio || 1), w = cv.clientWidth, h = cv.clientHeight; if (!w || !h) return;
       cv.width = Math.round(w * d); cv.height = Math.round(h * d); st.d = d;
-      const n = Math.max(140, Math.min(1800, Math.round(w * h / 240)));
+      const n = Math.max(300, Math.min(6000, Math.round(w * h / 60)));
       st.ps = Array.from({ length: n }, () => ({ x: Math.random() * cv.width, y: Math.random() * cv.height, a: Math.random() * 6.28, sp: .6 + Math.random() * 1.6, dir: Math.random() * 6.28 }));
       if (matchMedia('(prefers-reduced-motion: reduce)').matches) drawSpoiler(st, 0);
     };
