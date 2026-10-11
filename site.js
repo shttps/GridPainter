@@ -1211,28 +1211,34 @@ function initWorkshop() {
     applyIcons($('.ws-head'));
     requestAnimationFrame(() => { ['#wsTabs', '#wsSorts', '#wsBg'].forEach(s => segInd($(s))); });
   }
-  // ----- арт в шапке: случайные работы из Мастерской (18+ не берём), пока не загрузились — готовые картинки -----
+  // ----- арт в шапке: одна случайная работа из Мастерской на всю плитку — сетка или фон (18+ не берём) -----
+  // пока не загрузилась — готовая картинка
   (async () => {
     const pick = a => a[Math.floor(Math.random() * a.length)];
     const [gr, br] = await Promise.allSettled([API.list({ sort: 'popular', limit: 24 }), API.bg.list({ sort: 'popular', limit: 24 })]);
-    const g = gr.status === 'fulfilled' && pick(gr.value.items.filter(x => !x.nsfw && x.cats >= 20)),
-      b = br.status === 'fulfilled' && pick(br.value.items.filter(x => !x.nsfw));
-    const label = (frame, href, text, n) => {
-      const a = $('.ws-art-label', frame); a.href = href; a.removeAttribute('tabindex'); a.innerHTML = `<em>${esc(text)}</em><i>${n}</i>`;
+    const grids = gr.status === 'fulfilled' ? gr.value.items.filter(x => !x.nsfw && x.cats >= 20) : [],
+      bgs = br.status === 'fulfilled' ? br.value.items.filter(x => !x.nsfw) : [];
+    const frame = $('#wsArt'), media = $('.ws-art-media', frame);
+    const show = (el, href, g, kind) => {
+      media.replaceChildren(el); frame.href = href; frame.classList.add('live');
+      $('.ws-art-label em', frame).textContent = g.title;
+      $('.ws-art-label i', frame).textContent = `${kind} · ${g.author || 'Аноним'}`;
     };
-    if (b) {
-      const fr = $('.ws-art-back'), img = $('img', fr);
-      img.onload = () => { fr.classList.add('live'); label(fr, bgPageUrl(b.id), b.title, '02'); };
-      img.src = b.poster;
-    }
-    if (g) {
-      const cfg = await API.config(g.id).catch(() => null);
-      if (!cfg?.categories?.length) return;
-      const fr = $('.ws-art-front'), cv = document.createElement('canvas');
-      cv.setAttribute('aria-hidden', 'true');
-      $('img', fr).replaceWith(cv);
-      GridRender.mount(cv, cfg.categories, { bg: 'dota' });
-      fr.classList.add('live'); label(fr, gridUrl(g.id), g.title, '01');
+    for (const kind of (Math.random() < .5 ? ['grid', 'bg'] : ['bg', 'grid'])) {
+      if (kind === 'bg' && bgs.length) {
+        const b = pick(bgs), img = new Image();
+        img.alt = ''; img.onload = () => show(img, bgPageUrl(b.id), b, 'Фон меню'); img.src = b.poster;
+        return;
+      }
+      if (kind === 'grid' && grids.length) {
+        const g = pick(grids), cfg = await API.config(g.id).catch(() => null);
+        if (!cfg?.categories?.length) continue;
+        const cv = document.createElement('canvas');
+        cv.setAttribute('aria-hidden', 'true');
+        show(cv, gridUrl(g.id), g, 'Сетка героев');
+        GridRender.mount(cv, cfg.categories, { bg: 'dota' });
+        return;
+      }
     }
   })();
   const relayout = () => ['#wsTabs', '#wsSorts', '#wsBg'].forEach(s => segInd($(s)));

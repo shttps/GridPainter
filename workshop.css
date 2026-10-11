@@ -13,24 +13,20 @@ body[data-page="workshop"] { padding-top: calc(var(--nav-h) + 24px); }
 .ws-actions .btn { height: 44px; }
 .ws-actions .btn:not(.primary) { border-color: transparent; background: transparent; box-shadow: none; color: var(--muted); }
 .ws-actions .btn:not(.primary):hover { color: var(--ink); background: var(--bg-2); }
-.ws-art { position: relative; width: 100%; height: 220px; }
-.ws-art-frame { position: absolute; width: 80%; padding: 7px; border: 1px solid var(--line-strong); border-radius: 12px; background: var(--bg-2); box-shadow: 0 18px 38px -16px #0009; }
-.ws-art-frame img { display: block; width: 100%; height: 138px; border-radius: 7px; object-fit: cover; background: #101819; }
-.ws-art-frame canvas { display: block; width: 100%; height: 138px; border-radius: 7px; object-fit: contain; background: #101819; }
-.ws-art-label { display: flex; justify-content: space-between; gap: 12px; padding: 8px 5px 2px; color: var(--muted); font: 10px var(--mono); letter-spacing: .1em; text-decoration: none; }
-.ws-art-label em { min-width: 0; overflow: hidden; font-style: normal; text-overflow: ellipsis; text-transform: uppercase; white-space: nowrap; }
-.ws-art-label[href]:hover { color: var(--ink); }
-.ws-art-frame img, .ws-art-frame canvas { animation: ws-art-in .6s var(--ease) both; }
+.ws-art { position: relative; align-self: stretch; min-height: 220px; }
+.ws-art-frame { position: absolute; inset: 0; display: flex; flex-direction: column; padding: 7px; border: 1px solid var(--line-strong); border-radius: 16px; background: var(--bg-2); box-shadow: 0 22px 44px -22px #000a; color: inherit; text-decoration: none; transform: rotate(1.5deg); transition: transform .5s var(--ease), box-shadow .5s var(--ease); }
+.ws-art-frame.live:hover { transform: rotate(0) scale(1.015); box-shadow: 0 28px 52px -22px #000; }
+.ws-art-media { position: relative; flex: 1; min-height: 0; overflow: hidden; border-radius: 10px; background: #101819; }
+.ws-art-media :is(img, canvas) { position: absolute; inset: 0; display: block; width: 100%; height: 100%; object-fit: cover; animation: ws-art-in .6s var(--ease) both; }
+.ws-art-media canvas { object-fit: contain; }
+.ws-art-label { display: flex; align-items: baseline; justify-content: space-between; gap: 14px; padding: 10px 6px 3px; font: 10px var(--mono); letter-spacing: .1em; }
+.ws-art-label em { min-width: 0; overflow: hidden; color: var(--ink-2); font-style: normal; text-overflow: ellipsis; text-transform: uppercase; white-space: nowrap; }
+.ws-art-label i { flex: none; color: var(--faint); font-style: normal; text-transform: uppercase; }
+.ws-art-frame.live:hover .ws-art-label em { color: var(--ink); }
 @keyframes ws-art-in { from { opacity: 0; } }
-.ws-art-frame i { color: var(--faint); font-style: normal; }
-.ws-art-back { top: -8px; right: -2px; transform: rotate(8deg); opacity: .65; }
-.ws-art-back img { object-position: 50% 36%; }
-.ws-art-front { top: 34px; left: 0; transform: rotate(-6deg); }
-.ws-art-front img { object-fit: contain; }
-.ws-art-caption { position: absolute; right: 0; bottom: -15px; color: var(--faint); font: 10px var(--mono); }
 .ws-head .demo-note { margin: 8px 0 0; }
-.ws-bar { top: 62px; gap: 18px; margin: 0; padding: 14px 0; border-bottom-color: var(--line); background: var(--bg); animation: none; }
-.ws-bar.stuck { background: color-mix(in oklab, var(--bg) 95%, transparent); }
+.ws-bar { top: 62px; gap: 18px; margin: 0; padding: 14px 0; border-bottom-color: var(--line); background: transparent; animation: none; }
+.ws-bar.stuck { background: color-mix(in oklab, var(--bg) 92%, transparent); box-shadow: 0 0 0 100vmax color-mix(in oklab, var(--bg) 92%, transparent); clip-path: inset(0 -100vmax); }
 .ws-tabs { gap: 8px; padding: 0; border: 0; border-radius: 0; background: transparent; }
 .ws-tabs .seg-ind { display: none; }
 .ws-tabs button { display: inline-flex; align-items: center; justify-content: center; gap: 9px; height: 46px; padding: 0 17px; border: 1px solid transparent; border-radius: 11px; font-size: 16px; font-weight: 600; }
@@ -67,9 +63,7 @@ body[data-page="workshop"] { padding-top: calc(var(--nav-h) + 24px); }
 .workshop .site-foot { margin-top: 46px; }
 @media (max-width: 1050px) {
   .ws-head { padding: 30px; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); }
-  .ws-art-frame { width: 90%; }
-  .ws-art-frame img, .ws-art-frame canvas { height: 112px; }
-  .ws-art { height: 200px; }
+  .ws-art { min-height: 200px; }
   .ws-bar { flex-wrap: nowrap; }
   .ws-tabs button { font-size: 14px; padding: 0 13px; }
   .ws-bar .search { flex: 0 1 280px; }
