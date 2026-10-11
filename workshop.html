@@ -14,7 +14,7 @@
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600;700&family=Unbounded:wght@500;600;700&display=swap">
 <link rel="stylesheet" href="site.css?v=44">
 <link rel="stylesheet" href="community.css?v=43">
-<link rel="stylesheet" href="workshop.css?v=46">
+<link rel="stylesheet" href="workshop.css?v=48">
 </head>
 <body data-page="workshop">
 <!-- фон как на главной: сполохи темы и поле ASCII-символов (рисует site.js), внизу гаснет в цвет страницы -->
@@ -27,6 +27,7 @@
 
 <main class="wrap workshop">
   <section class="ws-head" aria-labelledby="wsTitle">
+    <div class="ws-art" id="wsArt"><div class="ws-art-stage"></div><a class="ws-art-label" id="wsArtLabel" hidden><i></i><em></em></a></div>
     <div class="ws-copy">
       <span class="ws-eyebrow"><span data-icon="compass"></span>Сделано игроками</span>
       <h1 id="wsTitle">Мастерская<span>.</span></h1>
@@ -35,9 +36,6 @@
         <a class="btn primary" id="wsCreate" href="editor.html">Создать сетку</a>
         <button class="btn" id="wsHow"><span data-icon="book"></span>Как установить</button>
       </div>
-    </div>
-    <div class="ws-art">
-      <a class="ws-art-frame" id="wsArt"><span class="ws-art-media"><img src="docs/hero-art.webp" alt=""></span><span class="ws-art-label"><em>Случайная работа из мастерской</em><i></i></span></a>
     </div>
     <div class="demo-note" id="demoNote" hidden>
       <span data-icon="alert"></span>
@@ -82,6 +80,6 @@
 <script src="gridrender.js?v=37"></script>
 <script src="catalog-api.js?v=39"></script>
 <script src="dotabg.js?v=37"></script>
-<script src="site.js?v=47"></script>
+<script src="site.js?v=48"></script>
 </body>
 </html>
