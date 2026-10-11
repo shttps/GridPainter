@@ -203,18 +203,18 @@ button:focus { outline: none; }
 @media (prefers-reduced-motion: reduce) { .ff-track { animation: none; } }
 .fcard:hover .fc-faces-grid img { filter: none; }
 .fc-faces-grid img:hover { transform: scale(1.12); }
-/* три арта сменяют друг друга: сначала картинка, потом по ней проходит луч и остаётся line-art */
-.fl-slide { position: absolute; inset: 0; opacity: 0; animation: fcCycle 12s infinite; }
-.fl-slide:nth-child(2), .fl-slide:nth-child(2) .out, .fl-slide:nth-child(2)::after { animation-delay: 4s; }
-.fl-slide:nth-child(3), .fl-slide:nth-child(3) .out, .fl-slide:nth-child(3)::after { animation-delay: 8s; }
+/* арты по очереди (порядок случайный): сначала картинка, потом по ней проходит луч и остаётся line-art */
+.fl-slide { position: absolute; inset: 0; opacity: 0; transition: opacity .7s var(--ease); }
+.fl-slide.on { opacity: 1; }
 .fl-slide img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: 50% 22%; transition: transform .6s var(--ease); }
-.fl-slide .out { clip-path: inset(0 100% 0 0); animation: flWipe 12s infinite; }
-.fl-slide::after { content: ""; position: absolute; top: 0; bottom: 0; left: 0; width: 2px; background: var(--accent-hi); box-shadow: 0 0 14px 2px var(--accent-hi); opacity: 0; animation: flScan 12s infinite; }
+.fl-slide .out { clip-path: inset(0 100% 0 0); }
+.fl-slide.on .out { animation: flWipe 4.8s var(--ease) forwards; }
+.fl-slide::after { content: ""; position: absolute; top: 0; bottom: 0; left: 0; width: 2px; background: var(--accent-hi); box-shadow: 0 0 14px 2px var(--accent-hi); opacity: 0; }
+.fl-slide.on::after { animation: flScan 4.8s var(--ease) forwards; }
 .fcard:hover .fl-slide img { transform: scale(1.06); }
-@keyframes fcCycle { 0% { opacity: 0; } 6% { opacity: 1; } 33% { opacity: 1; } 39% { opacity: 0; } 100% { opacity: 0; } }
-@keyframes flWipe { 0%, 8% { clip-path: inset(0 100% 0 0); } 22%, 100% { clip-path: inset(0 0 0 0); } }
-@keyframes flScan { 0%, 7.9% { left: 0; opacity: 0; } 8% { left: 0; opacity: 1; } 22% { left: calc(100% - 2px); opacity: 1; } 22.1%, 100% { left: 0; opacity: 0; } }
-@media (prefers-reduced-motion: reduce) { .fl-slide { animation: none; } .fl-slide:first-child { opacity: 1; } .fl-slide .out { animation: none; clip-path: none; } .fl-slide::after { display: none; } }
+@keyframes flWipe { 0%, 14% { clip-path: inset(0 100% 0 0); } 58%, 100% { clip-path: inset(0 0 0 0); } }
+@keyframes flScan { 0%, 13.9% { left: 0; opacity: 0; } 14% { left: 0; opacity: 1; } 58% { left: calc(100% - 2px); opacity: 1; } 58.1%, 100% { left: 0; opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .fl-slide .out { animation: none; clip-path: none; } .fl-slide::after { display: none; } }
 .fc-braille { display: block; }
 .fc-braille canvas { position: absolute; inset: 0; display: block; width: 100%; height: 100%; }
 .fcard > b { font-size: 18px; font-weight: 700; letter-spacing: -.01em; }

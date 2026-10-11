@@ -844,6 +844,21 @@ function homeTileFx() {
     r.textContent = Array.from({ length: 3 }, () => ramp[Math.floor(Math.random() * ramp.length)]).join('');
   }, 240);
 }
+// «Арт из картинки»: слайды сменяются в случайном порядке, пока плитка на экране
+function homeLineart(still) {
+  const slides = $$('#fcLineart .fl-slide');
+  if (slides.length < 2 || still) return;
+  let at = 0, tm = 0;
+  const next = () => {
+    if (document.hidden) return;
+    let k; do k = Math.floor(Math.random() * slides.length); while (k === at);
+    slides[at].classList.remove('on'); slides[at = k].classList.add('on');
+  };
+  new IntersectionObserver(es => {
+    clearInterval(tm);
+    if (es.some(e => e.isIntersecting)) tm = setInterval(next, 5200);
+  }, { threshold: .3 }).observe($('#fcLineart'));
+}
 // «Фон меню»: в плитке по кругу случайные работы из Мастерской — плавно сменяются и чуть «дышат»
 function homeBgTile() {
   const box = $('#wcBg'); if (!box) return;
@@ -874,6 +889,7 @@ function initHome() {
   brailleCanvas($('#fcBraille'), [BRAILLE, ...(window.BRAILLE_ARTS || [])]);
   if (!still) homeTileFx();
   homeBgTile();
+  homeLineart(still);
 
   // «Угадайка»: номер дня и, если сегодня уже играли, — результат
   const day = gameDay(), today = (() => { try { return JSON.parse(localStorage.getItem('gs.game.daily')); } catch { return null; } })();
