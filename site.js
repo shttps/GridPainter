@@ -1126,9 +1126,12 @@ function heroBackdrop() {
   const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
   const lite = matchMedia('(max-width: 900px)').matches || navigator.connection?.saveData;
   const first = $('video', box);
-  if (still) { first.removeAttribute('autoplay'); first.pause(); } else first.play().catch(() => {});
+  // туман с фонарями — запасной: показываем, только если фона «На главную» нет или он не загрузился (иначе он мелькает до фона)
+  let done = false;
+  const fog = () => { if (done) return; done = true; first.classList.add('on'); if (!still) first.play().catch(() => {}); };
+  const slow = setTimeout(fog, 6000);
   API.bg.featured().then(async list => {
-    if (!list.length) return;
+    if (!list.length) return fog();
     const b = list[Math.floor(Math.random() * list.length)];
     const video = b.kind === 'video' && !lite && !still;
     const el = document.createElement(video ? 'video' : 'img');
@@ -1138,16 +1141,18 @@ function heroBackdrop() {
     el.style.setProperty('--bgk', await dimFor(b.poster));
     // показываем, только когда есть что показать, — и плавно гасим туман под ним
     el.addEventListener(video ? 'playing' : 'load', () => {
+      if (done) return; done = true; clearTimeout(slow);
       el.classList.add('on'); first.classList.remove('on');
       setTimeout(() => { first.pause(); first.remove(); }, 1800);
     }, { once: true });
+    el.addEventListener('error', fog, { once: true });
     el.src = video || b.kind !== 'video' ? b.file : b.poster;
     box.append(el);
     const credit = $('#heroCredit');
     credit.href = bgPageUrl(b.id);
     credit.innerHTML = `${icon('image')}<span>Фон: «${esc(b.title)}» — ${esc(b.author || 'Игрок')}</span>`;
     credit.hidden = false;
-  });
+  }).catch(fog);
 }
 
 // Фон главной: поле ASCII-символов. Яркость клетки — сумма нескольких бегущих волн, у курсора светлее;
