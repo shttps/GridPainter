@@ -711,6 +711,13 @@ body[data-page="workshop"]::before { content: ""; position: absolute; z-index: -
 /* версия внизу — кнопка-пасхалка; холст с частицами лежит поверх страницы и не ловит клики */
 .bb-ver { cursor: pointer; background: none; }
 .bb-ver:active { transform: scale(.94); }
+.bb-ver.egg-pop { animation: egg-pop .55s var(--ease); }
+@keyframes egg-pop { 30% { transform: scale(1.12); box-shadow: 0 0 0 3px color-mix(in oklab, var(--c, #ffd678) 35%, transparent), 0 0 22px color-mix(in oklab, var(--c, #ffd678) 55%, transparent); border-color: var(--c, #ffd678); } }
+.egg-orbit { position: fixed; z-index: 151; width: 0; height: 0; pointer-events: none; }
+.egg-orbit b { position: absolute; left: 0; top: 0; line-height: 1; color: var(--c); font-weight: 400; text-shadow: 0 0 10px var(--c); }
+.egg-ring { position: absolute; left: 0; top: 0; width: var(--w); height: var(--h); border: 1.5px solid var(--c); border-radius: 12px; transform: translate(-50%, -50%); opacity: 0; animation: egg-ring .9s cubic-bezier(.2, .7, .3, 1) both; }
+@keyframes egg-ring { from { opacity: .85; transform: translate(-50%, -50%) scale(1); } to { opacity: 0; transform: translate(-50%, -50%) scale(2.1, 2.8); } }
+@media (prefers-reduced-motion: reduce) { .bb-ver.egg-pop { animation: none; } }
 .fx { position: fixed; inset: 0; z-index: 150; width: 100vw; height: 100vh; pointer-events: none; }
 
 /* плитка «Как в игре»: экран «Герои» Доты. Всё в долях ширины экрана (cqw), экран 16:9 «обложкой» заполняет плитку */
