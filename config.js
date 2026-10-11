@@ -14,10 +14,20 @@ window.GRID_CATALOG = {
 
 // Сайт: версия, автор и ссылки внизу главной. Пустая ссылка — пункт не показывается.
 window.SITE = {
-  version: '2.6.0',
+  version: '2.7.0',
   author: { nick: 'ahttps', discord: 'ahttps', github: 'shttps', avatar: 'https://avatars.githubusercontent.com/u/184304697?v=4&s=96' },
   repo: 'https://github.com/shttps/GridPainter',
   telegram: 'https://t.me/gridstudio_example',   // ПРИМЕР — замени на свой канал/чат: чат и новости
-  support: '',    // поддержать разработку: Boosty, DonationAlerts и т. п.
+  support: '',    // поддержать разработку рублями: Boosty, DonationAlerts и т. п.
+  // Криптовалюта в окне «Поддержать разработку». Пустой addr — монета не показывается; пока адресов нет, там написано «скоро».
+  // Вставь СВОИ адреса и проверь каждый (лучше тестовым переводом): отправленное на неверный адрес не вернуть.
+  // network — сеть, которую увидит донатер; memo — тег/комментарий, если сеть его требует (TON, XRP…).
+  crypto: [
+    { id: 'btc',  ticker: 'BTC',  name: 'Bitcoin',  network: 'Bitcoin',           color: '#f7931a', addr: '' },
+    { id: 'eth',  ticker: 'ETH',  name: 'Ethereum', network: 'Ethereum (ERC-20)', color: '#8c9eff', addr: '' },
+    { id: 'usdt', ticker: 'USDT', name: 'Tether',   network: 'TRON (TRC-20)',     color: '#26a17b', addr: '' },
+    { id: 'ton',  ticker: 'TON',  name: 'Toncoin',  network: 'TON',               color: '#2aa3f0', addr: '', memo: '' },
+    { id: 'sol',  ticker: 'SOL',  name: 'Solana',   network: 'Solana',            color: '#a96bff', addr: '' },
+  ],
   ads: '',        // реклама: ссылка для связи; пусто — показываем контакты автора
 };

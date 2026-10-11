@@ -13,8 +13,8 @@
 <link rel="icon" href="logo.svg" type="image/svg+xml">
 <link rel="preload" href="docs/hero-art.webp" as="image" fetchpriority="high">
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap">
-<link rel="stylesheet" href="site.css?v=41">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600;700&family=Unbounded:wght@500;600;700&display=swap">
+<link rel="stylesheet" href="site.css?v=42">
 </head>
 <body data-page="home">
 
@@ -159,8 +159,22 @@
       <div class="tile-text"><span class="tile-ico" data-icon="grid"></span><b>Мозаика из героев</b><span>Каждая клетка — портрет, подобранный по цвету.</span></div>
     </article>
     <article class="tile t-ingame" data-reveal style="--d:.16s">
-      <div class="tile-img"><img src="docs/ingame.webp" alt="Сетка в экране «Герои» Dota 2" loading="lazy"></div>
-      <div class="tile-text"><span class="tile-ico" data-icon="eye"></span><b>Как в игре</b><span>Превью по стилям Доты — без запуска игры.</span></div>
+      <!-- экран «Герои» Доты разметкой; в центре — случайные работы из Мастерской (сменяют друг друга), пока они грузятся или Мастерская молчит — снимок из игры -->
+      <div class="tile-img ig" id="igView" aria-hidden="true">
+        <img class="ig-fallback" src="docs/ingame.webp" alt="" loading="lazy">
+        <div class="ig-screen">
+          <div class="ig-top"><i class="ig-logo"></i><span class="on">ГЕРОИ</span><span>АРСЕНАЛ</span><span>ПРОСМОТР</span><span>БАЗА ЗНАНИЙ</span><span>ИГРОТЕКА</span></div>
+          <div class="ig-crumbs"><span>ГЕРОИ</span><i>/</i><span>РУКОВОДСТВА</span><i>/</i><span>ТРЕНДЫ</span></div>
+          <div class="ig-bans"><small>БАНЫ</small><i></i><i></i><i></i><i></i></div>
+          <div class="ig-stage" id="igStage"></div>
+          <div class="ig-hidden" id="igHidden" hidden></div>
+          <div class="ig-bar"><span class="ig-sort"><small>СОРТИРОВКА:</small><b>Моя сетка</b></span><span class="ig-filters"><small>ТИП</small><small>СЛОЖНОСТЬ</small><small>МЕТКИ</small><small>НАКЛЕЙКИ</small></span></div>
+          <div class="ig-slots"><i></i><i></i><i></i><i></i><i></i></div>
+          <div class="ig-chat">(Группа): Введите сообщение или символ «/» для команд</div>
+          <div class="ig-play">ИГРАТЬ</div>
+        </div>
+      </div>
+      <div class="tile-text"><span class="tile-ico" data-icon="eye"></span><b>Как в игре</b><span>Превью по стилям Доты — без запуска игры.</span><a class="ig-cap" id="igCap" hidden></a></div>
     </article>
     <article class="tile t-tools" data-reveal style="--d:.08s">
       <div class="tools" id="toolsDemo" aria-hidden="true">
@@ -185,10 +199,10 @@
 <div class="modal-root" id="modalRoot"></div>
 <div class="toasts" id="toasts"></div>
 <script src="heroes.js?v=37"></script>
-<script src="config.js?v=37"></script>
+<script src="config.js?v=38"></script>
 <script src="auth.js?v=37"></script>
 <script src="gridrender.js?v=37"></script>
 <script src="catalog-api.js?v=39"></script>
-<script src="site.js?v=41"></script>
+<script src="site.js?v=42"></script>
 </body>
 </html>

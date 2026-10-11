@@ -57,6 +57,8 @@ const ICONS = {
   globe: '<circle cx="12" cy="12" r="8.5"/><path d="M3.5 12h17M12 3.5c2.5 2.7 3.5 5.5 3.5 8.5s-1 5.8-3.5 8.5c-2.5-2.7-3.5-5.5-3.5-8.5s1-5.8 3.5-8.5z"/>',
   trash: 'M4.5 7h15M9.5 7V4.5h5V7M6.5 7l1 13h9l1-13',
   mail: '<rect x="3.5" y="5.5" width="17" height="13" rx="2"/><path d="M4 7l8 6 8-6"/>',
+  coin: '<circle cx="12" cy="12" r="8.5"/><path d="M14.8 9.4c-.4-.9-1.4-1.4-2.8-1.4-1.6 0-2.7.8-2.7 2 0 2.8 5.6 1.4 5.6 4.2 0 1.2-1.2 2.1-2.9 2.1-1.5 0-2.6-.6-3-1.6M12 6.8V8m0 8v1.2"/>',
+  shield: 'M12 3.5l7 2.8v5.4c0 4.2-2.9 7.4-7 8.8-4.1-1.4-7-4.6-7-8.8V6.3zM9 12l2.2 2.2L15.5 10',
   star: 'M12 3.5l2.6 5.4 5.9.8-4.3 4.1 1 5.8-5.2-2.8-5.2 2.8 1-5.8-4.3-4.1 5.9-.8z',
   compass: '<circle cx="12" cy="12" r="8.5"/><path d="M15.5 8.5l-2 5-5 2 2-5z"/>',
   play: 'M8 5.5v13l10.5-6.5z',
@@ -133,6 +135,7 @@ function renderNav() {
       ${NAV.map(([k, href, ic, label]) => `<a href="${href}"${k === (PAGE === 'grid' || PAGE === 'bg' ? 'workshop' : PAGE) ? ' aria-current="page"' : ''}>${icon(ic)}${label}${k === 'workshop' ? '<b class="nav-badge" data-cat-count hidden></b>' : ''}</a>`).join('')}
       <a href="editor.html" class="nav-studio">${icon('brush')}Редактор${icon('arrow')}</a>
     </div>
+    ${SITE.telegram ? `<a class="nav-tg" href="${esc(SITE.telegram)}" target="_blank" rel="noopener" title="Telegram: чат и новости" aria-label="Telegram: чат и новости">${icon('telegram')}<span>Чат и новости</span></a>` : ''}
     <div class="nav-acc" id="navAcc"></div>
     <button class="nav-burger" id="navBurger" aria-label="Открыть меню" aria-expanded="false" aria-controls="navLinks"><i></i><i></i></button>
   </nav>`;
@@ -164,6 +167,9 @@ function initNav() {
   // без перехода при первой расстановке — иначе подсветка «приезжает» из угла
   hl.style.transition = 'none'; home(); requestAnimationFrame(() => { hl.style.transition = ''; });
   document.fonts?.ready.then(home); addEventListener('resize', home);
+  // бейдж «13» у «Мастерской» появляется, когда придёт ответ каталога, — ссылка раздвигается, подсветка должна за ней
+  const ro = new ResizeObserver(() => { const h = $('a:hover', links); moveTo(h || cur); });
+  $$('a', links).forEach(a => ro.observe(a));
 
   const onScroll = () => bar.classList.toggle('scrolled', scrollY > 12);
   onScroll(); addEventListener('scroll', onScroll, { passive: true });
@@ -185,17 +191,110 @@ function renderBottomBars() {
   const html = `<div class="bb-left">
       <span class="bb-authors">Автор <button class="bb-author" data-info="author">${avatarHTML(a.avatar, a.nick)}@${esc(a.nick || 'ahttps')}</button></span>
       <button class="bb-link" data-info="support">${icon('heart')}Поддержать разработку</button>
-      ${SITE.telegram ? `<a class="bb-link" href="${esc(SITE.telegram)}" target="_blank" rel="noopener">${icon('send')}Чат и новости</a>` : ''}
       <button class="bb-link" data-info="ads">${icon('megaphone')}Реклама</button>
     </div>
     <div class="bb-right">
       ${SITE.repo ? `<a class="bb-link" href="${esc(SITE.repo)}" target="_blank" rel="noopener">${icon('github')}GitHub${icon('ext')}</a>` : ''}
-      <a class="bb-ver" href="${esc(SITE.repo || '#')}/commits/main" target="_blank" rel="noopener" title="Что нового — история изменений">v${esc(SITE.version || '1.0.0')}</a>
+      <button class="bb-ver" data-egg title="Версия сайта">v${esc(SITE.version || '1.0.0')}</button>
     </div>`;
   for (const el of $$('[data-bottom-bar]')) el.innerHTML = html;
   document.addEventListener('click', e => {
     const b = e.target.closest('[data-info]'); if (b) openInfo(b.dataset.info);
+    if (e.target.closest('[data-egg]')) egg();
   });
+  konami();
+}
+
+// ---------- пасхалки: клик по версии — сакура, снег, угли, золото, Аегис; код из старых игр — всё сразу ----------
+// Лёгкий холст поверх страницы: частицы падают (или летят вверх) несколько секунд, потом холст убирается.
+const EGGS = [
+  ['sakura', '🌸 Сакура — цветёт, пока не смотрят патчноуты'],
+  ['snow', '❄ Снег — Crystal Maiden где-то рядом'],
+  ['embers', '🔥 Угли — Phoenix уже в пути'],
+  ['gold', '🪙 +600 золота — не забудь купить курьера'],
+  ['aegis', '🛡 Рошан убит. Эгида ждёт — но только один раз'],
+];
+let eggAt = 0, fx = null;
+function egg(kind) {
+  const [k, msg] = kind ? [kind, ''] : EGGS[eggAt++ % EGGS.length];
+  if (!kind) toast(msg);
+  if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  burst(k);
+}
+function konami() {
+  const seq = ['ArrowUp', 'ArrowUp', 'ArrowDown', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'ArrowLeft', 'ArrowRight', 'b', 'a'];
+  let at = 0;
+  addEventListener('keydown', e => {
+    if (e.target.closest?.('input, textarea, select, [contenteditable]')) return;
+    at = (e.key.length === 1 ? e.key.toLowerCase() : e.key) === seq[at] ? at + 1 : +(e.key === seq[0]);
+    if (at === seq.length) { at = 0; toast('⌨ Код принят: сакура, золото и Эгида разом'); ['sakura', 'gold', 'aegis'].forEach((k, i) => setTimeout(() => egg(k), i * 500)); }
+  });
+}
+function burst(kind) {
+  if (!fx) {
+    const cv = document.createElement('canvas');
+    cv.className = 'fx'; cv.setAttribute('aria-hidden', 'true');
+    document.body.appendChild(cv);
+    fx = { cv, c: cv.getContext('2d'), ps: [], t: 0, last: 0, raf: 0 };
+    const fit = () => { const d = Math.min(2, devicePixelRatio || 1); cv.width = innerWidth * d; cv.height = innerHeight * d; fx.c.setTransform(d, 0, 0, d, 0, 0); };
+    fit(); fx.fit = fit; addEventListener('resize', fit);
+  }
+  const W = innerWidth, H = innerHeight, rnd = (a, b) => a + Math.random() * (b - a);
+  const n = Math.min(110, Math.round(W / 14));
+  const make = {
+    sakura: () => ({ k: 'petal', x: rnd(-.1, 1.05) * W, y: rnd(-.3, 0) * H, vy: rnd(40, 90), vx: rnd(20, 60), s: rnd(7, 13), a: rnd(0, 6.28), va: rnd(-2, 2), sw: rnd(0, 6.28), col: ['#ffc4d2', '#ff9db5', '#ffb3c6', '#fff0f4'][Math.floor(Math.random() * 4)] }),
+    snow: () => ({ k: 'flake', x: rnd(-.05, 1.05) * W, y: rnd(-.3, 0) * H, vy: rnd(45, 110), vx: rnd(-14, 14), s: rnd(1.6, 4.2), sw: rnd(0, 6.28), col: '#eef5ff' }),
+    embers: () => ({ k: 'ember', x: rnd(0, 1) * W, y: H + rnd(0, .2) * H, vy: -rnd(70, 190), vx: rnd(-26, 26), s: rnd(1.4, 3.6), sw: rnd(0, 6.28), col: ['#ff6a2a', '#ff9a3c', '#ffd27a', '#ff4d2a'][Math.floor(Math.random() * 4)] }),
+    gold: () => ({ k: 'coin', x: rnd(0, 1) * W, y: rnd(-.35, 0) * H, vy: rnd(160, 330), vx: rnd(-18, 18), s: rnd(7, 11), a: rnd(0, 6.28), va: rnd(5, 10), sw: 0 }),
+  };
+  if (kind === 'aegis') fx.ps.push({ k: 'aegis', life: 0 });
+  else for (let i = 0; i < n; i++) { const p = make[kind](); p.delay = rnd(0, 2.6); fx.ps.push(p); }
+  if (fx.raf) return;
+  fx.last = performance.now();
+  const step = now => {
+    const dt = Math.min(.05, (now - fx.last) / 1000); fx.last = now;
+    const { c, ps } = fx; c.clearRect(0, 0, W, H);
+    for (let i = ps.length - 1; i >= 0; i--) {
+      const p = ps[i];
+      if (p.k === 'aegis') { p.life += dt; drawAegis(c, p.life, W, H); if (p.life > 2.6) ps.splice(i, 1); continue; }
+      if (p.delay > 0) { p.delay -= dt; continue; }
+      p.sw += dt * 2.2; p.y += p.vy * dt; p.x += (p.vx + Math.sin(p.sw) * (p.k === 'coin' ? 6 : 26)) * dt;
+      if (p.a !== undefined) p.a += p.va * dt;
+      if (p.y > H + 30 || p.y < -80 || p.x > W + 40 || p.x < -40) { ps.splice(i, 1); continue; }
+      drawParticle(c, p);
+    }
+    if (ps.length) fx.raf = requestAnimationFrame(step);
+    else { fx.raf = 0; removeEventListener('resize', fx.fit); fx.cv.remove(); fx = null; }
+  };
+  fx.raf = requestAnimationFrame(step);
+}
+function drawParticle(c, p) {
+  c.save(); c.translate(p.x, p.y);
+  if (p.k === 'petal') {
+    c.rotate(p.a); c.scale(1, .55 + .45 * Math.abs(Math.cos(p.a * .7))); c.fillStyle = p.col; c.globalAlpha = .92;
+    const s = p.s; c.beginPath(); c.moveTo(0, -s); c.bezierCurveTo(s * .9, -s * .7, s * .8, s * .5, 0, s); c.bezierCurveTo(-s * .8, s * .5, -s * .9, -s * .7, 0, -s * .55); c.fill();
+  } else if (p.k === 'flake') {
+    c.fillStyle = p.col; c.globalAlpha = .55 + p.s / 10; c.beginPath(); c.arc(0, 0, p.s, 0, 6.283); c.fill();
+  } else if (p.k === 'ember') {
+    c.globalCompositeOperation = 'lighter'; c.fillStyle = p.col; c.globalAlpha = Math.max(.15, Math.min(1, p.y / 300));
+    c.shadowColor = p.col; c.shadowBlur = 10; c.beginPath(); c.arc(0, 0, p.s, 0, 6.283); c.fill();
+  } else if (p.k === 'coin') {
+    const w = Math.abs(Math.cos(p.a)), s = p.s;
+    c.scale(Math.max(.12, w), 1);
+    const g = c.createRadialGradient(-s * .3, -s * .3, 1, 0, 0, s); g.addColorStop(0, '#fff3b0'); g.addColorStop(.55, '#f3b93a'); g.addColorStop(1, '#a9740f');
+    c.fillStyle = g; c.beginPath(); c.arc(0, 0, s, 0, 6.283); c.fill();
+    c.strokeStyle = 'rgba(120,70,0,.55)'; c.lineWidth = 1.2; c.beginPath(); c.arc(0, 0, s * .66, 0, 6.283); c.stroke();
+  }
+  c.restore();
+}
+// Эгида Бессмертного: золотая вспышка из центра и кольцо света
+function drawAegis(c, t, W, H) {
+  const k = Math.min(1, t / 2.6), a = Math.sin(Math.PI * Math.min(1, k * 1.15)), R = Math.hypot(W, H) * (.25 + .5 * k), cx = W / 2, cy = H * .45;
+  c.save(); c.globalCompositeOperation = 'lighter';
+  const g = c.createRadialGradient(cx, cy, 0, cx, cy, R); g.addColorStop(0, `rgba(255,214,120,${.26 * a})`); g.addColorStop(.5, `rgba(255,150,60,${.14 * a})`); g.addColorStop(1, 'rgba(255,120,40,0)');
+  c.fillStyle = g; c.fillRect(0, 0, W, H);
+  c.strokeStyle = `rgba(255,226,150,${.7 * (1 - k)})`; c.lineWidth = 3 + 8 * (1 - k); c.beginPath(); c.arc(cx, cy, R * .62, 0, 6.283); c.stroke();
+  c.restore();
 }
 // небольшие окна: автор, поддержка, реклама
 function openSheet(html) {
@@ -210,6 +309,7 @@ function openSheet(html) {
   return { root: $('.modal', root), close };
 }
 function openInfo(kind) {
+  if (kind === 'support') return openSupport();
   const a = SITE.author || {};
   const discord = `<button class="btn block" data-copy="${esc(a.discord || 'ahttps')}">${icon('discord')}Discord: ${esc(a.discord || 'ahttps')}<span class="sh-note">скопировать</span></button>`;
   const tg = SITE.telegram ? `<a class="btn block" href="${esc(SITE.telegram)}" target="_blank" rel="noopener">${icon('send')}Telegram: чат и новости</a>` : '';
@@ -217,20 +317,80 @@ function openInfo(kind) {
     author: `${avatarHTML(a.avatar, a.nick, 'sh-ava')}<h2>@${esc(a.nick || 'ahttps')}</h2>
       <p>Автор Grid Studio. Пиши по вопросам, насчёт заказа сеток и с интересными предложениями.</p>
       <div class="sh-actions">${discord}${a.github ? `<a class="btn block" href="https://github.com/${esc(a.github)}" target="_blank" rel="noopener">${icon('github')}GitHub: ${esc(a.github)}</a>` : ''}${tg}</div>`,
-    support: `<div class="sh-ico">${icon('heart')}</div><h2>Поддержать разработку</h2>
-      <p>Grid Studio бесплатный и таким останется. Если сайт пригодился — помоги ему расти: новые режимы, гайды и игры появляются быстрее.</p>
-      <div class="sh-actions">
-        ${SITE.support ? `<a class="btn primary block" href="${esc(SITE.support)}" target="_blank" rel="noopener">${icon('heart')}Поддержать рублём</a>` : ''}
-        ${SITE.repo ? `<a class="btn block" href="${esc(SITE.repo)}" target="_blank" rel="noopener">${icon('star')}Поставить звезду на GitHub</a>` : ''}
-        <button class="btn block" data-copy="${esc(new URL('index.html', location.href).href)}">${icon('link')}Поделиться сайтом с друзьями<span class="sh-note">скопировать ссылку</span></button>
-        <a class="btn block" href="editor.html?publish">${icon('upload')}Выложить свою сетку в Мастерскую</a>
-      </div>`,
     ads: `<div class="sh-ico">${icon('megaphone')}</div><h2>Реклама на Grid Studio</h2>
       <p>Аудитория — игроки Dota 2, которые настраивают игру под себя. Места: главная, Мастерская, гайды и «Угадайка». Обсудим формат и цену.</p>
       <div class="sh-actions">${SITE.ads ? `<a class="btn primary block" href="${esc(SITE.ads)}" target="_blank" rel="noopener">${icon('send')}Написать насчёт рекламы</a>` : ''}${discord}${tg}</div>`,
   };
   const m = openSheet(`<div class="sh-body">${sheets[kind]}</div>`);
   m.root.addEventListener('click', e => { const b = e.target.closest('[data-copy]'); if (b) copyText(b.dataset.copy, 'Скопировано'); });
+}
+
+// ---------- «Поддержать разработку»: криптовалюта (адреса — в config.js), ещё способы, QR для телефона ----------
+const COIN_MARK = { btc: '₿', eth: 'Ξ', usdt: '₮', ton: '◈', sol: '◎', ltc: 'Ł', trx: 'T', xmr: 'ɱ' };
+let qrLoad = null;
+const loadQR = () => qrLoad ||= new Promise((res, rej) => {
+  if (window.qrcode) return res(window.qrcode);
+  const sc = document.createElement('script');
+  sc.src = 'https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.js';
+  sc.onload = () => res(window.qrcode); sc.onerror = () => { qrLoad = null; rej(new Error('qr')); };
+  document.head.appendChild(sc);
+});
+// QR одним SVG-путём: тёмные модули на белой плашке с тихой зоной — так читается любым сканером
+async function qrSVG(text) {
+  const q = (await loadQR())(0, 'M'); q.addData(text); q.make();
+  const n = q.getModuleCount(), m = 3; let d = '';
+  for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) {
+    if (!q.isDark(y, x)) continue;
+    let w = 1; while (x + w < n && q.isDark(y, x + w)) w++;
+    d += `M${x + m} ${y + m}h${w}v1h-${w}z`; x += w - 1;
+  }
+  return `<svg viewBox="0 0 ${n + m * 2} ${n + m * 2}" shape-rendering="crispEdges" role="img" aria-label="QR-код адреса"><rect width="100%" height="100%" fill="#fff"/><path d="${d}" fill="#15100d"/></svg>`;
+}
+function openSupport() {
+  const coins = (SITE.crypto || []).filter(c => c?.addr);
+  const m = openSheet(`<div class="sup-body">
+    <div class="sup-head">
+      <div class="sup-heart"><i></i><i></i>${icon('heart')}</div>
+      <h2>Поддержать Grid Studio</h2>
+      <p>Сайт бесплатный и таким останется. Если он пригодился — помоги ему расти: новые режимы, гайды и игры появятся быстрее.</p>
+    </div>
+    <section class="sup-sec">
+      <h3>${icon('coin')}Криптовалютой</h3>
+      ${coins.length ? `<div class="coin-tabs" role="tablist">${coins.map((c, i) => `<button class="coin-tab${i ? '' : ' on'}" role="tab" data-coin="${i}" style="--cc:${esc(c.color || '#f08a4b')}"><i>${esc(COIN_MARK[c.id] || c.ticker?.[0] || '¤')}</i>${esc(c.ticker)}</button>`).join('')}</div>
+      <div class="coin-panel" id="coinPanel"></div>`
+      : `<div class="coin-soon">${icon('coin')}<b>Кошельки скоро появятся</b><span>Адреса для перевода добавятся сюда. Пока можно поддержать другими способами ниже.</span></div>`}
+    </section>
+    <section class="sup-sec">
+      <h3>${icon('star')}Без денег — тоже помощь</h3>
+      <div class="sup-ways">
+        ${SITE.support ? `<a class="sup-way pri" href="${esc(SITE.support)}" target="_blank" rel="noopener">${icon('heart')}<b>Рублями</b><span>Boosty и подобные</span></a>` : ''}
+        ${SITE.repo ? `<a class="sup-way" href="${esc(SITE.repo)}" target="_blank" rel="noopener">${icon('star')}<b>Звезда на GitHub</b><span>одна секунда</span></a>` : ''}
+        <button class="sup-way" data-copy="${esc(new URL('index.html', location.href).href)}">${icon('link')}<b>Рассказать друзьям</b><span>скопировать ссылку</span></button>
+        <a class="sup-way" href="editor.html?publish">${icon('upload')}<b>Выложить сетку</b><span>в Мастерскую</span></a>
+      </div>
+    </section>
+    <p class="sup-thanks">Спасибо, что ты здесь 🧡</p>
+  </div>`);
+  m.root.classList.add('sup');
+  m.root.addEventListener('click', e => { const b = e.target.closest('[data-copy]'); if (b) copyText(b.dataset.copy, 'Скопировано'); });
+  if (!coins.length) return;
+  const panel = $('#coinPanel', m.root);
+  const show = async i => {
+    const c = coins[i];
+    panel.dataset.i = i;
+    $$('.coin-tab', m.root).forEach((t, k) => { t.classList.toggle('on', k === i); t.setAttribute('aria-selected', k === i); });
+    panel.style.setProperty('--cc', c.color || '#f08a4b');
+    panel.innerHTML = `<div class="coin-qr" aria-hidden="true"><span class="loading">QR…</span></div>
+      <div class="coin-info">
+        <div class="coin-name"><b>${esc(c.name || c.ticker)}</b><em>сеть ${esc(c.network || c.name)}</em></div>
+        <button class="coin-addr" data-copy="${esc(c.addr)}" title="Скопировать адрес"><code>${esc(c.addr)}</code><span>${icon('copy')}Копировать</span></button>
+        ${c.memo ? `<button class="coin-addr memo" data-copy="${esc(c.memo)}" title="Скопировать memo"><small>Memo / тег</small><code>${esc(c.memo)}</code><span>${icon('copy')}</span></button>` : ''}
+        <p class="coin-warn">${icon('shield')}<span>Отправляй только ${esc(c.ticker)} в сети «${esc(c.network || c.name)}» — перевод в другую сеть не вернуть.</span></p>
+      </div>`;
+    try { const svg = await qrSVG(c.addr); if (+panel.dataset.i === i) $('.coin-qr', panel).innerHTML = svg; } catch { $('.coin-qr', panel)?.remove(); }
+  };
+  m.root.addEventListener('click', e => { const t = e.target.closest('.coin-tab'); if (t) show(+t.dataset.coin); });
+  show(0);
 }
 
 // ---------- карточка сетки ----------
@@ -795,6 +955,7 @@ function initHome() {
     $('#catNum').textContent = total ? num(total) : '#1';
     $('.big-num span').textContent = total ? plural(total, 'сетка', 'сетки', 'сеток') + ' в Мастерской' : 'стань первым автором';
     box.innerHTML = items.length ? items.slice(0, 6).map(cardHTML).join('') : `<div class="cards-empty">${MARK}<b>Здесь пока пусто</b><span>Стань первым: нарисуй сетку в редакторе и нажми «В Мастерскую».</span><a class="btn primary sm" href="editor.html">Открыть редактор</a></div>`;
+    inGameTile(items, still);
     // случайная сетка из Мастерской — на экран ноутбука и в подпись под ним; 18+ на главную не берём
     const pool = items.filter(g => !g.nsfw), big = pool.filter(g => g.cats >= 300);
     if (pool.length) {
@@ -809,6 +970,40 @@ function initHome() {
   // сетка открывается своей страницей
   box.onclick = e => { const c = e.target.closest('.gcard[data-id]'); if (c) goGrid(c.dataset.id, e); };
   heroBackdrop();
+}
+
+// Плитка «Как в игре»: экран «Герои» Доты, в нём по очереди случайные работы из Мастерской.
+// Работы подгружаются заранее и сменяются плавно, пока плитка на экране; 18+ не берём.
+function inGameTile(items, still) {
+  const view = $('#igView'), stage = $('#igStage'), cap = $('#igCap'), hid = $('#igHidden');
+  const pool = shuffled(items.filter(g => !g.nsfw && g.cats >= 20), 1 + Math.floor(Math.random() * 2e9)).slice(0, 6);
+  if (!view || !pool.length) return;
+  const cfgs = new Map(), want = g => cfgs.get(g.id) || cfgs.set(g.id, API.config(g.id).then(c => c?.categories?.length ? c.categories : null).catch(() => null)).get(g.id);
+  let at = -1, timer = 0, cur = null;
+  const show = async () => {
+    for (let tries = 0; tries < pool.length; tries++) {
+      const g = pool[(at = (at + 1) % pool.length)], cats = await want(g);
+      if (!cats) continue;
+      want(pool[(at + 1) % pool.length]);                    // следующую грузим, пока смотрят эту
+      const cv = document.createElement('canvas'); cv.className = 'ig-cv'; stage.appendChild(cv);
+      GridRender.mount(cv, cats, { bg: 'none' });
+      requestAnimationFrame(() => requestAnimationFrame(() => { $$('.ig-cv.on', stage).forEach(o => { o.classList.remove('on'); setTimeout(() => o.remove(), 900); }); cv.classList.add('on'); }));
+      view.classList.add('live'); cur = g;
+      const used = new Set(cats.flatMap(c => c.hero_ids || [])), hidden = Math.max(0, (window.HEROES || []).length - used.size);
+      hid.hidden = !hidden; hid.textContent = `НЕ ВИДНО ${hidden} ${plural(hidden, 'ГЕРОЯ', 'ГЕРОЕВ', 'ГЕРОЕВ')}`;
+      cap.hidden = false; cap.href = gridUrl(g.id);
+      cap.innerHTML = `<span>«${esc(g.title)}» — ${esc(g.author)}</span><small>случайная работа из Мастерской</small>`;
+      return;
+    }
+  };
+  view.onclick = e => { if (cur) goGrid(cur.id, e); };
+  view.style.cursor = 'pointer';
+  new IntersectionObserver(es => {
+    clearInterval(timer);
+    if (!es.some(e => e.isIntersecting)) return;
+    if (at < 0) show();
+    if (!still && pool.length > 1) timer = setInterval(show, 5200);
+  }, { threshold: .35 }).observe(view);
 }
 
 async function dimFor(src) {
