@@ -194,9 +194,13 @@ button:focus { outline: none; }
 .fc-media { position: relative; height: 112px; margin-bottom: 8px; border-radius: 14px; overflow: hidden; background: #120d0b; transition: transform .45s var(--ease); }
 .fcard:hover .fc-media { transform: scale(1.025); }
 .fc-media::after { content: ""; position: absolute; inset: 0; border-radius: inherit; box-shadow: inset 0 0 0 1px oklch(1 0 0 / .05); pointer-events: none; }
-.fc-faces-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 5px; padding: 12px; align-content: center; }
-.fc-faces-grid img { width: 100%; aspect-ratio: 1; object-fit: cover; object-position: 50% 15%; border-radius: 7px; filter: saturate(.85); transition: transform .3s var(--spring), filter .2s, opacity .3s; }
-.fc-faces-grid img.swap { opacity: 0; transform: scale(.6); }
+.fc-faces-grid { display: flex; flex-direction: column; justify-content: center; gap: 6px; padding: 0; -webkit-mask-image: linear-gradient(90deg, transparent, #000 14%, #000 86%, transparent); mask-image: linear-gradient(90deg, transparent, #000 14%, #000 86%, transparent); }
+.ff-row { overflow: hidden; }
+.ff-track { display: flex; gap: 6px; width: max-content; animation: ffRun 34s linear infinite; }
+.ff-row:nth-child(2) .ff-track { animation-direction: reverse; animation-duration: 40s; }
+.fc-faces-grid img { flex: none; width: 46px; height: 46px; object-fit: cover; object-position: 50% 15%; border-radius: 7px; filter: saturate(.85); transition: transform .3s var(--spring), filter .2s; }
+@keyframes ffRun { to { transform: translateX(calc(-50% - 3px)); } }
+@media (prefers-reduced-motion: reduce) { .ff-track { animation: none; } }
 .fcard:hover .fc-faces-grid img { filter: none; }
 .fc-faces-grid img:hover { transform: scale(1.12); }
 /* три арта сменяют друг друга: сначала картинка, потом по ней проходит луч и остаётся line-art */
@@ -207,6 +211,7 @@ button:focus { outline: none; }
 .fl-slide .out { clip-path: inset(0 100% 0 0); animation: flWipe 12s infinite; }
 .fl-slide::after { content: ""; position: absolute; top: 0; bottom: 0; left: 0; width: 2px; background: var(--accent-hi); box-shadow: 0 0 14px 2px var(--accent-hi); opacity: 0; animation: flScan 12s infinite; }
 .fcard:hover .fl-slide img { transform: scale(1.06); }
+@keyframes fcCycle { 0% { opacity: 0; } 6% { opacity: 1; } 33% { opacity: 1; } 39% { opacity: 0; } 100% { opacity: 0; } }
 @keyframes flWipe { 0%, 8% { clip-path: inset(0 100% 0 0); } 22%, 100% { clip-path: inset(0 0 0 0); } }
 @keyframes flScan { 0%, 7.9% { left: 0; opacity: 0; } 8% { left: 0; opacity: 1; } 22% { left: calc(100% - 2px); opacity: 1; } 22.1%, 100% { left: 0; opacity: 0; } }
 @media (prefers-reduced-motion: reduce) { .fl-slide { animation: none; } .fl-slide:first-child { opacity: 1; } .fl-slide .out { animation: none; clip-path: none; } .fl-slide::after { display: none; } }
@@ -989,7 +994,6 @@ textarea.pf-bio:focus { outline: 0; border-color: var(--accent); background: var
   .fcards { grid-template-columns: 1fr; }
   .fcard { display: grid; grid-template-columns: 120px 1fr; grid-template-rows: auto auto 1fr auto; column-gap: 16px; }
   .fc-media { grid-row: 1 / span 4; height: 100%; min-height: 150px; margin: 0; }
-  .fc-faces-grid { grid-template-columns: repeat(2, 1fr); align-content: start; }
   .fcard > span { margin-bottom: 10px; }
   .fc-more { justify-content: flex-start; }
 }

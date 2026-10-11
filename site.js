@@ -791,10 +791,10 @@ const BRAILLE = `⠀⠀⠀⠀⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
 const BRAILLE_BITS = [[0, 0, 1], [0, 1, 2], [0, 2, 4], [1, 0, 8], [1, 1, 16], [1, 2, 32], [0, 3, 64], [1, 3, 128]];
 function brailleCanvas(cv, texts) {
   texts = [].concat(texts);
-  let rows = 0, cols = 0, dots = [], at = 0;
+  let rows = 0, cols = 0, dots = [], at = 0, cover = false;
   const load = text => {
     const lines = text.split('\n').map(l => [...l]);
-    rows = lines.length; cols = Math.max(...lines.map(l => l.length)); dots = [];
+    rows = lines.length; cols = Math.max(...lines.map(l => l.length)); dots = []; cover = text !== texts[0];
     lines.forEach((l, r) => l.forEach((ch, c) => { const b = ch.codePointAt(0) - 0x2800; for (const [dx, dy, bit] of BRAILLE_BITS) if (b & bit) dots.push(c * 2 + dx, r * 4 + dy); }));
   };
   load(texts[0]);
@@ -805,7 +805,7 @@ function brailleCanvas(cv, texts) {
     cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr);
     const c = cv.getContext('2d'); c.setTransform(dpr, 0, 0, dpr, 0, 0);
     // шаг точки — чтобы арт целиком влез с небольшими полями
-    const p = Math.min((W - 14) / (cols * 2), (H - 10) / (rows * 4)), ox = (W - p * cols * 2) / 2, oy = (H - p * rows * 4) / 2, rad = p * 0.36;
+    const p = cover ? Math.max(W / (cols * 2), H / (rows * 4)) : Math.min((W - 14) / (cols * 2), (H - 10) / (rows * 4)), ox = (W - p * cols * 2) / 2, oy = (H - p * rows * 4) / 2, rad = p * 0.36;
     c.fillStyle = color; c.beginPath();
     for (let i = 0; i < dots.length; i += 2) {
       if (dots[i + 1] >= upto) continue;
@@ -835,17 +835,8 @@ function brailleCanvas(cv, texts) {
   card?.addEventListener('pointerenter', () => { color = 'oklch(0.93 0.03 70)'; paint(); });
   card?.addEventListener('pointerleave', () => { color = 'oklch(0.86 0.02 250)'; paint(); });
 }
-// Оживляем плитки главной: портреты в «Сетке героев» меняются по одному, в «Угадайке» бегут случайные символы
-function homeTileFx(heroes) {
-  const faces = $$('#fcFacesGrid img');
-  if (faces.length && heroes.length > faces.length) setInterval(() => {
-    if (document.hidden) return;
-    const img = faces[Math.floor(Math.random() * faces.length)], shown = new Set(faces.map(f => f.title));
-    const pool = heroes.filter(h => !shown.has(h.n)), h = pool[Math.floor(Math.random() * pool.length)];
-    if (!h) return;
-    img.classList.add('swap');
-    setTimeout(() => { img.src = portrait(h); img.alt = img.title = h.n; img.classList.remove('swap'); }, 320);
-  }, 1300);
+// Оживляем «Угадайку» на главной: в плитке бегут случайные символы
+function homeTileFx() {
   const rows = $$('#gameCard .gc-art i'), ramp = '.:-=+*#%@';
   if (rows.length) setInterval(() => {
     if (document.hidden) return;
@@ -860,7 +851,7 @@ function homeBgTile() {
   API.bg.list({ sort: 'popular', limit: 24 }).then(({ items }) => {
     const pics = shuffled(items.filter(b => !b.nsfw), 1 + Math.floor(Math.random() * 2e9)).slice(0, 8);
     if (!pics.length) return fallback();
-    const imgs = pics.map(b => { const im = new Image(); im.alt = ''; im.src = b.poster; box.insertBefore(im, $('.wc-hud', box)); return im; });
+    const imgs = pics.map(b => { const im = new Image(); im.alt = ''; im.src = b.poster; box.append(im); return im; });
     let at = -1;
     const next = () => {
       const im = imgs[(at = (at + 1) % imgs.length)];
@@ -876,9 +867,12 @@ function initHome() {
   const heroes = window.HEROES || [], still = matchMedia('(prefers-reduced-motion: reduce)').matches;
 
   // карточки разделов: портреты героев, Брайль
-  $('#fcFacesGrid').innerHTML = shuffled(heroes, 5).slice(0, 10).map(h => heroImgTag(h, false)).join('');
+  // «Сетка героев»: два ряда портретов бегут навстречу друг другу (ряд дублируем, чтобы лента была бесшовной)
+  const ffRow = list => `<div class="ff-row"><div class="ff-track">${(list + list)}</div></div>`;
+  const tags = shuffled(heroes, 5).slice(0, 24).map(h => heroImgTag(h, false));
+  $('#fcFacesGrid').innerHTML = ffRow(tags.slice(0, 12).join("")) + ffRow(tags.slice(12).join(""));
   brailleCanvas($('#fcBraille'), [BRAILLE, ...(window.BRAILLE_ARTS || [])]);
-  if (!still) homeTileFx(heroes);
+  if (!still) homeTileFx();
   homeBgTile();
 
   // «Угадайка»: номер дня и, если сегодня уже играли, — результат
