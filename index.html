@@ -14,7 +14,7 @@
 <link rel="preload" href="docs/hero-art.webp" as="image" fetchpriority="high">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600;700&family=Unbounded:wght@500;600;700&display=swap">
-<link rel="stylesheet" href="site.css?v=44">
+<link rel="stylesheet" href="site.css?v=45">
 </head>
 <body data-page="home">
 
@@ -43,7 +43,7 @@
           <a class="fc-more" href="workshop.html">Готовые в Мастерской <span data-icon="arrow"></span></a>
         </article>
         <article class="fcard" style="--d:.42s">
-          <div class="fc-media fc-lineart" aria-hidden="true"><img src="docs/art-cc-out.webp" alt="" width="980" height="936"><img src="docs/art-white-out.webp" alt="" width="980" height="980" loading="lazy"><img src="docs/lineart-out.webp" alt="" width="810" height="918" loading="lazy"></div>
+          <div class="fc-media fc-lineart" aria-hidden="true"><span class="fl-slide"><img src="docs/art-cc-src.webp" alt=""><img class="out" src="docs/art-cc-out.webp" alt=""></span><span class="fl-slide"><img src="docs/art-white-src.webp" alt="" loading="lazy"><img class="out" src="docs/art-white-out.webp" alt="" loading="lazy"></span><span class="fl-slide"><img src="docs/lineart-src.webp" alt="" loading="lazy"><img class="out" src="docs/lineart-out.webp" alt="" loading="lazy"></span></div>
           <b>Арт из картинки</b>
           <span>Line-art, ASCII или мозаика из героев: вставь картинку — и готово.</span>
           <a class="btn block" href="editor.html?import">Загрузить картинку</a>
@@ -61,7 +61,7 @@
       <!-- вторая строка панелей: новое — фоны главного меню — и «Угадайка» дня -->
       <div class="frow">
         <a class="fwide" href="background.html" style="--d:.56s">
-          <span class="wc-art wc-bg has-img" aria-hidden="true"><img src="docs/menu-bg.webp" alt="" width="240" height="240"><i class="wc-hud"></i><i class="wc-hud b"></i></span>
+          <span class="wc-art wc-bg" id="wcBg" aria-hidden="true"><i class="wc-hud"></i><i class="wc-hud b"></i></span>
           <span class="wc-text"><b>Фон меню <em>новое</em></b><small>Свой фон на главный экран Доты — и под сетку героев</small></span>
           <span class="wc-go" data-icon="arrow"></span>
         </a>
@@ -203,6 +203,7 @@
 <script src="auth.js?v=37"></script>
 <script src="gridrender.js?v=37"></script>
 <script src="catalog-api.js?v=39"></script>
-<script src="site.js?v=48"></script>
+<script src="braille-arts.js?v=1"></script>
+<script src="site.js?v=49"></script>
 </body>
 </html>

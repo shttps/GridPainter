@@ -789,10 +789,15 @@ const BRAILLE = `⠀⠀⠀⠀⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
 ⡸⠀⠀⢯⣟⡏⡆⢷⠀⠈⢞⡌⢧⠹⡗⢦⣀⠀⠀⠀⠀⠀⠀⠀⠂⠀⠀⠀⠀⠀⠀⣀⡴⡿⢇⠃⡜⠀⠠⠁⠉⠃⠮⡐⡄⠁⠀⢹⡄⢷⣕⢯⡳⡽⣺⣪⢯⣗⣗⡷⣯⣷⣿⣷⣿⣿
 ⡸⠀⠀⣿⢽⠂⢿⢸⡆⠀⠐⠹⡘⣷⡹⠀⠌⠓⠦⣄⠀⠀⠀⠀⠀⠀⢀⣀⠤⠒⠉⠡⡑⠀⢸⠸⡀⠀⡈⠀⠀⠈⠀⠈⢦⠐⠀⠈⣷⡘⣗⡯⡯⡯⡷⣽⣳⣳⣻⣞⣷⢿⣾⣿⡿⣿`;
 const BRAILLE_BITS = [[0, 0, 1], [0, 1, 2], [0, 2, 4], [1, 0, 8], [1, 1, 16], [1, 2, 32], [0, 3, 64], [1, 3, 128]];
-function brailleCanvas(cv, text) {
-  const lines = text.split('\n').map(l => [...l]), rows = lines.length, cols = Math.max(...lines.map(l => l.length));
-  const dots = [];
-  lines.forEach((l, r) => l.forEach((ch, c) => { const b = ch.codePointAt(0) - 0x2800; for (const [dx, dy, bit] of BRAILLE_BITS) if (b & bit) dots.push(c * 2 + dx, r * 4 + dy); }));
+function brailleCanvas(cv, texts) {
+  texts = [].concat(texts);
+  let rows = 0, cols = 0, dots = [], at = 0;
+  const load = text => {
+    const lines = text.split('\n').map(l => [...l]);
+    rows = lines.length; cols = Math.max(...lines.map(l => l.length)); dots = [];
+    lines.forEach((l, r) => l.forEach((ch, c) => { const b = ch.codePointAt(0) - 0x2800; for (const [dx, dy, bit] of BRAILLE_BITS) if (b & bit) dots.push(c * 2 + dx, r * 4 + dy); }));
+  };
+  load(texts[0]);
   let color = 'oklch(0.86 0.02 250)', upto = rows * 4;
   const paint = () => {
     const W = cv.clientWidth, H = cv.clientHeight; if (!W || !H) return;
@@ -818,16 +823,63 @@ function brailleCanvas(cv, text) {
   };
   reveal();
   new ResizeObserver(paint).observe(cv);
+  // арты сменяют друг друга: каждый «печатается» сверху вниз заново, пока плитка на экране
+  if (texts.length > 1 && !matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    let tm = 0;
+    new IntersectionObserver(es => {
+      clearInterval(tm);
+      if (es.some(e => e.isIntersecting)) tm = setInterval(() => { if (!document.hidden) { load(texts[at = (at + 1) % texts.length]); upto = 0; reveal(); } }, 6500);
+    }, { threshold: .3 }).observe(cv);
+  }
   const card = cv.closest('.fcard');
   card?.addEventListener('pointerenter', () => { color = 'oklch(0.93 0.03 70)'; paint(); });
   card?.addEventListener('pointerleave', () => { color = 'oklch(0.86 0.02 250)'; paint(); });
+}
+// Оживляем плитки главной: портреты в «Сетке героев» меняются по одному, в «Угадайке» бегут случайные символы
+function homeTileFx(heroes) {
+  const faces = $$('#fcFacesGrid img');
+  if (faces.length && heroes.length > faces.length) setInterval(() => {
+    if (document.hidden) return;
+    const img = faces[Math.floor(Math.random() * faces.length)], shown = new Set(faces.map(f => f.title));
+    const pool = heroes.filter(h => !shown.has(h.n)), h = pool[Math.floor(Math.random() * pool.length)];
+    if (!h) return;
+    img.classList.add('swap');
+    setTimeout(() => { img.src = portrait(h); img.alt = img.title = h.n; img.classList.remove('swap'); }, 320);
+  }, 1300);
+  const rows = $$('#gameCard .gc-art i'), ramp = '.:-=+*#%@';
+  if (rows.length) setInterval(() => {
+    if (document.hidden) return;
+    const r = rows[Math.floor(Math.random() * rows.length)];
+    r.textContent = Array.from({ length: 3 }, () => ramp[Math.floor(Math.random() * ramp.length)]).join('');
+  }, 240);
+}
+// «Фон меню»: в плитке по кругу случайные работы из Мастерской — плавно сменяются и чуть «дышат»
+function homeBgTile() {
+  const box = $('#wcBg'); if (!box) return;
+  const fallback = () => { if (!$('img', box)) box.insertAdjacentHTML('afterbegin', '<img class="on" src="docs/menu-bg.webp" alt="">'); };
+  API.bg.list({ sort: 'popular', limit: 24 }).then(({ items }) => {
+    const pics = shuffled(items.filter(b => !b.nsfw), 1 + Math.floor(Math.random() * 2e9)).slice(0, 8);
+    if (!pics.length) return fallback();
+    const imgs = pics.map(b => { const im = new Image(); im.alt = ''; im.src = b.poster; box.insertBefore(im, $('.wc-hud', box)); return im; });
+    let at = -1;
+    const next = () => {
+      const im = imgs[(at = (at + 1) % imgs.length)];
+      if (!im.complete || !im.naturalWidth) return;
+      $$('img.on', box).forEach(o => o.classList.remove('on'));
+      im.classList.add('on');
+    };
+    next();
+    if (imgs.length > 1 && !matchMedia('(prefers-reduced-motion: reduce)').matches) setInterval(() => { if (!document.hidden) next(); }, 3200);
+  }).catch(fallback);
 }
 function initHome() {
   const heroes = window.HEROES || [], still = matchMedia('(prefers-reduced-motion: reduce)').matches;
 
   // карточки разделов: портреты героев, Брайль
   $('#fcFacesGrid').innerHTML = shuffled(heroes, 5).slice(0, 10).map(h => heroImgTag(h, false)).join('');
-  brailleCanvas($('#fcBraille'), BRAILLE);
+  brailleCanvas($('#fcBraille'), [BRAILLE, ...(window.BRAILLE_ARTS || [])]);
+  if (!still) homeTileFx(heroes);
+  homeBgTile();
 
   // «Угадайка»: номер дня и, если сегодня уже играли, — результат
   const day = gameDay(), today = (() => { try { return JSON.parse(localStorage.getItem('gs.game.daily')); } catch { return null; } })();
