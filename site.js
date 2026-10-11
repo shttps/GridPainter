@@ -1184,6 +1184,30 @@ function initWorkshop() {
     applyIcons($('.ws-head'));
     requestAnimationFrame(() => { ['#wsTabs', '#wsSorts', '#wsBg'].forEach(s => segInd($(s))); });
   }
+  // ----- арт в шапке: случайные работы из Мастерской (18+ не берём), пока не загрузились — готовые картинки -----
+  (async () => {
+    const pick = a => a[Math.floor(Math.random() * a.length)];
+    const [gr, br] = await Promise.allSettled([API.list({ sort: 'popular', limit: 24 }), API.bg.list({ sort: 'popular', limit: 24 })]);
+    const g = gr.status === 'fulfilled' && pick(gr.value.items.filter(x => !x.nsfw && x.cats >= 20)),
+      b = br.status === 'fulfilled' && pick(br.value.items.filter(x => !x.nsfw));
+    const label = (frame, href, text, n) => {
+      const a = $('.ws-art-label', frame); a.href = href; a.removeAttribute('tabindex'); a.innerHTML = `<em>${esc(text)}</em><i>${n}</i>`;
+    };
+    if (b) {
+      const fr = $('.ws-art-back'), img = $('img', fr);
+      img.onload = () => { fr.classList.add('live'); label(fr, bgPageUrl(b.id), b.title, '02'); };
+      img.src = b.poster;
+    }
+    if (g) {
+      const cfg = await API.config(g.id).catch(() => null);
+      if (!cfg?.categories?.length) return;
+      const fr = $('.ws-art-front'), cv = document.createElement('canvas');
+      cv.setAttribute('aria-hidden', 'true');
+      $('img', fr).replaceWith(cv);
+      GridRender.mount(cv, cfg.categories, { bg: 'dota' });
+      fr.classList.add('live'); label(fr, gridUrl(g.id), g.title, '01');
+    }
+  })();
   const relayout = () => ['#wsTabs', '#wsSorts', '#wsBg'].forEach(s => segInd($(s)));
   document.fonts?.ready.then(relayout); addEventListener('resize', relayout);
 
