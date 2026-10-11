@@ -8,7 +8,12 @@
   const HEROES = window.HEROES || [], ARTS = window.GAME_ARTS;
   const BY_ID = new Map(HEROES.map(h => [h.id, h]));
   const POOL = HEROES.filter(h => ARTS.d[h.id]);
-  const TRIES = 6, COLS = [28, 34, 40, 46, 52, 56];   // данные портрета — 56 колонок, больше нет смысла
+  const TRIES = 6;
+  // «Бесконечный» — для разминки; «Герой дня» — хардкор: грубее арт, первые стадии без цвета, подсказки позже
+  const COLS_EASY = [28, 34, 40, 46, 52, 56], COLS_HARD = [16, 20, 25, 31, 39, 50];   // данные портрета — 56 колонок
+  const colsFor = k => (mode === 'daily' ? COLS_HARD : COLS_EASY)[k];
+  const PLAIN_STAGES = 2;   // в «Герое дня» первые стадии — только символы, без цвета
+  const HINT_SHIFT = () => (mode === 'daily' ? 1 : 0);
   const RAMP = ' .:-=+*#%@';
   const ATTR = { str: 'Сила', agi: 'Ловкость', int: 'Интеллект', all: 'Универсал' };
   const ROLE_RU = { Carry: 'Керри', Support: 'Саппорт', Nuker: 'Нюкер', Disabler: 'Контроль', Jungler: 'Лесник', Durable: 'Танк', Escape: 'Побег', Pusher: 'Пушер', Initiator: 'Инициатор' };
@@ -38,7 +43,7 @@
 
   // ---------- рисование ----------
   const cv = $('#gArt'), ctx = cv.getContext('2d');
-  let shown = null, anim = 0, colored = load('gs.game.color', true);
+  let shown = null, anim = 0, plain = false, colored = load('gs.game.color', true);
   // сетка символов cols × rows: клетка вдвое выше, чем шире (как у моноширинного шрифта)
   function asciiGrid(id, cols) {
     const { lum, col, lo, span } = art(id), W = ARTS.w, H = ARTS.h, CW = ARTS.cw, CH = ARTS.ch;
@@ -63,8 +68,9 @@
     return out;
   }
   // смена детализации: символы «перебираются» и встают на место — около трети секунды
-  function draw(id, cols, { scramble = true } = {}) {
+  function draw(id, cols, { scramble = true, noColor } = {}) {
     const grid = asciiGrid(id, cols);
+    if (noColor !== undefined) plain = noColor;
     shown = { id, cols };
     cancelAnimationFrame(anim);
     const t0 = performance.now(), D = scramble && !matchMedia('(prefers-reduced-motion: reduce)').matches ? 380 : 0;
@@ -89,9 +95,9 @@
       // до конца анимации часть клеток ещё «перебирается»
       if (t < 1 && chr !== ' ' && Math.random() > t) chr = RAMP[1 + Math.floor(Math.random() * (RAMP.length - 1))];
       // пустая клетка в цветном режиме — блёклая точка её цвета: так читаются цветовые пятна портрета
-      if (chr === ' ' && !colored) continue;
+      if (chr === ' ' && (!colored || plain)) continue;
       const k = cell.k;
-      if (colored) {
+      if (colored && !plain) {
         // подложка — цвет портрета, промодулированный его яркостью: получается настоящий пиксель-арт, героя видно издалека
         const [R, G, B] = cell.rgb, m = Math.max(R, G, B, 1), b = 255 * (0.1 + 0.95 * cell.v ** 0.9);
         ctx.fillStyle = `rgb(${Math.min(255, R / m * b)},${Math.min(255, G / m * b)},${Math.min(255, B / m * b)})`;
@@ -124,7 +130,7 @@
     round = { hero: id, guesses: [], done: false, win: false };
     render(true);
   }
-  const persist = () => { if (mode === 'daily') save('gs.game.daily', { day: round.day, guesses: round.guesses, done: round.done, win: round.win }); };
+  const persist = () => { if (mode === 'daily') save('gs.game.daily', { day: round.day, guesses: round.guesses, done: round.done, win: round.win, sent: !!round.sent }); };
 
   function guess(id) {
     if (round.done || round.guesses.includes(id)) return;
@@ -142,12 +148,63 @@
       else stats.streak = 0;
       stats.best = Math.max(stats.best, stats.streak); stats.last = round.win ? today : 0;
       save('gs.game.stats', stats);
+      persist(); submitResult();
     } else {
       endless.streak = round.win ? endless.streak + 1 : 0;
       endless.best = Math.max(endless.best, endless.streak);
       save('gs.game.endless', endless);
     }
   }
+
+  // ---------- конкурс недели: результат «Героя дня» и таблица ----------
+  const CFG = window.GRID_CATALOG || {}, ACC = window.Accounts;
+  const remote = !!(CFG.url && CFG.key && ACC?.enabled);
+  async function rpc(fn, args) {
+    const h = { apikey: CFG.key, 'Content-Type': 'application/json' };
+    const t = await ACC.token();
+    if (t) h.Authorization = 'Bearer ' + t; else if (!CFG.key.startsWith('sb_')) h.Authorization = 'Bearer ' + CFG.key;
+    const res = await fetch(CFG.url.replace(/\/+$/, '') + '/rest/v1/rpc/' + fn, { method: 'POST', headers: h, body: JSON.stringify(args) });
+    const text = await res.text(), data = text ? JSON.parse(text) : null;
+    if (!res.ok) throw new Error(data?.message || res.statusText);
+    return data;
+  }
+  async function submitResult() {
+    if (!remote || mode !== 'daily' || !round.done || round.sent || !ACC.signedIn()) return;
+    try {
+      await rpc('game_submit', { p_day: round.day, p_tries: round.guesses.length, p_won: round.win });
+      round.sent = true; persist();
+      toast(round.win ? 'Результат записан в таблицу недели' : 'Попытка записана — завтра новый герой');
+      loadBoard();
+    } catch (e) { if (!/not_signed_in/.test(e.message)) console.warn('game_submit', e.message); }
+  }
+  const weekRu = (a, b) => { const f = d => new Date(d + 'T00:00:00').toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' }); return `${f(a)} — ${f(b)}`; };
+  let back = 0, boardSeq = 0;
+  async function loadBoard() {
+    const box = $('#gBoard'); if (!box) return;
+    const my = ++boardSeq;
+    $$('#gWeekTabs button').forEach(b => b.classList.toggle('on', +b.dataset.back === back));
+    const prize = (window.SITE?.contest?.prize || '').trim();
+    $('#gPrize').innerHTML = prize ? `<span>${icon('trophy')}Приз недели</span><b>${esc(prize)}</b>` : `<span>${icon('trophy')}Приз недели</span><b>скоро объявим</b>`;
+    if (!remote) { box.innerHTML = '<p class="g-board-note">Таблица заработает, когда сайт подключит базу. Пока играй для себя.</p>'; return; }
+    box.innerHTML = '<p class="g-board-note">Загружаем таблицу…</p>';
+    let r;
+    try { r = await rpc('game_board', { p_back: back }); } catch { if (my === boardSeq) box.innerHTML = '<p class="g-board-note">Таблица пока недоступна. Загляни позже.</p>'; return; }
+    if (my !== boardSeq) return;
+    $('#gWeekRange').textContent = weekRu(r.from, r.to);
+    const me = ACC.user()?.id;
+    const rows = r.rows || [];
+    box.innerHTML = rows.length ? `<ol class="g-rows">${rows.map(p => `<li class="${p.id === me ? 'me' : ''}${p.place <= 3 ? ' top' + p.place : ''}">
+        <i class="g-place">${p.place <= 3 ? ['🥇', '🥈', '🥉'][p.place - 1] : p.place}</i>${avatarHTML(p.avatar, p.nick, 'g-ava')}
+        <b>${esc(p.nick)}${p.id === me ? ' <em>ты</em>' : ''}</b><span class="g-meta">${p.wins} из ${p.played}</span><strong>${p.points}<small>очк.</small></strong></li>`).join('')}</ol>`
+      : `<p class="g-board-note">${back ? 'На той неделе никто не играл.' : 'Пока никого. Угадай героя дня первым — и ты в таблице.'}</p>`;
+  }
+  function renderContest() {
+    const el = $('#gContestCta'); if (!el) return;
+    if (!remote) { el.innerHTML = ''; return; }
+    el.innerHTML = ACC.signedIn() ? '' : `<a class="btn primary sm" href="profile.html?next=game.html">${icon('user')}Войти и участвовать</a><small>Без входа играть можно, но в таблицу ты не попадёшь.</small>`;
+  }
+  document.addEventListener('click', e => { const b = e.target.closest('#gWeekTabs button'); if (b) { back = +b.dataset.back; loadBoard(); } });
+  ACC?.onChange?.(() => { renderContest(); submitResult(); loadBoard(); });
 
   // ---------- интерфейс ----------
   const hero = id => BY_ID.get(id);
@@ -161,17 +218,17 @@
   ];
   function render(redraw) {
     const g = round.guesses, wrong = g.filter(id => id !== round.hero).length, ans = hero(round.hero);
-    const stage = round.done ? COLS.length - 1 : Math.min(wrong, COLS.length - 1);
-    if (redraw) draw(round.hero, COLS[stage]);
+    const stage = round.done ? 5 : Math.min(wrong, 5);
+    if (redraw) draw(round.hero, colsFor(stage), { noColor: mode === 'daily' && !round.done && stage < PLAIN_STAGES });
     $('#gReveal').hidden = !round.done;
     if (round.done) { $('#gReveal').src = portrait(ans); $('#gReveal').alt = ans.n; }
-    $('#gStage').textContent = round.done ? ans.n : `Детализация ${stage + 1} / ${COLS.length}`;
+    $('#gStage').textContent = round.done ? ans.n : `Детализация ${stage + 1} / 6`;
     $('#gTitle').textContent = mode === 'daily' ? `Герой дня #${today}` : `Бесконечный · серия ${endless.streak}`;
     $('#gTries').innerHTML = Array.from({ length: TRIES }, (_, k) => `<i class="${k < g.length ? (g[k] === round.hero ? 'win' : 'miss') : ''}"></i>`).join('')
       + `<span>${round.done ? (round.win ? 'Угадано!' : 'Попытки кончились') : `Осталось попыток: ${TRIES - g.length}`}</span>`;
     $('#gHints').innerHTML = HINTS.map(([label, value], k) => {
-      const open = wrong > k || round.done;
-      return `<div class="g-hint${open ? ' open' : ''}"><small>${label}</small><b>${open ? esc(value(ans)) : `после ${k + 1}-й ошибки`}</b></div>`;
+      const need = k + 1 + HINT_SHIFT(), open = wrong >= need || round.done;
+      return `<div class="g-hint${open ? ' open' : ''}"><small>${label}</small><b>${open ? esc(value(ans)) : `после ${need}-й ошибки`}</b></div>`;
     }).join('');
     // у каждой попытки — сравнение с загаданным: зелёное совпадает
     const ansRoles = new Set(roles(ans.id));
@@ -270,4 +327,5 @@
   addEventListener('resize', modeInd);
   $('#gModes [data-mode="daily"]').lastChild.textContent = ` Герой дня #${today}`;
   startDaily();
+  renderContest(); loadBoard(); submitResult();
 })();

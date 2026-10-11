@@ -12,7 +12,7 @@
 <link rel="icon" href="logo.svg" type="image/svg+xml">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600;700&family=Unbounded:wght@500;600;700&display=swap">
-<link rel="stylesheet" href="site.css?v=49">
+<link rel="stylesheet" href="site.css?v=50">
 </head>
 <body data-page="game">
 
@@ -50,6 +50,16 @@
       <div class="g-stats" id="gStats"></div>
     </div>
   </div>
+  <section class="g-contest" id="gContest" aria-labelledby="gContestTitle">
+    <div class="g-contest-head">
+      <div><span class="g-eyebrow">Герой дня</span><h2 id="gContestTitle">Конкурс недели</h2>
+        <p>Каждый день — один герой на всех. Чем меньше попыток, тем больше очков: <b>с 1-й — 6, со 2-й — 5 … с 6-й — 1</b>. В понедельник победитель недели получает приз.</p></div>
+      <div class="g-prize" id="gPrize"></div>
+    </div>
+    <div class="g-contest-bar"><div class="seg ghost" id="gWeekTabs"><button class="on" data-back="0">Эта неделя</button><button data-back="1">Прошлая</button></div><span class="g-week" id="gWeekRange"></span></div>
+    <div id="gBoard"></div>
+    <div class="g-cta" id="gContestCta"></div>
+  </section>
 </main>
 
 <footer class="wrap site-foot">
@@ -61,11 +71,11 @@
 <div class="toasts" id="toasts"></div>
 <script src="heroes.js?v=37"></script>
 <script src="game-data.js?v=2"></script>
-<script src="config.js?v=39"></script>
+<script src="config.js?v=40"></script>
 <script src="auth.js?v=37"></script>
 <script src="gridrender.js?v=37"></script>
 <script src="catalog-api.js?v=39"></script>
-<script src="site.js?v=55"></script>
-<script src="game.js?v=39"></script>
+<script src="site.js?v=56"></script>
+<script src="game.js?v=40"></script>
 </body>
 </html>

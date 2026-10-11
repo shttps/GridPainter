@@ -1334,3 +1334,38 @@ body[data-page="grid"] { padding-top: calc(var(--nav-h) + 18px); background: rad
   .gp-block { padding: 20px 18px; }
   .gp-steps { grid-template-columns: 1fr; }
 }
+
+/* ---------- Угадайка: конкурс недели ---------- */
+.g-contest { margin-top: 56px; padding: 30px; border: 1px solid var(--line); border-radius: 24px; background: radial-gradient(ellipse at 100% 0, color-mix(in oklab, var(--c2) 10%, transparent), transparent 60%), var(--card); }
+.g-contest-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 24px; flex-wrap: wrap; }
+.g-contest-head > div:first-child { max-width: 560px; }
+.g-eyebrow { color: var(--accent-hi); font: 600 11px var(--mono); letter-spacing: .12em; text-transform: uppercase; }
+.g-contest h2 { margin: 8px 0 10px; font-size: 30px; letter-spacing: -.03em; }
+.g-contest-head p { margin: 0; color: var(--muted); font-size: 14.5px; line-height: 1.6; }
+.g-contest-head p b { color: var(--ink-2); font-weight: 600; }
+.g-prize { display: flex; flex-direction: column; gap: 6px; min-width: 220px; padding: 16px 18px; border: 1px solid var(--accent-line); border-radius: 16px; background: var(--accent-soft); }
+.g-prize span { display: inline-flex; align-items: center; gap: 7px; color: var(--accent-hi); font: 600 11px var(--mono); letter-spacing: .08em; text-transform: uppercase; }
+.g-prize .i { width: 15px; height: 15px; }
+.g-prize b { font-size: 17px; line-height: 1.35; }
+.g-contest-bar { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 26px 0 12px; }
+.g-week { color: var(--faint); font: 12px var(--mono); }
+.g-rows { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; counter-reset: none; }
+.g-rows li { display: grid; grid-template-columns: 38px 34px minmax(0, 1fr) auto auto; align-items: center; gap: 12px; padding: 10px 16px; border: 1px solid var(--line); border-radius: 14px; background: var(--bg-2); }
+.g-rows li.top1 { border-color: color-mix(in oklab, #f3b93a 60%, var(--line)); background: linear-gradient(90deg, #f3b93a1c, transparent 70%), var(--bg-2); }
+.g-rows li.me { border-color: var(--accent-line); box-shadow: inset 0 0 0 1px var(--accent-line); }
+.g-place { color: var(--muted); font: 700 15px var(--mono); font-style: normal; text-align: center; }
+.g-ava { width: 34px; height: 34px; border-radius: 50%; font-size: 13px; }
+.g-rows b { min-width: 0; overflow: hidden; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
+.g-rows b em { margin-left: 6px; padding: 1px 7px; border-radius: 6px; background: var(--accent-soft); color: var(--accent-hi); font: 600 10px var(--mono); font-style: normal; }
+.g-meta { color: var(--faint); font: 12px var(--mono); }
+.g-rows strong { min-width: 62px; font: 700 20px var(--mono); text-align: right; }
+.g-rows strong small { margin-left: 4px; color: var(--faint); font: 11px var(--font); }
+.g-board-note { margin: 6px 0; padding: 26px 0; color: var(--muted); font-size: 14px; text-align: center; }
+.g-cta { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; margin-top: 16px; }
+.g-cta:empty { display: none; }
+.g-cta small { color: var(--faint); font-size: 12.5px; }
+@media (max-width: 640px) {
+  .g-contest { padding: 22px 18px; border-radius: 18px; }
+  .g-rows li { grid-template-columns: 30px 30px minmax(0, 1fr) auto; gap: 9px; padding: 9px 12px; }
+  .g-meta { display: none; }
+}

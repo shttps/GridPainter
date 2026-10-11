@@ -13,6 +13,7 @@ const PAGE = document.body.dataset.page;
 // Та же система, что в редакторе: 24px, линия 1.75, скруглённые концы, currentColor.
 // Строка без «<» — это d у <path>, иначе — готовая разметка внутри <svg>.
 const ICONS = {
+  trophy: 'M8 4h8v5a4 4 0 0 1-8 0zM8 6H4v2a3 3 0 0 0 4 3M16 6h4v2a3 3 0 0 1-4 3M12 13v4M8 20h8M10 17h4',
   brush: 'M4 20l1-5L16 4l4 4L9 19zM13.5 6.5l4 4',
   grid: '<rect x="3.5" y="3.5" width="17" height="17" rx="2"/><path d="M3.5 9.5h17M3.5 14.5h17M9.5 3.5v17M14.5 3.5v17"/>',
   upload: 'M12 16V5M7 10l5-5 5 5M5 20h14',

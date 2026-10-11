@@ -604,3 +604,54 @@ begin
 end $$;
 revoke all on function public.admin_feature(uuid, boolean) from public, anon;
 grant execute on function public.admin_feature(uuid, boolean) to authenticated;
+
+
+-- ---------- Угадайка: результаты «Героя дня» и конкурс недели ----------
+-- Один результат на игрока в день (первый засчитывается). Очки: угадал с 1-й попытки — 6, со 2-й — 5 … с 6-й — 1, не угадал — 0.
+-- Неделя — с понедельника по воскресенье (UTC). Победитель — больше очков, потом больше побед, потом тот, кто набрал их раньше.
+-- Номер дня считается от 2026-10-09 (как GAME_START в site.js). Ответ «героя дня» знает только клиент, поэтому приз стоит выдавать, глядя на таблицу глазами.
+create table if not exists public.game_results (
+  user_id    uuid not null references auth.users(id) on delete cascade,
+  day        int  not null,
+  tries      int  not null,
+  won        boolean not null,
+  created_at timestamptz not null default now(),
+  primary key (user_id, day),
+  constraint game_results_tries check (tries between 1 and 6)
+);
+alter table public.game_results enable row level security;
+revoke all on public.game_results from anon, authenticated;
+
+create or replace function public.game_submit(p_day int, p_tries int, p_won boolean) returns json
+language plpgsql security definer set search_path = public as $$
+declare v_today int := ((now() at time zone 'utc')::date - date '2026-10-09') + 1;
+begin
+  if auth.uid() is null then raise exception 'not_signed_in'; end if;
+  if p_day is null or p_day not between v_today - 1 and v_today + 1 then raise exception 'game_day'; end if;
+  if p_tries is null or p_tries not between 1 and 6 then raise exception 'game_tries'; end if;
+  insert into game_results (user_id, day, tries, won) values (auth.uid(), p_day, p_tries, coalesce(p_won, false))
+    on conflict (user_id, day) do nothing;
+  return json_build_object('saved', found);
+end $$;
+revoke all on function public.game_submit(int, int, boolean) from public, anon;
+grant execute on function public.game_submit(int, int, boolean) to authenticated;
+
+-- таблица недели: p_back = 0 — текущая, 1 — прошлая и т. д.
+create or replace function public.game_board(p_back int default 0) returns json
+language plpgsql stable security definer set search_path = public as $$
+declare
+  v_from date := date_trunc('week', (now() at time zone 'utc')::date)::date - 7 * greatest(0, least(coalesce(p_back, 0), 52));
+  v_d0 int := (v_from - date '2026-10-09') + 1;
+begin
+  return json_build_object('from', v_from, 'to', v_from + 6, 'rows', coalesce((
+    select json_agg(t order by t.place) from (
+      select row_number() over (order by sum(case when g.won then 7 - g.tries else 0 end) desc, count(*) filter (where g.won) desc, max(g.created_at)) as place,
+             g.user_id as id, p.nick, p.avatar,
+             sum(case when g.won then 7 - g.tries else 0 end)::int as points,
+             (count(*) filter (where g.won))::int as wins, count(*)::int as played
+        from game_results g join profiles p on p.id = g.user_id
+       where g.day between v_d0 and v_d0 + 6
+       group by g.user_id, p.nick, p.avatar
+       order by 1 limit 50) t), '[]'::json));
+end $$;
+grant execute on function public.game_board(int) to anon, authenticated;

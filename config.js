@@ -17,6 +17,8 @@ window.SITE = {
   version: '2.8.0',
   author: { nick: 'ahttps', discord: 'ahttps', github: 'shttps', avatar: 'https://avatars.githubusercontent.com/u/184304697?v=4&s=96' },
   repo: 'https://github.com/shttps/GridPainter',
+  // Конкурс недели в «Угадайке»: приз победителю. Пусто — в таблице написано «приз скоро объявим».
+  contest: { prize: '' },
   telegram: 'https://t.me/gridstudio_example',   // ПРИМЕР — замени на свой канал/чат: чат и новости
   support: '',    // поддержать разработку рублями: Boosty, DonationAlerts и т. п.
   // Криптовалюта в окне «Поддержать разработку». Пустой addr — монета не показывается; пока адресов нет, там написано «скоро».
