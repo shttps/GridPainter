@@ -323,8 +323,11 @@ button:focus { outline: none; }
 .bb-link .i { width: 17px; height: 17px; }
 .bb-link .i:last-child:not(:first-child) { width: 14px; height: 14px; opacity: .7; }
 .bb-link:hover, .bb-author:hover { color: var(--ink); }
-.bb-ver { padding: 4px 9px; border-radius: 8px; border: 1px solid var(--line); color: var(--faint); font: 12.5px var(--mono); text-decoration: none; transition: color .15s, border-color .15s; }
-.bb-ver:hover { color: var(--ink); border-color: var(--line-strong); }
+.bb-ver { position: relative; padding: 4px 10px; border-radius: 8px; border: 1px solid #ff9db566; background: linear-gradient(135deg, #ff9db514, transparent 70%); color: #ffc4d2; font: 12.5px var(--mono); text-decoration: none; cursor: default; box-shadow: 0 0 14px -4px #ff9db555, inset 0 0 8px -4px #ff9db555; transition: color .2s, border-color .2s, box-shadow .2s; }
+.bb-ver::before, .bb-ver::after { content: ""; position: absolute; width: 9px; height: 9px; background: #ffb3c6; border-radius: 80% 0 80% 0; opacity: .9; pointer-events: none; }
+.bb-ver::before { top: -5px; left: -4px; transform: rotate(-20deg); }
+.bb-ver::after { right: -4px; bottom: -5px; width: 7px; height: 7px; transform: rotate(150deg); background: #ff9db5; }
+.bb-ver:hover { color: #fff0f4; border-color: #ff9db5; box-shadow: 0 0 18px -2px #ff9db577, inset 0 0 10px -3px #ff9db577; }
 
 /* ---------- секции ниже ---------- */
 .section { padding: 96px 0 20px; }
@@ -708,16 +711,7 @@ body[data-page="workshop"]::before { content: ""; position: absolute; z-index: -
   .sup-sec { margin: 0 14px; padding: 14px; }
 }
 
-/* версия внизу — кнопка-пасхалка; холст с частицами лежит поверх страницы и не ловит клики */
-.bb-ver { cursor: pointer; background: none; }
-.bb-ver:active { transform: scale(.94); }
-.bb-ver.egg-pop { animation: egg-pop .55s var(--ease); }
-@keyframes egg-pop { 30% { transform: scale(1.12); box-shadow: 0 0 0 3px color-mix(in oklab, var(--c, #ffd678) 35%, transparent), 0 0 22px color-mix(in oklab, var(--c, #ffd678) 55%, transparent); border-color: var(--c, #ffd678); } }
-.egg-orbit { position: fixed; z-index: 151; width: 0; height: 0; pointer-events: none; }
-.egg-orbit b { position: absolute; left: 0; top: 0; line-height: 1; color: var(--c); font-weight: 400; text-shadow: 0 0 10px var(--c); }
-.egg-ring { position: absolute; left: 0; top: 0; width: var(--w); height: var(--h); border: 1.5px solid var(--c); border-radius: 12px; transform: translate(-50%, -50%); opacity: 0; animation: egg-ring .9s cubic-bezier(.2, .7, .3, 1) both; }
-@keyframes egg-ring { from { opacity: .85; transform: translate(-50%, -50%) scale(1); } to { opacity: 0; transform: translate(-50%, -50%) scale(2.1, 2.8); } }
-@media (prefers-reduced-motion: reduce) { .bb-ver.egg-pop { animation: none; } }
+/* холст с частицами (код из старых игр) лежит поверх страницы и не ловит клики */
 .fx { position: fixed; inset: 0; z-index: 150; width: 100vw; height: 100vh; pointer-events: none; }
 
 /* плитка «Как в игре»: экран «Герои» Доты. Всё в долях ширины экрана (cqw), экран 16:9 «обложкой» заполняет плитку */

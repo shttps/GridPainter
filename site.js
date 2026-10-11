@@ -195,58 +195,21 @@ function renderBottomBars() {
     </div>
     <div class="bb-right">
       ${SITE.repo ? `<a class="bb-link" href="${esc(SITE.repo)}" target="_blank" rel="noopener">${icon('github')}GitHub${icon('ext')}</a>` : ''}
-      <button class="bb-ver" data-egg title="Версия сайта">v${esc(SITE.version || '1.0.0')}</button>
+      <span class="bb-ver" title="Версия сайта">v${esc(SITE.version || '1.0.0')}</span>
     </div>`;
   for (const el of $$('[data-bottom-bar]')) el.innerHTML = html;
   document.addEventListener('click', e => {
     const b = e.target.closest('[data-info]'); if (b) openInfo(b.dataset.info);
-    const eg = e.target.closest('[data-egg]'); if (eg) egg(undefined, eg);
   });
   konami();
 }
 
-// ---------- пасхалки: клик по версии — сакура, снег, угли, золото, Аегис; код из старых игр — всё сразу ----------
+// ---------- пасхалка: код из старых игр (↑↑↓↓←→←→ B A) — сакура, золото и Эгида разом ----------
 // Лёгкий холст поверх страницы: частицы падают (или летят вверх) несколько секунд, потом холст убирается.
-const EGGS = [
-  ['sakura', '🌸 Сакура — цветёт, пока не смотрят патчноуты'],
-  ['snow', '❄ Снег — Crystal Maiden где-то рядом'],
-  ['embers', '🔥 Угли — Phoenix уже в пути'],
-  ['gold', '🪙 +600 золота — не забудь купить курьера'],
-  ['aegis', '🛡 Рошан убит. Эгида ждёт — но только один раз'],
-];
-let eggAt = 0, fx = null;
-function egg(kind, from) {
-  const [k, msg] = kind ? [kind, ''] : EGGS[eggAt++ % EGGS.length];
-  if (!kind) toast(msg);
+let fx = null;
+function egg(kind) {
   if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
-  if (from) orbit(from, k);
-  burst(k);
-}
-// Вокруг кнопки версии: кольцо света и россыпь значков по теме пасхалки — разлетаются веером и гаснут
-const EGG_BITS = { sakura: ['🌸', '🌸', '✿'], snow: ['❄', '❅', '·'], embers: ['🔥', '✦', '·'], gold: ['🪙', '✦', '$'], aegis: ['🛡', '✦', '✧'] };
-const EGG_HUE = { sakura: '#ff9db5', snow: '#bfe0ff', embers: '#ff8a3c', gold: '#f3b93a', aegis: '#ffd678' };
-function orbit(btn, kind) {
-  const r = btn.getBoundingClientRect(), cx = r.left + r.width / 2, cy = r.top + r.height / 2, col = EGG_HUE[kind] || '#ffd678';
-  const box = document.createElement('div');
-  box.className = 'egg-orbit'; box.setAttribute('aria-hidden', 'true');
-  box.style.cssText = `left:${cx}px;top:${cy}px;--w:${r.width}px;--h:${r.height}px;--c:${col}`;
-  const ring = (delay) => { const i = document.createElement('i'); i.className = 'egg-ring'; i.style.animationDelay = delay + 'ms'; box.append(i); };
-  ring(0); ring(180);
-  const bits = EGG_BITS[kind] || EGG_BITS.aegis, n = 14, done = [];
-  for (let k = 0; k < n; k++) {
-    const b = document.createElement('b'), a = (k / n) * 6.283 + Math.random() * .4, d = 38 + Math.random() * 42, up = 22 + Math.random() * 18;
-    b.textContent = bits[k % bits.length]; b.style.fontSize = (11 + Math.random() * 9) + 'px';
-    const rx = Math.cos(a) * (d + r.width * .35), ry = Math.sin(a) * d * .8 - up, rot = (Math.random() - .5) * 200;
-    done.push(b.animate([
-      { transform: 'translate(-50%,-50%) scale(.2)', opacity: 0 },
-      { transform: `translate(calc(-50% + ${rx * .55}px), calc(-50% + ${ry * .55}px)) scale(1.15) rotate(${rot * .5}deg)`, opacity: 1, offset: .35 },
-      { transform: `translate(calc(-50% + ${rx}px), calc(-50% + ${ry + 26}px)) scale(.7) rotate(${rot}deg)`, opacity: 0 },
-    ], { duration: 1100 + Math.random() * 500, delay: Math.random() * 120, easing: 'cubic-bezier(.2,.7,.3,1)', fill: 'both' }).finished);
-    box.append(b);
-  }
-  document.body.append(box);
-  btn.classList.remove('egg-pop'); void btn.offsetWidth; btn.classList.add('egg-pop'); btn.style.setProperty('--c', col);
-  Promise.allSettled(done).then(() => box.remove());
+  burst(kind);
 }
 function konami() {
   const seq = ['ArrowUp', 'ArrowUp', 'ArrowDown', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'ArrowLeft', 'ArrowRight', 'b', 'a'];
