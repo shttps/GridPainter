@@ -1236,56 +1236,68 @@ function initWorkshop() {
     applyIcons($('.ws-head'));
     requestAnimationFrame(() => { ['#wsTabs', '#wsSorts', '#wsBg'].forEach(s => segInd($(s))); });
   }
-  // ----- арт в шапке: случайные работы из Мастерской (сетки и фоны, без 18+) на всю плитку, плавно сменяют друг друга -----
-  (async () => {
-    const stage = $('#wsArt .ws-art-stage'), label = $('#wsArtLabel');
-    const seed = () => 1 + Math.floor(Math.random() * 2e9);
-    const [gr, br] = await Promise.allSettled([API.list({ sort: 'popular', limit: 24 }), API.bg.list({ sort: 'popular', limit: 24 })]);
-    const grids = gr.status === 'fulfilled' ? gr.value.items.filter(x => !x.nsfw && x.cats >= 20).map(g => ({ ...g, kind: 'grid' })) : [],
-      bgs = br.status === 'fulfilled' ? br.value.items.filter(x => !x.nsfw).map(b => ({ ...b, kind: 'bg' })) : [];
-    const pool = shuffled([...shuffled(grids, seed()).slice(0, 5), ...shuffled(bgs, seed()).slice(0, 4)], seed());
-    if (!stage || !pool.length) return;
-    const ready = new Map();                                    // id → Promise<элемент слайда | null>
-    const build = w => ready.get(w.id) || ready.set(w.id, (async () => {
-      const a = document.createElement('a'); a.className = `ws-slide ${w.kind}`; a.tabIndex = -1; a.setAttribute('aria-hidden', 'true');
-      a.href = w.kind === 'bg' ? bgPageUrl(w.id) : gridUrl(w.id);
-      if (w.kind === 'bg') {
-        const img = new Image(); img.alt = ''; img.src = w.poster;
-        await img.decode(); a.append(img); return a;
-      }
-      const cfg = await API.config(w.id);
-      if (!cfg?.categories?.length) return null;
-      const cv = document.createElement('canvas'); cv.setAttribute('aria-hidden', 'true'); a.append(cv);
-      stage.append(a);                                          // холсту нужна ширина, поэтому рисуем уже в плитке
-      GridRender.mount(cv, cfg.categories, { bg: 'dota' });
-      return a;
-    })().catch(() => null)).get(w.id);
-    let at = -1, cur = null, timer = 0;
-    const show = async () => {
-      for (let tries = 0; tries < pool.length; tries++) {
-        const w = pool[(at = (at + 1) % pool.length)], el = await build(w);
-        if (!el) continue;
-        if (pool.length > 1) build(pool[(at + 1) % pool.length]);   // следующую готовим, пока смотрят эту
-        stage.append(el);
-        const old = cur; cur = el;
-        label.classList.remove('in');
-        requestAnimationFrame(() => requestAnimationFrame(() => {
-          if (old) { old.classList.remove('on'); old.classList.add('out'); setTimeout(() => { old.classList.remove('out'); old.remove(); }, 1300); }
-          el.classList.add('on');
-          label.href = el.href; label.hidden = false;
-          $('i', label).textContent = w.kind === 'bg' ? 'Фон меню' : 'Сетка героев';
-          $('em', label).textContent = `${w.title} · ${w.author || 'Аноним'}`;
-          label.classList.add('in');
-        }));
-        return;
+  // ----- арт в шапке: случайные работы текущей вкладки (сетки или фоны, без 18+) на всю плитку, плавно сменяют друг друга -----
+  const wsArt = (() => {
+    const stage = $('#wsArt .ws-art-stage'), label = $('#wsArtLabel'), cache = {};
+    let gen = 0, timer = 0, io = null;
+    const fetchKind = k => cache[k] ||= (k === 'bg' ? API.bg.list({ sort: 'popular', limit: 24 }) : API.list({ sort: 'popular', limit: 24 }))
+      .then(r => r.items.filter(x => !x.nsfw && (k === 'bg' || x.cats >= 20)).map(x => ({ ...x, kind: k === 'bg' ? 'bg' : 'grid' }))).catch(() => []);
+    return async kind => {
+      const my = ++gen;
+      clearInterval(timer); io?.disconnect();
+      if (!stage) return;
+      $$('.ws-slide', stage).forEach(el => { el.classList.remove('on'); el.classList.add('out'); setTimeout(() => el.remove(), 1300); });
+      label.classList.remove('in');
+      const items = await fetchKind(kind);
+      if (my !== gen) return;
+      const pool = shuffled(items, 1 + Math.floor(Math.random() * 2e9)).slice(0, 8);
+      if (!pool.length) { label.hidden = true; return; }
+      const ready = new Map();                                    // id → Promise<элемент слайда | null>
+      const build = w => ready.get(w.id) || ready.set(w.id, (async () => {
+        const a = document.createElement('a'); a.className = `ws-slide ${w.kind}`; a.tabIndex = -1; a.setAttribute('aria-hidden', 'true');
+        a.href = w.kind === 'bg' ? bgPageUrl(w.id) : gridUrl(w.id);
+        if (w.kind === 'bg') {
+          const img = new Image(); img.alt = ''; img.src = w.poster;
+          await new Promise((ok, no) => { img.onload = ok; img.onerror = no; }); a.append(img); return a;
+        }
+        const cfg = await API.config(w.id);
+        if (!cfg?.categories?.length) return null;
+        const cv = document.createElement('canvas'); cv.setAttribute('aria-hidden', 'true'); a.append(cv);
+        if (my === gen) stage.append(a);                          // холсту нужна ширина, поэтому рисуем уже в плитке
+        GridRender.mount(cv, cfg.categories, { bg: 'dota' });
+        return a;
+      })().catch(() => null)).get(w.id);
+      let at = -1, cur = null;
+      const show = async () => {
+        for (let tries = 0; tries < pool.length; tries++) {
+          const w = pool[(at = (at + 1) % pool.length)], el = await build(w);
+          if (my !== gen) return;
+          if (!el) continue;
+          if (pool.length > 1) build(pool[(at + 1) % pool.length]);   // следующую готовим, пока смотрят эту
+          stage.append(el);
+          const old = cur; cur = el;
+          label.classList.remove('in');
+          requestAnimationFrame(() => requestAnimationFrame(() => {
+            if (my !== gen) return;
+            if (old) { old.classList.remove('on'); old.classList.add('out'); setTimeout(() => old.remove(), 1300); }
+            el.classList.add('on');
+            label.href = el.href; label.hidden = false;
+            $('i', label).textContent = w.kind === 'bg' ? 'Фон меню' : 'Сетка героев';
+            $('em', label).textContent = `${w.title} · ${w.author || 'Аноним'}`;
+            label.classList.add('in');
+          }));
+          return;
+        }
+      };
+      show();
+      if (pool.length > 1 && !matchMedia('(prefers-reduced-motion: reduce)').matches) {
+        io = new IntersectionObserver(es => {
+          clearInterval(timer);
+          if (es.some(e => e.isIntersecting)) timer = setInterval(() => { if (!document.hidden) show(); }, 6500);
+        }, { threshold: .2 });
+        io.observe(stage);
       }
     };
-    show();
-    if (pool.length > 1 && !matchMedia('(prefers-reduced-motion: reduce)').matches)
-      new IntersectionObserver(es => {
-        clearInterval(timer);
-        if (es.some(e => e.isIntersecting)) timer = setInterval(() => { if (!document.hidden) show(); }, 6500);
-      }, { threshold: .2 }).observe(stage);
   })();
   const relayout = () => ['#wsTabs', '#wsSorts', '#wsBg'].forEach(s => segInd($(s)));
   document.fonts?.ready.then(relayout); addEventListener('resize', relayout);
@@ -1340,7 +1352,7 @@ function initWorkshop() {
     const u = new URL(location.href);
     u.search = t === 'bg' ? '?backgrounds' : '';
     history.replaceState(null, '', u);
-    renderControls(); load();
+    renderControls(); load(); wsArt(t);
   }
   $('#wsTabs').onclick = e => { const b = e.target.closest('button'); if (b) setTab(b.dataset.v); };
   $('#wsTabs').onkeydown = e => {
@@ -1392,6 +1404,7 @@ function initWorkshop() {
 
   renderControls();
   load();
+  wsArt(f.tab);
 }
 
 // ---------- фоны: карточка, страница, загрузка ----------
