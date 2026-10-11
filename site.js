@@ -1156,27 +1156,31 @@ function initWorkshop() {
   if (qs.get('id')) { location.replace(gridUrl(qs.get('id'))); return; }
   if (qs.get('bg')) { location.replace(bgPageUrl(qs.get('bg'))); return; }
   const f = { tab: qs.has('backgrounds') || qs.has('bg') ? 'bg' : 'grids', q: '', tag: qs.get('tag') || '', sort: 'popular', aspect: '' };
-  let offset = 0, total = 0, seq = 0;
+  let offset = 0, total = 0, seq = 0, qt = 0;
   const cards = $('#cards'), more = $('#more');
   $('#demoNote').hidden = API.remote;
 
   // ----- разметка фильтров под вкладку -----
-  const chip = (v, label, on) => `<button class="tchip${on ? ' on' : ''}" data-v="${esc(v)}">${esc(label)}</button>`;
+  const chip = (v, label, on) => `<button class="tchip${on ? ' on' : ''}" data-v="${esc(v)}" aria-pressed="${!!on}">${esc(label)}</button>`;
   function renderControls() {
     const bg = f.tab === 'bg';
     document.title = bg ? 'Мастерская — фоны главного меню Dota 2 · Grid Studio' : 'Мастерская — сетки героев Dota 2 · Grid Studio';
-    $('#wsLead').textContent = bg ? 'Фоны главного меню от игроков: картинки и видео. Посмотри, скачай — или выложи свой.' : 'Найди свой вариант. Открой в редакторе и сделай по-своему.';
+    $('#wsLead').textContent = bg ? 'Новый вид с первого экрана. Картинки и видео для главного меню твоей Dota.' : 'Твоя Dota. Твой стиль. Найди сетку по душе и сделай её своей.';
     const create = $('#wsCreate');
     create.innerHTML = `${icon('plus')}${bg ? 'Выложить фон' : 'Создать сетку'}`;
     create.href = bg ? '#' : 'editor.html';
-    $('#wsSorts').innerHTML = '<i class="seg-ind"></i>' + SORTS.map(([v, l]) => `<button data-v="${v}" class="${f.sort === v ? 'on' : ''}">${l}</button>`).join('');
+    $('#wsSorts').innerHTML = '<i class="seg-ind"></i>' + SORTS.map(([v, l]) => `<button data-v="${v}" class="${f.sort === v ? 'on' : ''}" aria-pressed="${f.sort === v}">${l}</button>`).join('');
     const tags = bg ? API.TAGS.bg : API.TAGS.grid;
     $('#wsTags').innerHTML = chip('', 'Все теги', !f.tag) + tags.map(t => chip(t, t, f.tag === t)).join('') + chip('18+', '18+', f.tag === '18+');
     $('#wsAspect').hidden = !bg;
     $('#wsAspect').innerHTML = `<span>Экран</span>` + chip('', 'Любой', !f.aspect) + API.TAGS.aspects.map(a => chip(a, a, f.aspect === a)).join('');
-    $('#wsBg').hidden = bg;
-    $('#wsBg').innerHTML = '<i class="seg-ind"></i>' + PREVIEW_BG.map(([v, l]) => `<button data-v="${v}" class="${previewBg() === v ? 'on' : ''}">${l}</button>`).join('');
-    $$('#wsTabs button').forEach(b => b.classList.toggle('on', b.dataset.v === f.tab));
+    $('#wsPreview').hidden = bg;
+    $('#wsBg').innerHTML = '<i class="seg-ind"></i>' + PREVIEW_BG.map(([v, l]) => `<button data-v="${v}" class="${previewBg() === v ? 'on' : ''}" aria-pressed="${previewBg() === v}">${l}</button>`).join('');
+    $$('#wsTabs button').forEach(b => {
+      const selected = b.dataset.v === f.tab;
+      b.classList.toggle('on', selected); b.setAttribute('aria-selected', selected); b.tabIndex = selected ? 0 : -1;
+    });
+    $('#wsResults').setAttribute('aria-labelledby', bg ? 'wsBackgroundsTab' : 'wsGridsTab');
     applyIcons($('.ws-head'));
     requestAnimationFrame(() => { ['#wsTabs', '#wsSorts', '#wsBg'].forEach(s => segInd($(s))); });
   }
@@ -1186,7 +1190,12 @@ function initWorkshop() {
   // ----- загрузка списка -----
   async function load(reset = true) {
     const my = ++seq, bg = f.tab === 'bg';
-    if (reset) { offset = 0; cards.className = bg ? 'cards bcards' : 'cards'; cards.innerHTML = skeletons(6); }
+    $('#wsReset').hidden = !(f.q || f.tag || f.aspect || f.sort !== 'popular');
+    cards.setAttribute('aria-busy', 'true');
+    if (reset) {
+      offset = 0; cards.className = bg ? 'cards bcards' : 'cards'; cards.innerHTML = skeletons(6);
+      more.hidden = true; $('#count').textContent = 'Ищем работы…';
+    }
     more.disabled = true;
     try {
       const args = { q: f.q, tag: f.tag, sort: f.sort === 'mine' ? 'new' : f.sort, onlyMine: f.sort === 'mine', offset, limit: PAGE_SIZE };
@@ -1198,28 +1207,32 @@ function initWorkshop() {
       if (reset) cards.innerHTML = html || emptyHTML(r.missing);
       else cards.insertAdjacentHTML('beforeend', html);
       offset += r.items.length;
-      $('#count').textContent = `${bg ? 'Фонов' : 'Сеток'}: ${num(total)} · ${SORT_NOTE[f.sort]}`;
+      $('#count').innerHTML = `<strong>${num(total)} ${bg ? plural(total, 'фон', 'фона', 'фонов') : plural(total, 'сетка', 'сетки', 'сеток')}</strong> · ${SORT_NOTE[f.sort]}`;
       more.hidden = offset >= total;
     } catch (e) {
       if (my !== seq) return;
+      more.hidden = true; $('#count').textContent = 'Не удалось загрузить работы';
       cards.innerHTML = `<div class="cards-empty"><b>Мастерская не загрузилась</b><span>${esc(e.message)}</span><button class="btn sm" onclick="location.reload()">Обновить</button></div>`;
     }
+    cards.setAttribute('aria-busy', 'false');
     more.disabled = false;
   }
   function emptyHTML(missing) {
+    const resetButton = '<button class="btn sm" data-act="reset">Сбросить фильтры</button>';
     if (f.tab === 'bg') {
       if (missing || !API.bg.enabled) return `<div class="cards-empty">${MARK}<b>Фоны скоро появятся</b><span>Раздел уже готов — осталось подключить хранилище. Загляни чуть позже.</span></div>`;
-      if (f.q || f.tag || f.aspect || f.sort === 'mine') return `<div class="cards-empty"><b>Ничего не нашлось</b><span>${f.sort === 'mine' ? 'Ты ещё не выкладывал фоны.' : 'Попробуй другой тег или пропорции.'}</span></div>`;
+      if (f.q || f.tag || f.aspect || f.sort === 'mine') return `<div class="cards-empty">${MARK}<b>Ничего не нашлось</b><span>${f.sort === 'mine' ? 'Ты ещё не выкладывал фоны.' : 'Попробуй другой запрос, тег или пропорции экрана.'}</span>${resetButton}</div>`;
       return `<div class="cards-empty">${MARK}<b>Фонов пока нет</b><span>Стань первым: выложи картинку или видео для главного меню.</span><button class="btn primary sm" data-act="upload">Выложить фон</button></div>`;
     }
     return f.q || f.tag || f.sort === 'mine' || f.sort === 'week'
-      ? `<div class="cards-empty"><b>Ничего не нашлось</b><span>${f.sort === 'mine' ? 'Ты ещё ничего не выкладывал из этого браузера или аккаунта.' : 'Попробуй другой запрос или тег.'}</span></div>`
+      ? `<div class="cards-empty">${MARK}<b>Ничего не нашлось</b><span>${f.sort === 'mine' ? 'Ты ещё ничего не выкладывал из этого браузера или аккаунта.' : 'Попробуй другой запрос или тег — твоя сетка ещё найдётся.'}</span>${resetButton}</div>`
       : `<div class="cards-empty">${MARK}<b>Здесь пока пусто</b><span>Стань первым: нарисуй сетку в редакторе и выложи её сюда.</span><a class="btn primary sm" href="editor.html?publish">Выложить сетку</a></div>`;
   }
 
   // ----- переключатели -----
   function setTab(t) {
     if (t === f.tab) return;
+    clearTimeout(qt);
     f.tab = t; f.tag = ''; f.aspect = '';
     const u = new URL(location.href);
     u.search = t === 'bg' ? '?backgrounds' : '';
@@ -1227,27 +1240,44 @@ function initWorkshop() {
     renderControls(); load();
   }
   $('#wsTabs').onclick = e => { const b = e.target.closest('button'); if (b) setTab(b.dataset.v); };
+  $('#wsTabs').onkeydown = e => {
+    if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(e.key)) return;
+    e.preventDefault();
+    const tab = e.key === 'Home' ? 'grids' : e.key === 'End' ? 'bg' : f.tab === 'grids' ? 'bg' : 'grids';
+    setTab(tab); $(`#wsTabs button[data-v="${tab}"]`).focus();
+  };
   $('#wsSorts').onclick = e => {
     const b = e.target.closest('button'); if (!b || b.classList.contains('on')) return;
-    f.sort = b.dataset.v; $$('#wsSorts button').forEach(x => x.classList.toggle('on', x === b)); segInd($('#wsSorts')); load();
+    f.sort = b.dataset.v; $$('#wsSorts button').forEach(x => { x.classList.toggle('on', x === b); x.setAttribute('aria-pressed', x === b); }); segInd($('#wsSorts')); load();
   };
   const chips = (box, key) => box.onclick = e => {
     const b = e.target.closest('.tchip'); if (!b || b.classList.contains('on')) return;
-    f[key] = b.dataset.v; $$('.tchip', box).forEach(x => x.classList.toggle('on', x === b)); load();
+    f[key] = b.dataset.v; $$('.tchip', box).forEach(x => { x.classList.toggle('on', x === b); x.setAttribute('aria-pressed', x === b); }); load();
   };
   chips($('#wsTags'), 'tag'); chips($('#wsAspect'), 'aspect');
   $('#wsBg').onclick = e => {
     const b = e.target.closest('button'); if (!b) return;
-    $$('#wsBg button').forEach(x => x.classList.toggle('on', x === b)); segInd($('#wsBg')); setPreviewBg(b.dataset.v);
+    $$('#wsBg button').forEach(x => { x.classList.toggle('on', x === b); x.setAttribute('aria-pressed', x === b); }); segInd($('#wsBg')); setPreviewBg(b.dataset.v);
   };
-  let qt = 0;
-  $('#q').oninput = e => { clearTimeout(qt); qt = setTimeout(() => { f.q = e.target.value; load(); }, 280); };
+  $('#q').oninput = e => { clearTimeout(qt); f.q = e.target.value; qt = setTimeout(() => load(), 280); };
+  function resetFilters() {
+    clearTimeout(qt); f.q = ''; f.tag = ''; f.aspect = ''; f.sort = 'popular'; $('#q').value = '';
+    const u = new URL(location.href); u.searchParams.delete('tag'); history.replaceState(null, '', u);
+    renderControls(); load();
+  }
+  $('#wsReset').onclick = resetFilters;
+  document.addEventListener('keydown', e => {
+    if (e.key === '/' && !e.ctrlKey && !e.metaKey && !e.altKey && !e.target.closest('input, textarea, select, [contenteditable]') && !$('#modalRoot').children.length) {
+      e.preventDefault(); $('#q').focus();
+    }
+  });
   more.onclick = () => load(false);
   $('#wsHow').onclick = () => openHowTo(f.tab);
   $('#wsCreate').onclick = e => { if (f.tab === 'bg') { e.preventDefault(); openBgUpload(() => { f.sort = 'new'; renderControls(); load(); }); } };
 
   // ----- карточки -----
   cards.onclick = e => {
+    if (e.target.closest('[data-act="reset"]')) { resetFilters(); return; }
     if (e.target.closest('[data-act="upload"]')) { openBgUpload(() => load()); return; }
     if (bgLikeClick(e)) return;
     const b = e.target.closest('.bcard[data-bg]');
@@ -1667,16 +1697,27 @@ async function initProfile() {
 function renderSignIn(box, next) {
   const redirect = new URL('profile.html' + (next ? '?next=' + encodeURIComponent(next) : ''), location.href).href;
   const PROV = { discord: ['discord', 'Discord'], github: ['github', 'GitHub'] };
-  box.innerHTML = `<div class="auth-card">${LOGO}
-    <h1>Вход в Grid Studio</h1>
-    <p>Сохраняй работы в профиль и возвращайся к ним с любого устройства. Выкладывай сетки в Мастерскую от своего имени.</p>
+  box.innerHTML = `<div class="pf-auth-layout">
+    <section class="pf-auth-intro" aria-labelledby="authIntro">
+      <span class="pf-eyebrow">Твоё пространство в Grid Studio</span>
+      <h1 id="authIntro">Хорошие сетки.<br><span>Всегда под рукой.</span></h1>
+      <p>Собирай героев по-своему. Сохраняй идеи и делись тем, что получилось.</p>
+      <div class="pf-auth-art" aria-hidden="true"><div class="pf-art-grid"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div><span class="pf-art-mark">${LOGO}</span><span class="pf-art-label">Твоя игра. Твой порядок.</span></div>
+      <ul class="pf-auth-benefits"><li>${icon('lock')}Личные работы видишь только ты</li><li>${icon('globe')}Публикации — от твоего имени</li><li>${icon('heart')}Любимые сетки — в одном месте</li></ul>
+    </section>
+    <section class="auth-card pf-signin" aria-labelledby="authTitle">
+    <span class="pf-auth-symbol">${icon('user')}</span>
+    <span class="pf-eyebrow">Личный профиль</span>
+    <h2 id="authTitle">Заходи, здесь твоё</h2>
+    <p>Войди, чтобы сохранить свою следующую идею.</p>
     ${ACC.providers.length ? `<div class="auth-prov">${ACC.providers.map(p => `<button class="btn block" data-prov="${p}">${icon(PROV[p]?.[0] || 'user')}Войти через ${PROV[p]?.[1] || p}</button>`).join('')}</div><div class="auth-or"><span>или по почте</span></div>` : ''}
     <form class="auth-form" id="authForm">
-      <label class="auth-field">${icon('mail')}<input class="input" id="authEmail" type="email" required placeholder="почта@пример.ru" autocomplete="email"></label>
-      <button class="btn primary block" id="authGo">Получить ссылку для входа</button>
+      <label class="pf-field-label" for="authEmail">Электронная почта</label>
+      <div class="auth-field">${icon('mail')}<input class="input" id="authEmail" type="email" required placeholder="you@example.com" autocomplete="email"></div>
+      <button class="btn primary block" id="authGo">Получить ссылку для входа ${icon('arrow')}</button>
     </form>
-    <div class="hint">Пароль не нужен — пришлём письмо со ссылкой. Почту никто не увидит: в профиле только ник.</div>
-  </div>`;
+    <div class="pf-auth-privacy">${icon('shield')}<span>Без пароля. Почта останется приватной — другие увидят только твой ник.</span></div>
+  </section></div>`;
   for (const b of $$('[data-prov]', box)) b.onclick = () => ACC.oauth(b.dataset.prov, redirect);
   $('#authForm').onsubmit = async e => {
     e.preventDefault();
@@ -1687,11 +1728,12 @@ function renderSignIn(box, next) {
   };
 }
 function renderSent(box, email, next) {
-  box.innerHTML = `<div class="auth-card"><div class="sh-ico">${icon('mail')}</div>
+  box.innerHTML = `<div class="auth-card pf-sent"><span class="pf-auth-symbol">${icon('mail')}</span><span class="pf-eyebrow">Остался один шаг</span>
     <h1>Проверь почту</h1>
     <p>Письмо со ссылкой отправлено на <b>${esc(email)}</b>. Открой ссылку в этом браузере — и сразу окажешься в профиле. Письма нет — загляни в «Спам».</p>
     <form class="auth-form" id="codeForm">
-      <input class="input code" id="authCode" inputmode="numeric" autocomplete="one-time-code" maxlength="10" placeholder="Код из письма, если есть">
+      <label class="pf-field-label" for="authCode">Или введи код из письма, если он есть</label>
+      <input class="input code" id="authCode" inputmode="numeric" autocomplete="one-time-code" maxlength="10" required placeholder="Код из письма">
       <button class="btn block">Войти по коду</button>
     </form>
     <button class="link" id="authBack">Другая почта</button>
@@ -1706,10 +1748,11 @@ function renderSent(box, email, next) {
 
 // шапка профиля: баннер, аватар поверх него, ник, «о себе», ссылки (Steam, Telegram), цифры
 const MONTHS_GEN = ['января', 'февраля', 'марта', 'апреля', 'мая', 'июня', 'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря'];
-const sinceText = iso => { const d = new Date(iso); return `на сайте с ${MONTHS_GEN[d.getMonth()]} ${d.getFullYear()}`; };
+const sinceText = iso => { const d = new Date(iso); return Number.isNaN(d.getTime()) ? '' : `С нами с ${MONTHS_GEN[d.getMonth()]} ${d.getFullYear()}`; };
 const tgUrl = nick => 'https://t.me/' + encodeURIComponent(nick);
-function profileHead(p, { me, grids = [], works = null }) {
-  const likes = grids.reduce((a, g) => a + (+g.likes || 0), 0), dls = grids.reduce((a, g) => a + (+g.downloads || 0), 0);
+function profileHead(p, { me, grids = [], backgrounds = [], works = null }) {
+  const published = [...grids, ...backgrounds];
+  const likes = published.reduce((a, g) => a + (+g.likes || 0), 0), dls = published.reduce((a, g) => a + (+g.downloads || 0), 0);
   const adm = me ? ACC.isAdmin() : p.admin;
   const links = [
     p.steam && `<a class="pf-link" href="${esc(p.steam)}" target="_blank" rel="noopener">${icon('steam')}Steam</a>`,
@@ -1717,14 +1760,16 @@ function profileHead(p, { me, grids = [], works = null }) {
   ].filter(Boolean).join('');
   // чужой профиль глазами админа: убрать аватар или баннер
   const modBtns = !me && isAdmin() ? `${p.avatar ? `<button class="btn sm ghost danger" data-clear="avatar">${icon('trash')}Убрать аватар</button>` : ''}${p.banner ? `<button class="btn sm ghost danger" data-clear="banner">${icon('trash')}Убрать баннер</button>` : ''}` : '';
-  const stat = (n, a, b, c) => `<div><b>${num(n)}</b><span>${plural(n, a, b, c)}</span></div>`;
-  return `<section class="pf-head">
+  const stat = (n, ic, label) => `<div class="pf-stat">${icon(ic)}<b>${num(n)}</b><span>${label}</span></div>`;
+  return `<div class="pf-pagebar"><span class="pf-eyebrow">${me ? 'Личное пространство' : 'Знакомься с автором'}</span><a href="workshop.html">Мастерская ${icon('arrow')}</a></div><section class="pf-head${me ? ' pf-own' : ''}" aria-label="${me ? 'Мой профиль' : 'Профиль автора'}">
     <div class="pf-banner${p.banner ? ' on' : ''}">${p.banner ? `<img src="${esc(p.banner)}" alt="" onerror="this.remove()">` : ''}
+      <div class="pf-cover-art" aria-hidden="true"><i></i><i></i><i></i><span>GRID<br>STUDIO</span></div>
+      <span class="pf-cover-label">${icon(me ? 'brush' : 'compass')}${me ? 'Твоя игра. Твой порядок.' : 'Автор Grid Studio'}</span>
       ${me && ACC.media() ? `<button class="pf-banner-edit" id="pfBanner">${icon('image')}${p.banner ? 'Сменить баннер' : 'Добавить баннер'}</button>` : ''}</div>
     <div class="pf-top">
       <div class="pf-ava-wrap">${avatarHTML(p.avatar, p.nick, 'pf-ava')}${me ? `<button class="pf-ava-edit" id="pfAva" title="Сменить аватар" aria-label="Сменить аватар">${icon('edit')}</button>` : ''}</div>
       <div class="pf-id">
-        ${me ? `<input class="pf-nick" id="pfNick" value="${esc(p.nick)}" maxlength="32" spellcheck="false" title="Ник — его видят в Мастерской">` : `<h1 class="pf-nick">${esc(p.nick || 'Игрок')}</h1>`}
+        ${me ? `<h1 class="pf-name"><input class="pf-nick" id="pfNick" value="${esc(p.nick)}" maxlength="32" spellcheck="false" title="Нажми, чтобы изменить ник" aria-label="Твой ник в Мастерской">${icon('edit')}</h1>` : `<h1 class="pf-nick">${esc(p.nick || 'Игрок')}</h1>`}
         <div class="pf-meta">${adm ? `<span class="adm-tag">${icon('star')}Админ</span>` : ''}${p.created_at ? `<span>${sinceText(p.created_at)}</span>` : ''}</div>
       </div>
       <div class="pf-actions">
@@ -1735,16 +1780,16 @@ function profileHead(p, { me, grids = [], works = null }) {
     </div>
     <div class="pf-body">
       <div class="pf-about">
-        ${me && ACC.ext() ? `<textarea class="pf-bio" id="pfBio" maxlength="200" rows="1" placeholder="Пара слов о себе: какие сетки делаешь, за кого играешь…">${esc(p.bio || '')}</textarea>` : p.bio ? `<p class="pf-bio">${esc(p.bio)}</p>` : ''}
+        ${me && ACC.ext() ? `<label class="pf-about-label" for="pfBio">О себе ${icon('edit')}</label><textarea class="pf-bio" id="pfBio" maxlength="200" rows="1" aria-label="О себе" placeholder="Какие сетки делаешь? За кого играешь? Расскажи о себе…">${esc(p.bio || '')}</textarea>` : p.bio ? `<p class="pf-bio">${esc(p.bio)}</p>` : ''}
         ${links ? `<div class="pf-links">${links}</div>` : me && ACC.ext() ? `<button class="pf-link add" id="pfLinksAdd">${icon('plus')}Добавить Steam или Telegram</button>` : ''}
-        ${me ? `<span class="pf-private">${icon('lock')}${esc(ACC.user()?.email || '')} — видишь только ты</span>` : ''}
+        ${me ? `<span class="pf-private">${icon('lock')}<span>${esc(ACC.user()?.email || '')}<small>Почту видишь только ты</small></span></span>` : ''}
       </div>
-      <div class="pf-stats">
-        ${works ? stat(works.length, 'работа', 'работы', 'работ') : ''}
-        <div><b>${num(grids.length)}</b><span>в Мастерской</span></div>
-        ${stat(likes, 'лайк', 'лайка', 'лайков')}
-        ${stat(dls, 'скачивание', 'скачивания', 'скачиваний')}
-      </div>
+    </div>
+    <div class="pf-stats" aria-label="Статистика профиля">
+      ${works ? stat(works.length, 'lock', 'Личные работы') : ''}
+      ${stat(published.length, 'globe', 'В Мастерской')}
+      ${stat(likes, 'heart', 'Лайки')}
+      ${stat(dls, 'download', 'Скачивания')}
     </div>
   </section>`;
 }
@@ -1933,18 +1978,21 @@ async function renderMyProfile(box) {
   let works = [], pub = [], pubBg = [], liked = null, queue = null, home = null, tab = 'works';
   const adm = isAdmin();
   const head = () => {
-    $('#pfHeadBox').innerHTML = profileHead(p, { me: true, grids: pub, works });
+    $('#pfHeadBox').innerHTML = profileHead(p, { me: true, grids: pub, backgrounds: pubBg, works });
     applyIcons($('#pfHeadBox'));
     bindHead();
   };
   box.innerHTML = `<div id="pfHeadBox"></div>
-    <div class="pf-tabs chips" id="pfTabs"><i class="chip-ind" id="pfInd"></i>
-      <button class="chip on" data-tab="works">${icon('lock')}Мои работы <b id="pfWorksN"></b></button>
-      <button class="chip" data-tab="pub">${icon('globe')}Опубликованные <b id="pfPubN"></b></button>
-      <button class="chip" data-tab="liked">${icon('heart')}Понравившиеся <b id="pfLikedN"></b></button>
-      ${adm ? `<button class="chip" data-tab="mod">${icon('star')}Модерация <b id="pfModN"></b></button><button class="chip" data-tab="home">${icon('home')}Главная <b id="pfHomeN"></b></button>` : ''}
+    <div class="pf-tabs chips" id="pfTabs" role="tablist" aria-label="Работы профиля">
+      <button class="chip on" id="pfTab-works" role="tab" aria-selected="true" aria-controls="pfPanel" data-tab="works">${icon('lock')}Мои работы <b id="pfWorksN"></b></button>
+      <button class="chip" id="pfTab-pub" role="tab" aria-selected="false" aria-controls="pfPanel" tabindex="-1" data-tab="pub">${icon('globe')}Опубликованные <b id="pfPubN"></b></button>
+      <button class="chip" id="pfTab-liked" role="tab" aria-selected="false" aria-controls="pfPanel" tabindex="-1" data-tab="liked">${icon('heart')}Понравившиеся <b id="pfLikedN"></b></button>
+      ${adm ? `<button class="chip" id="pfTab-mod" role="tab" aria-selected="false" aria-controls="pfPanel" tabindex="-1" data-tab="mod">${icon('star')}Модерация <b id="pfModN"></b></button><button class="chip" id="pfTab-home" role="tab" aria-selected="false" aria-controls="pfPanel" tabindex="-1" data-tab="home">${icon('home')}Главная <b id="pfHomeN"></b></button>` : ''}
     </div>
-    <div class="cards" id="pfList">${skeletons(3)}</div>`;
+    <section class="pf-collection" id="pfPanel" role="tabpanel" aria-labelledby="pfTab-works" tabindex="0">
+      <div class="pf-section-head"><div><h2 id="pfSectionTitle">Мои работы</h2><p id="pfSectionNote">Сохранённые сетки, к которым хочется вернуться.</p></div><span class="pf-visibility" id="pfVisibility">${icon('lock')}Только для тебя</span></div>
+      <div class="cards" id="pfList" aria-busy="true">${skeletons(3)}</div>
+    </section>`;
   head();
   function bindHead() {
     const nick = $('#pfNick');
@@ -1960,23 +2008,37 @@ async function renderMyProfile(box) {
       fit(); bio.oninput = fit;
       bio.onchange = async () => { try { p = await ACC.updateProfile({ bio: bio.value.trim().slice(0, 200) }); toast('Сохранено', 'ok'); } catch (e) { toast(e.message, 'err'); } };
     }
-    $('#pfAva').onclick = $('.pf-ava-wrap .pf-ava').onclick = () => openAvatarSheet(p, np => { p = np; head(); });
+    $('#pfAva').onclick = () => openAvatarSheet(p, np => { p = np; head(); });
+    const avatar = $('.pf-ava-wrap .pf-ava');
+    avatar.setAttribute('role', 'button'); avatar.setAttribute('aria-label', 'Сменить аватар'); avatar.tabIndex = 0;
+    avatar.onclick = () => $('#pfAva').click();
+    avatar.onkeydown = e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); avatar.click(); } };
     const ban = $('#pfBanner'); if (ban) ban.onclick = () => openBannerSheet(p, np => { p = np; head(); });
     $('#pfOut').onclick = async () => { await ACC.signOut(); location.href = 'index.html'; };
     $('#pfShare').onclick = e => copyText(e.currentTarget.dataset.copy, 'Ссылка на профиль скопирована');
     for (const b of $$('#pfLinks, #pfLinksAdd')) b.onclick = () => openLinksSheet(p, np => { p = np; head(); });
   }
 
-  const ind = () => { const b = $('#pfTabs .chip.on'); $('#pfInd').style.cssText = `width:${b.offsetWidth}px;transform:translateX(${b.offsetLeft}px)`; };
+  const sections = {
+    works: ['Мои работы', 'Сохранённые сетки, к которым хочется вернуться.', 'lock', 'Только для тебя'],
+    pub: ['В Мастерской', 'Твои сетки и фоны, которыми ты поделился с сообществом.', 'globe', 'Видно всем'],
+    liked: ['Твои находки', 'Сетки из Мастерской, которые тебе понравились.', 'heart', 'Твоя коллекция'],
+    mod: ['Модерация', 'Жалобы на работы и скрытые публикации.', 'shield', 'Для администратора'],
+    home: ['Фоны главной', 'Выбирай, что увидят посетители Grid Studio.', 'home', 'Для администратора'],
+  };
   const draw = () => {
     $('#pfWorksN').textContent = works.length; $('#pfPubN').textContent = pub.length + pubBg.length; $('#pfLikedN').textContent = liked ? liked.length : API.likedIds().length;
     const list = $('#pfList');
+    const [title, note, symbol, visibility] = sections[tab];
+    $('#pfSectionTitle').textContent = title; $('#pfSectionNote').textContent = note;
+    $('#pfVisibility').innerHTML = `${icon(symbol)}${visibility}`;
+    list.setAttribute('aria-busy', String((tab === 'liked' && !liked) || (tab === 'mod' && !queue) || (tab === 'home' && !home)));
     if (tab === 'works') list.innerHTML = works.length ? works.map(workCard).join('')
-      : `<div class="cards-empty">${MARK}<b>Пока нет сохранённых работ</b><span>В редакторе открой меню у названия сетки → «Сохранить в мои работы». Работы видишь только ты.</span><a class="btn primary sm" href="editor.html">Открыть редактор</a></div>`;
+      : `<div class="cards-empty"><span class="pf-empty-icon">${icon('brush')}</span><b>Здесь начнётся твоя коллекция</b><span>Создай сетку в редакторе и выбери «Сохранить в мои работы» в меню у её названия.</span><a class="btn primary" href="editor.html?new">${icon('plus')}Создать первую сетку</a></div>`;
     else if (tab === 'pub') list.innerHTML = pub.length + pubBg.length ? pub.map(cardHTML).join('') + pubBg.map((x, i) => bgCardHTML(x, i)).join('')
-      : `<div class="cards-empty"><b>Ничего не опубликовано</b><span>Сетки и фоны, которые ты выложишь в Мастерскую, войдя в профиль, появятся здесь.</span></div>`;
+      : `<div class="cards-empty"><span class="pf-empty-icon">${icon('globe')}</span><b>Твои идеи ещё впереди</b><span>Опубликуй сетку или фон в Мастерской — здесь появятся все твои публикации.</span><a class="btn" href="workshop.html">Открыть Мастерскую ${icon('arrow')}</a></div>`;
     else if (tab === 'liked') list.innerHTML = !liked ? skeletons(3) : liked.length ? liked.map(cardHTML).join('')
-      : `<div class="cards-empty"><b>Пока пусто</b><span>Ставь лайки сеткам в Мастерской — они соберутся здесь.</span><a class="btn sm" href="workshop.html">В Мастерскую</a></div>`;
+      : `<div class="cards-empty"><span class="pf-empty-icon">${icon('heart')}</span><b>Сохраняй то, что вдохновляет</b><span>Ставь лайки сеткам в Мастерской — любимые работы соберутся здесь.</span><a class="btn" href="workshop.html">Найти свою сетку ${icon('arrow')}</a></div>`;
     else if (tab === 'home') {
       // админ: нажатие на фон ставит его на главную или убирает; на главной случайный из отмеченных
       if (!home) list.innerHTML = skeletons(3);
@@ -2019,12 +2081,14 @@ async function renderMyProfile(box) {
   };
   $('#pfTabs').onclick = async e => {
     const b = e.target.closest('.chip'); if (!b) return;
-    tab = b.dataset.tab; $$('#pfTabs .chip').forEach(c => c.classList.toggle('on', c === b)); ind(); draw();
+    tab = b.dataset.tab;
+    $$('#pfTabs .chip').forEach(c => { const on = c === b; c.classList.toggle('on', on); c.setAttribute('aria-selected', String(on)); c.tabIndex = on ? 0 : -1; });
+    $('#pfPanel').setAttribute('aria-labelledby', b.id); draw();
     if (tab === 'liked' && !liked) { try { liked = await API.byIds(API.likedIds()); } catch { liked = []; } if (tab === 'liked') draw(); }
     if (tab === 'mod') loadQueue();
     if (tab === 'home' && !home) loadHome();
   };
-  ind(); document.fonts?.ready.then(ind);
+  bindProfileTabKeys($('#pfTabs'));
   $('#pfList').onclick = async e => {
     const act = e.target.closest('[data-wact]');
     if (act) {
@@ -2077,7 +2141,17 @@ async function renderMyProfile(box) {
     head(); draw();
     // число на вкладке «Модерация» видно сразу, не дожидаясь клика
     if (adm) API.admin.queue().then(q => { queue = q; if (tab === 'mod') draw(); else $('#pfModN').textContent = q.grids.length + q.backgrounds.length; }).catch(() => {});
-  } catch (e) { $('#pfList').innerHTML = `<div class="cards-empty"><b>Не удалось загрузить работы</b><span>${esc(e.message)}</span></div>`; }
+  } catch (e) { $('#pfList').setAttribute('aria-busy', 'false'); $('#pfList').innerHTML = `<div class="cards-empty"><span class="pf-empty-icon">${icon('alert')}</span><b>Не удалось загрузить работы</b><span>${esc(e.message)}</span><button class="btn" id="pfRetry">Попробовать ещё раз</button></div>`; $('#pfRetry').onclick = () => renderMyProfile(box); }
+}
+function bindProfileTabKeys(tabs) {
+  tabs.onkeydown = e => {
+    if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(e.key)) return;
+    const buttons = $$('[role="tab"]', tabs), current = buttons.indexOf(document.activeElement);
+    if (current < 0) return;
+    e.preventDefault();
+    const next = e.key === 'Home' ? 0 : e.key === 'End' ? buttons.length - 1 : (current + (e.key === 'ArrowRight' ? 1 : -1) + buttons.length) % buttons.length;
+    buttons[next].focus(); buttons[next].click();
+  };
 }
 const workCard = (w, k) => `<a class="gcard wcard" href="editor.html?project=${encodeURIComponent(w.id)}" style="animation-delay:${Math.min(k, 12) * 40}ms">
   <span class="gthumb">${w.thumb ? `<img src="${esc(w.thumb)}" alt="" loading="lazy">` : ''}
@@ -2091,13 +2165,33 @@ const workCard = (w, k) => `<a class="gcard wcard" href="editor.html?project=${e
     <span class="gmeta"><span class="by">${icon('clock')}изменена ${ago(w.updated_at)}</span><span class="w-open">Открыть ${icon('arrow')}</span></span></span>
 </a>`;
 async function renderPublicProfile(box, id) {
-  box.innerHTML = `<div class="loading">Загружаю профиль…</div>`;
+  box.innerHTML = `<div class="loading" role="status">Загружаю профиль…</div>`;
   try {
     const [p, grids, bgs] = await Promise.all([ACC.getProfile(id), ACC.userGrids(id), API.bg.list({ userId: id, sort: 'new', limit: 60 }).then(r => r.items, () => [])]);
     if (!p) throw new Error('Такого профиля нет.');
     document.title = `${p.nick} · Grid Studio`;
-    box.innerHTML = `${profileHead(p, { me: false, grids })}
-      <div class="cards" id="pfList">${grids.length + bgs.length ? grids.map(cardHTML).join('') + bgs.map((x, i) => bgCardHTML(x, i)).join('') : `<div class="cards-empty"><b>Пока ничего нет</b><span>Автор ещё ничего не выложил в Мастерскую.</span></div>`}</div>`;
+    box.innerHTML = `${profileHead(p, { me: false, grids, backgrounds: bgs })}
+      <div class="pf-tabs chips" id="pfPublicTabs" role="tablist" aria-label="Публикации автора">
+        <button class="chip on" id="pfPublic-all" role="tab" aria-selected="true" aria-controls="pfPublicPanel" data-kind="all">${icon('globe')}Все работы <b>${num(grids.length + bgs.length)}</b></button>
+        <button class="chip" id="pfPublic-grids" role="tab" aria-selected="false" aria-controls="pfPublicPanel" tabindex="-1" data-kind="grids">${icon('grid')}Сетки <b>${num(grids.length)}</b></button>
+        <button class="chip" id="pfPublic-backgrounds" role="tab" aria-selected="false" aria-controls="pfPublicPanel" tabindex="-1" data-kind="backgrounds">${icon('image')}Фоны <b>${num(bgs.length)}</b></button>
+      </div>
+      <section class="pf-collection" id="pfPublicPanel" role="tabpanel" aria-labelledby="pfPublic-all" tabindex="0">
+        <div class="pf-section-head"><div><h2>Работы автора</h2><p>Сделано по-своему. Опубликовано для всех.</p></div><span class="pf-visibility">${icon('globe')}В Мастерской</span></div>
+        <div class="cards" id="pfList"></div>
+      </section>`;
+    const drawPublic = (kind = 'all') => {
+      const showGrids = kind !== 'backgrounds' ? grids : [], showBgs = kind !== 'grids' ? bgs : [];
+      $('#pfList').innerHTML = showGrids.length + showBgs.length ? showGrids.map(cardHTML).join('') + showBgs.map((x, i) => bgCardHTML(x, i)).join('') : `<div class="cards-empty"><span class="pf-empty-icon">${icon(kind === 'backgrounds' ? 'image' : 'grid')}</span><b>${kind === 'all' ? 'Первые работы ещё впереди' : kind === 'grids' ? 'Пока нет опубликованных сеток' : 'Пока нет опубликованных фонов'}</b><span>Загляни в Мастерскую — там есть работы других авторов.</span><a class="btn" href="workshop.html">Открыть Мастерскую ${icon('arrow')}</a></div>`;
+      applyIcons($('#pfList'));
+    };
+    drawPublic();
+    $('#pfPublicTabs').onclick = e => {
+      const tab = e.target.closest('[role="tab"]'); if (!tab) return;
+      $$('#pfPublicTabs .chip').forEach(b => { const on = b === tab; b.classList.toggle('on', on); b.setAttribute('aria-selected', String(on)); b.tabIndex = on ? 0 : -1; });
+      $('#pfPublicPanel').setAttribute('aria-labelledby', tab.id); drawPublic(tab.dataset.kind);
+    };
+    bindProfileTabKeys($('#pfPublicTabs'));
     applyIcons(box);
     $('#pfShare').onclick = e => copyText(e.currentTarget.dataset.copy, 'Ссылка на профиль скопирована');
     $('#pfList').onclick = e => {
@@ -2110,7 +2204,7 @@ async function renderPublicProfile(box, id) {
       if (!confirm(`Убрать ${what} у «${p.nick}»?`)) return;
       try { await ACC.adminClear(p.id, b.dataset.clear); toast(`${what[0].toUpperCase() + what.slice(1)} убран`, 'ok'); renderPublicProfile(box, id); } catch (e) { toast(e.message, 'err'); }
     };
-  } catch (e) { box.innerHTML = `<div class="auth-card"><h1>Профиль не найден</h1><p>${esc(e.message)}</p><a class="btn" href="workshop.html">В Мастерскую</a></div>`; }
+  } catch (e) { box.innerHTML = `<div class="auth-card pf-sent"><span class="pf-auth-symbol">${icon('user')}</span><span class="pf-eyebrow">Профиль недоступен</span><h1>Не удалось открыть профиль</h1><p>${esc(e.message)}</p><a class="btn" href="workshop.html">В Мастерскую ${icon('arrow')}</a></div>`; }
 }
 
 // ---------- запуск ----------

@@ -13,6 +13,8 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600;700&family=Unbounded:wght@500;600;700&display=swap">
 <link rel="stylesheet" href="site.css?v=42">
+<link rel="stylesheet" href="community.css?v=43">
+<link rel="stylesheet" href="workshop.css?v=43">
 </head>
 <body data-page="workshop">
 <!-- фон как на главной: сполохи темы и поле ASCII-символов (рисует site.js), внизу гаснет в цвет страницы -->
@@ -23,45 +25,56 @@
   <div class="bg-vignette"></div>
 </div>
 
-<div class="wrap">
-  <div class="ws-head">
-    <div class="ws-title">
-      <span class="ws-ico" data-icon="compass"></span>
-      <h1>Мастерская</h1>
-      <div class="seg" id="wsTabs" role="tablist" aria-label="Что смотреть"><i class="seg-ind"></i><button data-v="grids" class="on">Сетки</button><button data-v="bg">Фоны</button></div>
+<main class="wrap workshop">
+  <section class="ws-head" aria-labelledby="wsTitle">
+    <div class="ws-copy">
+      <span class="ws-eyebrow"><span data-icon="compass"></span>Сделано игроками</span>
+      <h1 id="wsTitle">Мастерская<span>.</span></h1>
+      <p id="wsLead">Твоя Dota. Твой стиль. Найди сетку по душе и сделай её своей.</p>
+      <div class="ws-actions">
+        <a class="btn primary" id="wsCreate" href="editor.html">Создать сетку</a>
+        <button class="btn" id="wsHow"><span data-icon="book"></span>Как установить</button>
+      </div>
     </div>
-    <div class="ws-actions">
-      <button class="btn" id="wsHow">Как установить</button>
-      <a class="btn primary" id="wsCreate" href="editor.html">Создать сетку</a>
+    <div class="ws-art" aria-hidden="true">
+      <div class="ws-art-frame ws-art-back"><img src="docs/menu-bg.webp" alt=""><span>ФОН МЕНЮ <i>02</i></span></div>
+      <div class="ws-art-frame ws-art-front"><img src="docs/hero-art.webp" alt=""><span>СЕТКА ГЕРОЕВ <i>01</i></span></div>
+      <span class="ws-art-caption">Создавай. Делись. Вдохновляйся.</span>
     </div>
-    <p id="wsLead">Найди свой вариант. Открой в редакторе и сделай по-своему.</p>
     <div class="demo-note" id="demoNote" hidden>
-      <span>⚠</span>
+      <span data-icon="alert"></span>
       <span>Мастерская работает в демо-режиме: база ещё не подключена, поэтому здесь видны только сетки, выложенные из этого браузера.</span>
     </div>
-  </div>
+  </section>
 
   <div class="ws-bar">
-    <div class="seg ghost" id="wsSorts" role="tablist" aria-label="Сортировка"></div>
-    <label class="search"><span data-icon="search"></span><input class="input" id="q" type="search" placeholder="Название или автор" autocomplete="off"></label>
+    <div class="seg ws-tabs" id="wsTabs" role="tablist" aria-label="Что смотреть">
+      <i class="seg-ind"></i>
+      <button id="wsGridsTab" data-v="grids" class="on" role="tab" aria-selected="true" aria-controls="wsResults"><span data-icon="grid"></span>Сетки героев</button>
+      <button id="wsBackgroundsTab" data-v="bg" role="tab" aria-selected="false" aria-controls="wsResults" tabindex="-1"><span data-icon="image"></span>Фоны меню</button>
+    </div>
+    <label class="search"><span data-icon="search"></span><input class="input" id="q" type="search" placeholder="Найти работу или автора" aria-label="Найти работу или автора" autocomplete="off"><kbd aria-hidden="true">/</kbd></label>
   </div>
-  <div class="ws-filters">
-    <div class="tchips" id="wsTags" aria-label="Теги"></div>
-    <div class="tchips ws-aspect" id="wsAspect" aria-label="Пропорции экрана" hidden></div>
-  </div>
-  <div class="ws-meta">
-    <span class="count" id="count"></span>
-    <div class="seg sm" id="wsBg" aria-label="Подложка превью"></div>
-  </div>
+  <section id="wsResults" role="tabpanel" aria-labelledby="wsGridsTab">
+    <div class="ws-filters">
+      <div class="ws-filter-row"><span class="ws-filter-label">Сначала</span><div class="seg ghost" id="wsSorts" role="group" aria-label="Сортировка"></div></div>
+      <div class="ws-filter-row"><span class="ws-filter-label">Темы</span><div class="tchips" id="wsTags" role="group" aria-label="Теги"></div></div>
+      <div class="tchips ws-aspect" id="wsAspect" role="group" aria-label="Пропорции экрана" hidden></div>
+    </div>
+    <div class="ws-meta">
+      <div class="ws-result-count"><span class="count" id="count" role="status" aria-live="polite"></span><button class="ws-reset" id="wsReset" hidden><span data-icon="x"></span>Сбросить</button></div>
+      <div class="ws-preview" id="wsPreview"><span class="ws-filter-label">Превью</span><div class="seg sm" id="wsBg" role="group" aria-label="Подложка превью"></div></div>
+    </div>
 
-  <div class="cards" id="cards"></div>
-  <div class="more"><button class="btn" id="more" hidden>Показать ещё</button></div>
+    <div class="cards" id="cards" aria-busy="true"></div>
+    <div class="more"><button class="btn" id="more" hidden>Показать ещё</button></div>
+  </section>
 
   <footer class="site-foot">
     <div class="bottom-bar" data-bottom-bar></div>
     <span class="foot-note">© 2026 shttps · Dota 2 — товарный знак Valve Corporation, проект с Valve не связан.</span>
   </footer>
-</div>
+</main>
 
 <div class="modal-root" id="modalRoot"></div>
 <div class="toasts" id="toasts"></div>
@@ -71,6 +84,6 @@
 <script src="gridrender.js?v=37"></script>
 <script src="catalog-api.js?v=39"></script>
 <script src="dotabg.js?v=37"></script>
-<script src="site.js?v=42"></script>
+<script src="site.js?v=43"></script>
 </body>
 </html>
