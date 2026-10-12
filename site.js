@@ -508,15 +508,18 @@ document.addEventListener('click', async e => {
 }, true);
 // «В Dota» на карточке фона — просто ссылка в сборщик: страницу фона при этом не открываем
 document.addEventListener('click', e => { if (e.target.closest('[data-bg-dota]') && !e.target.closest('.hide18')) e.stopPropagation(); }, true);
-// наведение на карточку в Мастерской и профиле: наклон за курсором, свет и параллакс превью (стили — community.css).
+// наведение на карточки (главная, Мастерская, профиль): наклон за курсором, свет и параллакс превью — стили в конце site.css.
 // Курсор задаёт цель, а значения догоняют её экспоненциально в одном rAF на все карточки — без рывков на любом fps.
-if (/^(workshop|profile)$/.test(document.body.dataset.page) && matchMedia('(hover: hover) and (pointer: fine)').matches) {
+// Большие плитки наклоняются слабее: угол делится на ширину. При «меньше анимации» остаётся только свет.
+const TILT = { home: '.fcard, .fwide, .gcard:not(.sk), .guide-card.in, .tile.in:not(.t-compare)', workshop: '.gcard:not(.sk), .bcard', profile: '.gcard:not(.sk), .bcard, .ach-item' }[PAGE];
+if (TILT && matchMedia('(hover: hover) and (pointer: fine)').matches) {
   const calm = matchMedia('(prefers-reduced-motion: reduce)'), live = new Map();
   let raf = 0, last = 0;
-  const cardOf = el => el?.closest?.('.gcard:not(.sk), .bcard');
+  const cardOf = el => el?.closest?.(TILT);
   const aim = (s, e) => {
     const r = s.card.getBoundingClientRect();
     s.tx = Math.min(1, Math.max(0, (e.clientX - r.left) / r.width)); s.ty = Math.min(1, Math.max(0, (e.clientY - r.top) / r.height));
+    s.k = calm.matches ? 0 : Math.min(1, 380 / r.width);
   };
   const tick = now => {
     const dt = Math.min(.05, last ? (now - last) / 1000 : .016); last = now;
@@ -528,10 +531,10 @@ if (/^(workshop|profile)$/.test(document.body.dataset.page) && matchMedia('(hove
         for (const v of ['--hov', '--prs', '--rx', '--ry', '--px', '--py', '--mx', '--my']) st.removeProperty(v);
         s.card.classList.remove('tilting'); live.delete(s.card); continue;
       }
-      const px = s.x * 2 - 1, py = s.y * 2 - 1;
-      st.setProperty('--hov', s.h.toFixed(4)); st.setProperty('--prs', s.p.toFixed(4));
-      st.setProperty('--rx', `${(-py * 3.2 * s.h).toFixed(3)}deg`); st.setProperty('--ry', `${(px * 4 * s.h).toFixed(3)}deg`);
-      st.setProperty('--px', (px * s.h).toFixed(4)); st.setProperty('--py', (py * s.h).toFixed(4));
+      const px = s.x * 2 - 1, py = s.y * 2 - 1, m = s.h * s.k;
+      st.setProperty('--hov', s.h.toFixed(4)); st.setProperty('--prs', (s.p * s.k).toFixed(4));
+      st.setProperty('--rx', `${(-py * 3.2 * m).toFixed(3)}deg`); st.setProperty('--ry', `${(px * 4 * m).toFixed(3)}deg`);
+      st.setProperty('--px', (px * m).toFixed(4)); st.setProperty('--py', (py * m).toFixed(4));
       st.setProperty('--mx', `${(s.x * 100).toFixed(2)}%`); st.setProperty('--my', `${(s.y * 100).toFixed(2)}%`);
     }
     raf = live.size ? requestAnimationFrame(tick) : 0;
@@ -539,11 +542,11 @@ if (/^(workshop|profile)$/.test(document.body.dataset.page) && matchMedia('(hove
   };
   const wake = () => { if (!raf) raf = requestAnimationFrame(tick); };
   document.addEventListener('pointermove', e => {
-    if (e.pointerType !== 'mouse' || calm.matches) return;
+    if (e.pointerType !== 'mouse') return;
     const card = cardOf(e.target); if (!card) return;
     let s = live.get(card);
     if (!s) {
-      s = { card, x: .5, y: .5, h: 0, p: 0, tx: .5, ty: .5, th: 1, tp: 0 };
+      s = { card, x: .5, y: .5, h: 0, p: 0, tx: .5, ty: .5, th: 1, tp: 0, k: 1 };
       aim(s, e); s.x = s.tx; s.y = s.ty; // свет появляется сразу под курсором, а не выезжает из центра
       live.set(card, s); card.classList.add('tilting');
     }
@@ -1003,13 +1006,6 @@ function initHome() {
   }
 
   glyphField($('#bgGlyphs'));
-
-  // панели: «прожектор» и светящийся край идут за курсором — пишем только две переменные той панели, что под мышью
-  $('.landing-copy').addEventListener('pointermove', e => {
-    const card = e.target.closest('.fcard, .fwide'); if (!card) return;
-    const r = card.getBoundingClientRect();
-    card.style.setProperty('--x', (e.clientX - r.left) + 'px'); card.style.setProperty('--y', (e.clientY - r.top) + 'px');
-  }, { passive: true });
 
   // экран ноутбука: в редакторе открыта случайная сетка из Мастерской (живой холст на подложке «как в Доте»);
   // она прорисовывается слева направо, счётчик категорий бежит вместе с ней. Мастерская молчит — показываем готовый арт.
@@ -2193,14 +2189,17 @@ function cropImage(m, img, { title, text, round = false, aspect = 1, outW, outH 
 
 async function renderMyProfile(box) {
   let p = ACC.profile() || await ACC.loadProfile();
-  let works = [], pub = [], pubBg = [], liked = null, queue = null, home = null, tab = 'works';
+  let works = [], pub = [], pubBg = [], liked = null, queue = null, home = null, tab = 'works', feats = null, loaded = false;
   const adm = isAdmin();
+  // достижения считаются по тем же данным, что и шапка; поменял аватар или «о себе» — медаль может открыться сразу
+  const ach = () => { if (loaded) window.Achievements?.render($('#pfAch'), { profile: p, grids: pub, backgrounds: pubBg, feats, admin: adm }, { uid: ACC.user().id, me: true }); };
   const head = () => {
     $('#pfHeadBox').innerHTML = profileHead(p, { me: true, grids: pub, backgrounds: pubBg, works });
     applyIcons($('#pfHeadBox'));
     bindHead();
+    ach();
   };
-  box.innerHTML = `<div id="pfHeadBox"></div>
+  box.innerHTML = `<div id="pfHeadBox"></div><div id="pfAch"></div>
     <div class="pf-tabs chips" id="pfTabs" role="tablist" aria-label="Работы профиля">
       <button class="chip on" id="pfTab-works" role="tab" aria-selected="true" aria-controls="pfPanel" data-tab="works">${icon('lock')}Мои работы <b id="pfWorksN"></b></button>
       <button class="chip" id="pfTab-pub" role="tab" aria-selected="false" aria-controls="pfPanel" tabindex="-1" data-tab="pub">${icon('globe')}Опубликованные <b id="pfPubN"></b></button>
@@ -2354,9 +2353,9 @@ async function renderMyProfile(box) {
     if (c && tab !== 'works') goGrid(c.dataset.id, e);
   };
   try {
-    [works, pub] = await Promise.all([ACC.projects.list(), ACC.userGrids(ACC.user().id)]);
+    [works, pub, feats] = await Promise.all([ACC.projects.list(), ACC.userGrids(ACC.user().id), window.Achievements?.feats(ACC.user().id)]);
     pubBg = (await API.bg.list({ userId: ACC.user().id, sort: 'new', limit: 60 }).catch(() => ({ items: [] }))).items;
-    head(); draw();
+    loaded = true; head(); draw();
     // число на вкладке «Модерация» видно сразу, не дожидаясь клика
     if (adm) API.admin.queue().then(q => { queue = q; if (tab === 'mod') draw(); else $('#pfModN').textContent = q.grids.length + q.backgrounds.length; }).catch(() => {});
   } catch (e) { $('#pfList').setAttribute('aria-busy', 'false'); $('#pfList').innerHTML = `<div class="cards-empty"><span class="pf-empty-icon">${icon('alert')}</span><b>Не удалось загрузить работы</b><span>${esc(e.message)}</span><button class="btn" id="pfRetry">Попробовать ещё раз</button></div>`; $('#pfRetry').onclick = () => renderMyProfile(box); }
@@ -2385,10 +2384,10 @@ const workCard = (w, k) => `<a class="gcard wcard" href="editor.html?project=${e
 async function renderPublicProfile(box, id) {
   box.innerHTML = `<div class="loading" role="status">Загружаю профиль…</div>`;
   try {
-    const [p, grids, bgs] = await Promise.all([ACC.getProfile(id), ACC.userGrids(id), API.bg.list({ userId: id, sort: 'new', limit: 60 }).then(r => r.items, () => [])]);
+    const [p, grids, bgs, feats] = await Promise.all([ACC.getProfile(id), ACC.userGrids(id), API.bg.list({ userId: id, sort: 'new', limit: 60 }).then(r => r.items, () => []), window.Achievements?.feats(id)]);
     if (!p) throw new Error('Такого профиля нет.');
     document.title = `${p.nick} · Grid Studio`;
-    box.innerHTML = `${profileHead(p, { me: false, grids, backgrounds: bgs })}
+    box.innerHTML = `${profileHead(p, { me: false, grids, backgrounds: bgs })}<div id="pfAch"></div>
       <div class="pf-tabs chips" id="pfPublicTabs" role="tablist" aria-label="Публикации автора">
         <button class="chip on" id="pfPublic-all" role="tab" aria-selected="true" aria-controls="pfPublicPanel" data-kind="all">${icon('globe')}Все работы <b>${num(grids.length + bgs.length)}</b></button>
         <button class="chip" id="pfPublic-grids" role="tab" aria-selected="false" aria-controls="pfPublicPanel" tabindex="-1" data-kind="grids">${icon('grid')}Сетки <b>${num(grids.length)}</b></button>
@@ -2404,6 +2403,7 @@ async function renderPublicProfile(box, id) {
       applyIcons($('#pfList'));
     };
     drawPublic();
+    window.Achievements?.render($('#pfAch'), { profile: p, grids, backgrounds: bgs, feats, admin: p.admin });
     $('#pfPublicTabs').onclick = e => {
       const tab = e.target.closest('[role="tab"]'); if (!tab) return;
       $$('#pfPublicTabs .chip').forEach(b => { const on = b === tab; b.classList.toggle('on', on); b.setAttribute('aria-selected', String(on)); b.tabIndex = on ? 0 : -1; });
@@ -2443,6 +2443,8 @@ if (PAGE === 'grid') initGridPage();
 if (PAGE === 'bg') initBgPage();
 if (PAGE === 'guides') initGuides();
 if (PAGE === 'profile') initProfile();
+// новые достижения празднуем на любой странице сайта, а не только в профиле — чуть позже, чтобы не мешать загрузке
+else setTimeout(() => window.Achievements?.watch(), 2500);
 reveal();
 // профиль подтягивается в фоне — меню обновится само
 if (ACC?.enabled && PAGE !== 'profile') ACC.ready();

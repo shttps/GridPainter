@@ -698,3 +698,18 @@ language sql stable security definer set search_path = public as $$
      order by a.score desc, a.updated_at limit 50) t;
 $$;
 grant execute on function public.arcade_board(text) to anon, authenticated;
+
+
+-- ---------- Достижения: игровые цифры профиля ----------
+-- Остальные достижения сайт считает сам по публичным данным (работы, лайки, скачивания, профиль).
+-- Здесь — только то, что спрятано в закрытых таблицах игр; рекорды и так видны в таблицах, поэтому функция открыта всем.
+create or replace function public.profile_feats(p_uid uuid) returns json
+language sql stable security definer set search_path = public as $$
+  select json_build_object(
+    'played', (select count(*) from game_results where user_id = p_uid),
+    'wins',   (select count(*) from game_results where user_id = p_uid and won),
+    'aces',   (select count(*) from game_results where user_id = p_uid and won and tries = 1),
+    'lockpick', coalesce((select score from arcade_scores where user_id = p_uid and game = 'lockpick'), 0),
+    'sweeper',  coalesce((select score from arcade_scores where user_id = p_uid and game = 'sweeper'), 0));
+$$;
+grant execute on function public.profile_feats(uuid) to anon, authenticated;

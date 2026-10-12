@@ -183,13 +183,12 @@ button:focus { outline: none; }
 .fcards { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
 .fcard, .fwide { position: relative; isolation: isolate; border-radius: 22px; background: oklch(0.17 0.008 var(--h) / .94); border: 1px solid var(--line);
   animation: rise .7s var(--ease) var(--d, .3s) both; transition: border-color .25s, transform .35s var(--ease), box-shadow .35s var(--ease); }
-.fcard::before, .fwide::before { content: ""; position: absolute; z-index: -1; inset: 0; border-radius: inherit; pointer-events: none; opacity: 0; transition: opacity .3s;
-  background: radial-gradient(260px circle at var(--x, 50%) var(--y, 0%), color-mix(in oklab, var(--c2) 16%, transparent), transparent 70%); }
-.fcard::after, .fwide::after { content: ""; position: absolute; inset: -1px; border-radius: inherit; padding: 1px; pointer-events: none; opacity: 0; transition: opacity .3s;
-  background: radial-gradient(200px circle at var(--x, 50%) var(--y, 0%), var(--c3), var(--c1) 45%, transparent 75%);
+.fcard::before, .fwide::before { content: ""; position: absolute; z-index: -1; inset: 0; border-radius: inherit; pointer-events: none; opacity: var(--hov, 0);
+  background: radial-gradient(260px circle at var(--mx, 50%) var(--my, 0%), color-mix(in oklab, var(--c2) 16%, transparent), transparent 70%); }
+.fcard::after, .fwide::after { content: ""; position: absolute; inset: -1px; border-radius: inherit; padding: 1px; pointer-events: none; opacity: var(--hov, 0);
+  background: radial-gradient(200px circle at var(--mx, 50%) var(--my, 0%), var(--c3), var(--c1) 45%, transparent 75%);
   -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask-composite: exclude; }
 .fcard:hover, .fwide:hover { border-color: oklch(0.32 0.014 var(--h)); transform: translateY(-4px); box-shadow: 0 26px 50px -30px color-mix(in oklab, var(--c1) 85%, transparent); }
-.fcard:hover::before, .fwide:hover::before, .fcard:hover::after, .fwide:hover::after { opacity: 1; }
 .fcard { display: flex; flex-direction: column; gap: 6px; padding: 12px 12px 14px; }
 .fc-media { position: relative; height: 112px; margin-bottom: 8px; border-radius: 14px; overflow: hidden; background: #120d0b; transition: transform .45s var(--ease); }
 .fcard:hover .fc-media { transform: scale(1.025); }
@@ -1368,4 +1367,162 @@ body[data-page="grid"] { padding-top: calc(var(--nav-h) + 18px); background: rad
   .g-contest { padding: 22px 18px; border-radius: 18px; }
   .g-rows li { grid-template-columns: 30px 30px minmax(0, 1fr) auto; gap: 9px; padding: 9px 12px; }
   .g-meta { display: none; }
+}
+
+/* ---------- наведение на карточки: наклон, свет и параллакс ----------
+   Карточка под мышью приподнимается и чуть наклоняется за курсором, под курсором — мягкий свет и светящийся край,
+   превью внутри едет навстречу (параллакс) и ловит блик. --hov/--rx/--ry/--px/--py/--mx/--my плавно ведёт site.js
+   (пружина в rAF) и вешает .tilting, пока карточка в движении; поэтому transform здесь без transition — иначе «вязнет».
+   Только мышь; при «меньше анимации» остаётся свет без наклона. */
+@media (hover: hover) and (pointer: fine) {
+  :is(.gcard:not(.sk), .bcard, .tile, .guide-card, .ach-item) { isolation: isolate; }
+  :is(.gcard:not(.sk), .bcard, .tile, .guide-card, .ach-item)::before {
+    content: ""; position: absolute; z-index: -1; inset: 0; border-radius: inherit; pointer-events: none; opacity: var(--hov, 0);
+    background: radial-gradient(420px circle at var(--mx, 50%) var(--my, 50%), color-mix(in oklab, var(--c2) 13%, transparent), transparent 60%);
+  }
+  /* светящийся край: та же точка света, но только в рамке толщиной 1px */
+  :is(.gcard:not(.sk), .bcard, .tile, .ach-item)::after {
+    content: ""; position: absolute; inset: -1px; border-radius: inherit; padding: 1px; pointer-events: none; opacity: var(--hov, 0);
+    background: radial-gradient(260px circle at var(--mx, 50%) var(--my, 50%), color-mix(in oklab, var(--accent-hi) 85%, transparent), transparent 70%);
+    -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor;
+    mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
+  }
+  .tile::after { inset: 0; z-index: 4; } /* у плиток overflow: hidden — рамку рисуем внутри */
+  :is(.gcard:not(.sk), .bcard):hover { border-color: color-mix(in oklab, var(--accent-line) 45%, var(--line-strong)); box-shadow: 0 34px 60px -34px #000e, 0 22px 50px -30px color-mix(in oklab, var(--c1) 60%, transparent); }
+  :is(.gcard, .bcard) :is(.gtitle, .btitle) { transition: color .35s var(--ease); }
+  :is(.gcard, .bcard):hover :is(.gtitle, .btitle) { color: var(--accent-hi); }
+  /* блик по превью */
+  :is(.gthumb, .bpic)::before {
+    content: ""; position: absolute; z-index: 1; inset: 0; pointer-events: none; opacity: calc(var(--hov, 0) * .9); mix-blend-mode: soft-light;
+    background: radial-gradient(70% 90% at var(--mx, 50%) var(--my, 50%), #fff9, transparent 70%);
+  }
+}
+@media (hover: hover) and (pointer: fine) and (prefers-reduced-motion: no-preference) {
+  .tilting {
+    transform: perspective(1100px) translateY(calc(var(--hov, 0) * -6px)) rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg)) scale(calc(1 - var(--prs, 0) * .016)) !important;
+    transition-property: border-color, background-color, box-shadow, color, opacity !important; will-change: transform;
+  }
+  /* превью: лёгкий зум и сдвиг против наклона — картинка будто лежит глубже рамки */
+  .tilting :is(.gthumb > canvas, .gthumb > img, .bpic > img, .bpic > video) {
+    transform: translate3d(calc(var(--px, 0) * -7px), calc(var(--py, 0) * -5px), 0) scale(calc(1.002 + var(--hov, 0) * .055)) !important;
+    transition: opacity .4s !important;
+  }
+}
+
+/* ---------- достижения (achievements.js) ----------
+   Медаль: кольцо прогресса цвета редкости (как предметы в Доте) и диск со значком. Не получено — серый диск и замок,
+   кольцо показывает, сколько осталось. Открытие: кольцо дозаполняется, замок слетает, медаль переворачивается уже
+   в цвете, вокруг — волна и искры; для легендарных и выше за медалью ещё крутятся лучи. */
+@property --p { syntax: "<number>"; inherits: true; initial-value: 0; }
+.ach { margin: -6px 0 34px; }
+.ach-head { align-items: flex-end; }
+.ach-sum { display: flex; flex-direction: column; align-items: flex-end; gap: 8px; flex: none; }
+.ach-sum b { font: 600 25px/1 var(--mono); letter-spacing: -.06em; font-variant-numeric: tabular-nums; }
+.ach-sum b span { color: var(--faint); font-size: 15px; letter-spacing: -.02em; }
+.ach-bar { display: block; width: 150px; height: 5px; border-radius: 3px; background: var(--card-2); overflow: hidden; }
+.ach-bar > i { display: block; height: 100%; border-radius: inherit; background: var(--grad); transform-origin: left; animation: achBar 1.2s var(--ease) .2s both; }
+@keyframes achBar { from { transform: scaleX(0); } }
+.ach-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 268px), 1fr)); gap: 12px; }
+.ach-item { --rc: #b0c3d9; position: relative; display: flex; align-items: center; gap: 14px; min-width: 0; padding: 14px 16px 14px 14px; border-radius: 16px; border: 1px solid var(--line); background: var(--card); outline-offset: 3px; transition: border-color .35s var(--ease), background-color .35s var(--ease), box-shadow .5s var(--ease); }
+.ach-item[hidden] { display: none; }
+.ach-item.done { border-color: color-mix(in oklab, var(--rc) 26%, var(--line)); background: linear-gradient(120deg, color-mix(in oklab, var(--rc) 11%, var(--card)), var(--card) 62%); }
+.ach-item.done:hover { border-color: color-mix(in oklab, var(--rc) 55%, var(--line)); box-shadow: 0 22px 44px -30px color-mix(in oklab, var(--rc) 80%, #000); }
+.ach-item.rise { animation: rise .45s var(--ease) calc(var(--k, 0) * 35ms) both; }
+.ach-txt { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.ach-txt b { font-size: 14.5px; font-weight: 650; letter-spacing: -.01em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ach-txt > span { color: var(--muted); font-size: 12px; line-height: 1.4; }
+.ach-txt small { display: flex; align-items: center; gap: 8px; margin-top: 3px; color: var(--faint); font: 500 10.5px var(--mono); }
+.ach-txt small em { color: var(--rc); font-style: normal; }
+.ach-txt small i { display: inline-flex; align-items: center; gap: 3px; font-style: normal; }
+.ach-txt small .i { width: 12px; height: 12px; }
+.ach-item:not(.done) .ach-txt b { color: var(--ink-2); }
+.ach-item:not(.done) .ach-txt small em { opacity: .6; }
+.ach-new { position: absolute; top: -8px; right: 12px; padding: 2px 8px; border-radius: 6px; background: var(--rc); color: #0b0a0a; font: 700 9.5px var(--disp); letter-spacing: .08em; text-transform: uppercase; opacity: 0; transform: translateY(4px) scale(.8); }
+.ach-item.fresh.play .ach-new { animation: achNew .5s var(--spring) .9s forwards; }
+@keyframes achNew { to { opacity: 1; transform: none; } }
+.ach-more { display: flex; margin: 16px auto 0; }
+.ach-more .i { width: 15px; height: 15px; order: 2; transition: transform .3s var(--ease); }
+.ach-more[aria-expanded="true"] .i { transform: rotate(180deg); }
+
+/* медаль */
+.ach-medal { --p: 0; position: relative; display: grid; place-items: center; flex: none; width: 54px; height: 54px; perspective: 400px; }
+.ach-ring { position: absolute; inset: 0; border-radius: 50%; background: conic-gradient(var(--rc) calc(var(--p) * 360deg), oklch(1 0 0 / .07) 0);
+  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 3px), #000 calc(100% - 2.5px)); mask: radial-gradient(farthest-side, transparent calc(100% - 3px), #000 calc(100% - 2.5px)); }
+.ach-core { display: grid; place-items: center; width: 42px; height: 42px; border-radius: 50%; color: var(--faint); background: var(--card-2); box-shadow: inset 0 0 0 1px var(--line); transition: background .3s, color .3s; }
+.ach-core .i { width: 21px; height: 21px; }
+.done > .ach-medal .ach-core, .ach-medal.unlock .ach-core { color: #fff; background: radial-gradient(circle at 34% 28%, color-mix(in oklab, var(--rc) 70%, #fff), color-mix(in oklab, var(--rc) 62%, #000) 75%);
+  box-shadow: inset 0 1px 0 #ffffff59, inset 0 -7px 12px #00000059, 0 6px 18px -6px var(--rc); }
+.done > .ach-medal .ach-core .i, .ach-medal.unlock .ach-core .i { filter: drop-shadow(0 1px 1px #0007); }
+.ach-lock { position: absolute; right: -2px; bottom: -2px; display: grid; place-items: center; width: 20px; height: 20px; border-radius: 50%; background: var(--bg-2); box-shadow: 0 0 0 2px var(--card); color: var(--muted); }
+.ach-lock .i { width: 11px; height: 11px; }
+.ach-item:not(.done) .ach-ring { opacity: .75; }
+
+/* открытие прямо в сетке достижений */
+.ach-item.fresh:not(.play) .ach-core { color: var(--faint); background: var(--card-2); box-shadow: inset 0 0 0 1px var(--line); }
+.ach-item.fresh:not(.play) .ach-ring { --p: 0; }
+.ach-item.fresh.play .ach-ring { animation: achFill .8s var(--ease) both; }
+.ach-item.fresh.play .ach-core { animation: achFlip .9s var(--spring) .6s both; }
+.ach-item.fresh.play { animation: achGlow 1.6s var(--ease) .7s; }
+@keyframes achFill { from { --p: 0; } to { --p: 1; } }
+@keyframes achFlip { 0% { transform: rotateY(0) scale(1); filter: grayscale(1) brightness(.6); } 45% { transform: rotateY(200deg) scale(1.18); } 100% { transform: rotateY(360deg) scale(1); filter: none; } }
+@keyframes achGlow { 0% { box-shadow: 0 0 0 0 color-mix(in oklab, var(--rc) 70%, transparent); } 100% { box-shadow: 0 0 0 14px transparent; } }
+
+/* окно «Достижение открыто» */
+.ach-pop { --rc: #b0c3d9; position: fixed; z-index: 300; left: 50%; top: calc(var(--nav-h) + 14px); display: flex; align-items: center; gap: 18px; width: min(440px, calc(100vw - 32px)); padding: 16px 22px 16px 16px; overflow: hidden; border-radius: 20px; text-decoration: none; color: var(--ink); cursor: pointer;
+  border: 1px solid color-mix(in oklab, var(--rc) 45%, var(--line-strong)); background: radial-gradient(260px 140px at 15% 50%, color-mix(in oklab, var(--rc) 22%, transparent), transparent 75%), oklch(0.2 0.01 var(--h) / .97);
+  box-shadow: 0 30px 80px -20px #000d, 0 0 0 1px #0006, 0 0 60px -20px color-mix(in oklab, var(--rc) 70%, transparent);
+  opacity: 0; transform: translate(-50%, -26px) scale(.92); transition: opacity .45s var(--ease), transform .7s var(--spring); }
+.ach-pop.in { opacity: 1; transform: translate(-50%, 0); }
+.ach-pop.out { opacity: 0; transform: translate(-50%, -14px) scale(.97); transition: opacity .35s var(--ease), transform .4s var(--ease); }
+.ach-pop-medal { position: relative; display: grid; place-items: center; flex: none; width: 76px; height: 76px; }
+.ach-medal.big { width: 72px; height: 72px; }
+.ach-medal.big .ach-core { width: 56px; height: 56px; }
+.ach-medal.big .ach-core .i { width: 28px; height: 28px; }
+.ach-medal.big .ach-lock { width: 24px; height: 24px; box-shadow: 0 0 0 2px oklch(0.2 0.01 var(--h)); }
+.ach-pop.in .ach-medal .ach-ring { animation: achFill .85s var(--ease) .2s both; }
+.ach-pop.in .ach-medal .ach-lock { animation: achShake .4s ease-in-out .6s 2; }
+.ach-medal.unlock .ach-lock { animation: achLockOff .5s var(--ease) forwards !important; }
+.ach-medal.unlock .ach-core { animation: achFlip .95s var(--spring) both; }
+@keyframes achShake { 25% { transform: rotate(-14deg); } 75% { transform: rotate(14deg); } }
+@keyframes achLockOff { to { opacity: 0; transform: translate(14px, 18px) rotate(40deg) scale(.6); } }
+.ach-wave { position: absolute; inset: 2px; border-radius: 50%; border: 2px solid var(--rc); opacity: 0; pointer-events: none; }
+.ach-pop.burst .ach-wave { animation: achWave .9s var(--ease) forwards; }
+@keyframes achWave { 0% { opacity: .9; transform: scale(.8); } 100% { opacity: 0; transform: scale(2.1); border-width: 1px; } }
+.ach-sparks { position: absolute; left: 50%; top: 50%; width: 0; height: 0; pointer-events: none; }
+.ach-sparks i { position: absolute; left: -2.5px; top: -2.5px; width: 5px; height: 5px; border-radius: 50%; background: var(--rc); box-shadow: 0 0 8px var(--rc); opacity: 0; }
+.ach-pop.burst .ach-sparks i { animation: achSpark .95s cubic-bezier(.15, .7, .3, 1) var(--t) forwards; }
+@keyframes achSpark { 0% { opacity: 1; transform: rotate(var(--a)) translateX(10px) scale(var(--s)); } 70% { opacity: .9; } 100% { opacity: 0; transform: rotate(var(--a)) translateX(var(--d)) scale(0); } }
+.ach-rays { position: absolute; inset: -34px; border-radius: 50%; pointer-events: none; opacity: 0;
+  background: repeating-conic-gradient(from 0deg, color-mix(in oklab, var(--rc) 55%, transparent) 0 7deg, transparent 7deg 22deg);
+  -webkit-mask: radial-gradient(closest-side, #000 25%, transparent); mask: radial-gradient(closest-side, #000 25%, transparent); }
+.ach-pop.burst .ach-rays { animation: achRays 5s linear forwards; }
+@keyframes achRays { 0% { opacity: 0; transform: rotate(0) scale(.6); } 12% { opacity: 1; transform: rotate(20deg) scale(1); } 100% { opacity: .55; transform: rotate(160deg) scale(1); } }
+.ach-pop-txt { position: relative; display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.ach-pop-txt small { color: var(--rc); font: 600 9.5px var(--disp); letter-spacing: .14em; text-transform: uppercase; }
+.ach-pop-txt b { font-size: 19px; font-weight: 700; letter-spacing: -.02em; }
+.ach-pop-txt span { color: var(--muted); font-size: 12.5px; line-height: 1.4; }
+.ach-pop-txt em { margin-top: 3px; color: var(--faint); font: 500 10.5px var(--mono); font-style: normal; }
+.ach-pop-txt > * { opacity: 0; transform: translateY(6px); filter: blur(4px); }
+.ach-pop.in .ach-pop-txt > * { animation: achText .6s var(--ease) forwards; }
+.ach-pop.in .ach-pop-txt small { animation-delay: .25s; }
+.ach-pop.in .ach-pop-txt b { animation-delay: 1.1s; }
+.ach-pop.in .ach-pop-txt span { animation-delay: 1.2s; }
+.ach-pop.in .ach-pop-txt em { animation-delay: 1.3s; }
+@keyframes achText { to { opacity: 1; transform: none; filter: none; } }
+.ach-shine { position: absolute; inset: 0; pointer-events: none; background: linear-gradient(105deg, transparent 35%, #ffffff24 48%, transparent 60%); transform: translateX(-110%); }
+.ach-pop.burst .ach-shine { animation: achShine 1.1s var(--ease) .15s forwards; }
+@keyframes achShine { to { transform: translateX(110%); } }
+.ach-pop.epic { border-color: color-mix(in oklab, var(--rc) 70%, var(--line-strong)); }
+@media (max-width: 640px) {
+  .ach-head { flex-direction: column; align-items: flex-start; }
+  .ach-sum { flex-direction: row-reverse; align-items: center; gap: 12px; }
+  .ach-pop { gap: 14px; padding: 13px 16px 13px 12px; top: calc(var(--nav-h) + 8px); }
+  .ach-pop-medal { width: 64px; height: 64px; }
+  .ach-medal.big { width: 60px; height: 60px; }
+  .ach-medal.big .ach-core { width: 46px; height: 46px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ach-pop, .ach-pop.out { transition: opacity .3s; transform: translate(-50%, 0); }
+  .ach-pop *, .ach-item.fresh.play, .ach-item.fresh.play * { animation-duration: .01s !important; animation-delay: 0s !important; }
+  .ach-rays, .ach-sparks, .ach-wave { display: none; }
 }

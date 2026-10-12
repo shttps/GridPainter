@@ -383,7 +383,7 @@ window.CatalogAPI = (() => {
   };
 
   return {
-    remote, list, get, config, thumb, byIds, publish, like, hit, report, remove, likedIds: () => [...liked],
+    remote, rpc, list, get, config, thumb, byIds, publish, like, hit, report, remove, likedIds: () => [...liked],
     isMine: (id, userId) => mine.has(id) || (!!userId && userId === window.Accounts?.user()?.id), isLiked: id => liked.has(id), isReported: id => reported.has(id), mineCount: () => mine.size,
     author: () => load('gs.author', ''), setAuthor: a => save('gs.author', a),
     KINDS: { ascii: 'ASCII', mosaic: 'Мозаика', mixed: 'Смешанная' },
