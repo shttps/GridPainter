@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Мини-игры · Grid Studio — мини-игры Dota 2 в браузере</title>
+<meta name="description" content="Мини-игры из ивентов Dota 2 прямо в браузере: «Взлом замка» Сларка из «Тёмного карнавала», «Сапёр Сплин» Кеза и Техиков и «Угадайка» героя дня. Рекорды и награды как в игре.">
+<meta name="theme-color" content="#0e0a09">
+<meta property="og:title" content="Мини-игры Dota 2 — Grid Studio">
+<meta property="og:description" content="«Взлом замка», «Сапёр Сплин» и «Угадайка» — с таблицей рекордов.">
+<meta property="og:image" content="https://shttps.github.io/GridPainter/docs/ingame.webp">
+<link rel="icon" href="logo.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600;700&family=Unbounded:wght@500;600;700&family=Philosopher:wght@400;700&display=swap">
+<link rel="stylesheet" href="site.css?v=50">
+<link rel="stylesheet" href="arcade.css?v=4">
+</head>
+<body data-page="arcade">
+
+<main class="wrap arcade">
+  <header class="page-head">
+    <span class="kicker">Мини-игры</span>
+    <h1>Мини-игры Dota&nbsp;2</h1>
+    <p>Мини-игры из ивентов Доты, перенесённые в браузер: те же правила, очки и награды. Без установки — играй, пока ищется матч.</p>
+  </header>
+
+  <div class="ar-cards">
+    <a class="ar-card c-lock" href="#lockpick" data-play="lockpick">
+      <span class="ar-card-art" aria-hidden="true">
+        <svg viewBox="0 0 200 200"><defs><linearGradient id="rimG" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#8c8892"/><stop offset=".6" stop-color="#3a3840"/><stop offset="1" stop-color="#6a6670"/></linearGradient></defs>
+          <path d="M62 92V70a38 38 0 0 1 76 0v22" fill="none" stroke="#6d6a73" stroke-width="13"/>
+          <circle cx="100" cy="122" r="66" fill="url(#rimG)"/><circle cx="100" cy="122" r="55" fill="#17151a"/>
+          <path d="M100 122 L100 70 A52 52 0 0 1 128 78 Z" fill="none"/>
+          <path d="M82.6 73.1 A52 52 0 0 1 117.4 73.1 L110.4 92.5 A31.5 31.5 0 0 0 89.6 92.5 Z" fill="#86c6f0"/>
+          <path d="M60.4 152.6 A52 52 0 0 1 52.6 138 L72 131.2 A31.5 31.5 0 0 0 76.6 140 Z" fill="#e2bc35"/>
+          <line class="pick" x1="100" y1="153.5" x2="100" y2="174" stroke="#fff" stroke-width="3" stroke-linecap="round"/>
+          <circle cx="100" cy="122" r="28" fill="#36333a"/></svg>
+      </span>
+      <span class="ar-card-body"><small>«Тёмный карнавал» · 2026</small><b>Взлом замка</b><span>Помогите Сларку выбраться из камеры: ловите отмычкой жёлтые и синие деления.</span>
+        <em data-best="lockpick"></em></span>
+      <span class="ar-card-go">Играть</span>
+    </a>
+    <a class="ar-card c-sweep" href="#sweeper" data-play="sweeper">
+      <span class="ar-card-art" aria-hidden="true"><span class="sw-mini"><i class="g"></i><i class="g"></i><i class="g"></i><i class="g"></i><i class="g"></i><i class="g"></i><i class="g"></i><i class="g"></i><i class="g"></i><i class="n2">2</i><i class="n1">1</i><i class="g"></i><i class="g"></i><i class="g"></i><i class="g"></i><i class="f"></i><i class="n2">2</i><i class="o"></i><i class="n1">1</i><i class="g"></i><i class="g"></i><i class="g"></i><i class="g"></i><i class="n1">1</i><i class="o"></i><i class="o"></i><i class="n1">1</i><i class="g"></i><i class="g"></i><i class="g"></i><i class="n1">1</i><i class="o"></i><i class="n1">1</i><i class="f"></i><i class="g"></i><i class="g"></i><i class="g"></i><i class="g"></i><i class="n2">2</i><i class="g"></i><i class="g"></i><i class="g"></i></span></span>
+      <span class="ar-card-body"><small>Мини-игры поиска матча · Кез и Сплин</small><b>Сапёр Сплин</b><span>Пять этапов минного поля на время, Echo Slash и предметы. Одна ошибка — подрыв.</span>
+        <em data-best="sweeper"></em></span>
+      <span class="ar-card-go">Играть</span>
+    </a>
+    <a class="ar-card c-guess" href="game.html">
+      <span class="ar-card-art" aria-hidden="true"><span class="gc-ascii"><i>.:+=*</i><i>=#@%+</i><i>-*%#:</i><i>.:=+.</i></span></span>
+      <span class="ar-card-body"><small>Grid Studio · каждый день</small><b>Угадайка</b><span>Угадай героя дня по портрету из символов. Конкурс недели с таблицей.</span>
+        <em>Новый герой в полночь</em></span>
+      <span class="ar-card-go">Играть</span>
+    </a>
+  </div>
+  <p class="ar-foot-note">Игры сделаны по правилам и скриншотам из Dota 2. Арт отрисован заново, портреты героев — Valve. Рекорды в общую таблицу попадают у тех, кто вошёл в профиль.</p>
+</main>
+
+<footer class="wrap site-foot">
+  <div class="bottom-bar" data-bottom-bar></div>
+  <span class="foot-note">© 2026 shttps · Портреты героев — Valve. Dota 2 — товарный знак Valve Corporation, проект с Valve не связан.</span>
+</footer>
+
+<div class="modal-root" id="modalRoot"></div>
+<div class="toasts" id="toasts"></div>
+<script src="heroes.js?v=37"></script>
+<script src="config.js?v=41"></script>
+<script src="auth.js?v=37"></script>
+<script src="gridrender.js?v=37"></script>
+<script src="catalog-api.js?v=39"></script>
+<script src="site.js?v=58"></script>
+<script src="arcade-audio.js?v=1"></script>
+<script src="arcade-fx.js?v=1"></script>
+<script src="arcade.js?v=3"></script>
+<script src="lockpick.js?v=2"></script>
+<script src="sweeper.js?v=4"></script>
+</body>
+</html>

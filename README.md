@@ -14,7 +14,7 @@
   <a href="https://shttps.github.io/GridPainter/editor.html">Редактор</a> ·
   <a href="https://shttps.github.io/GridPainter/workshop.html">Мастерская</a> ·
   <a href="https://shttps.github.io/GridPainter/guides.html">Гайды</a> ·
-  <a href="https://shttps.github.io/GridPainter/game.html">Угадайка</a>
+  <a href="https://shttps.github.io/GridPainter/arcade.html">Мини-игры</a>
 </p>
 
 <p align="center">
@@ -28,7 +28,7 @@
 - 🎮 **«Как в игре»** — превью по стилям Доты, без запуска игры.
 - 🌐 **Мастерская** — сетки и фоны главного меню от игроков.
 - 🧩 **Профиль Steam** — брайль-арт для «Своего информационного поля».
-- 🎯 **Угадайка** — герой дня по портрету из символов.
+- 🎯 **Мини-игры** — «Взлом замка» и «Сапёр Сплин» из Доты с рекордами и «Угадайка» героя дня.
 
 | Редактор | В игре |
 |:---:|:---:|

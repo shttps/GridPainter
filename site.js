@@ -122,10 +122,10 @@ const isAdmin = () => !!ACC?.enabled && ACC.isAdmin();
 const GAME_START = new Date(2026, 9, 9);
 const gameDay = (d = new Date()) => Math.round((new Date(d.getFullYear(), d.getMonth(), d.getDate()) - GAME_START) / 864e5) + 1;
 // куда можно вернуться после входа: только страницы этого сайта
-const safeNext = s => /^(index|workshop|grid|bg|editor|guides|game|profile|background)\.html(\?[\w=&%.-]*)?$/.test(s || '') ? s : '';
+const safeNext = s => /^(index|workshop|grid|bg|editor|guides|game|arcade|profile|background)\.html(\?[\w=&%.-]*)?$/.test(s || '') ? s : '';
 
 // ---------- меню сверху ----------
-const NAV = [['workshop', 'workshop.html', 'compass', 'Мастерская'], ['background', 'background.html', 'image', 'Фон меню'], ['guides', 'guides.html', 'book', 'Гайды'], ['game', 'game.html', 'dice', 'Угадайка']];
+const NAV = [['workshop', 'workshop.html', 'compass', 'Мастерская'], ['background', 'background.html', 'image', 'Фон меню'], ['guides', 'guides.html', 'book', 'Гайды'], ['arcade', 'arcade.html', 'dice', 'Мини-игры']];
 function renderNav() {
   const bar = document.createElement('header');
   bar.className = 'navbar'; bar.id = 'navbar';
@@ -133,7 +133,7 @@ function renderNav() {
     <a class="logo" href="index.html" aria-label="Grid Studio — на главную">${LOGO}<span>Grid<b>Studio</b></span></a>
     <div class="nav-links" id="navLinks">
       <span class="nav-hl" aria-hidden="true"></span>
-      ${NAV.map(([k, href, ic, label]) => `<a href="${href}"${k === (PAGE === 'grid' || PAGE === 'bg' ? 'workshop' : PAGE) ? ' aria-current="page"' : ''}>${icon(ic)}${label}${k === 'workshop' ? '<b class="nav-badge" data-cat-count hidden></b>' : ''}</a>`).join('')}
+      ${NAV.map(([k, href, ic, label]) => `<a href="${href}"${k === (PAGE === 'grid' || PAGE === 'bg' ? 'workshop' : PAGE === 'game' ? 'arcade' : PAGE) ? ' aria-current="page"' : ''}>${icon(ic)}${label}${k === 'workshop' ? '<b class="nav-badge" data-cat-count hidden></b>' : ''}</a>`).join('')}
       <a href="editor.html" class="nav-studio">${icon('brush')}Редактор${icon('arrow')}</a>
     </div>
     ${SITE.telegram ? `<a class="nav-tg" href="${esc(SITE.telegram)}" target="_blank" rel="noopener" title="Telegram: чат и новости" aria-label="Telegram: чат и новости">${icon('telegram')}<span>Чат и новости</span></a>` : ''}
@@ -2399,4 +2399,4 @@ reveal();
 // профиль подтягивается в фоне — меню обновится само
 if (ACC?.enabled && PAGE !== 'profile') ACC.ready();
 // число сеток в меню на страницах, где Мастерская сама его не грузит
-if (PAGE === 'guides' || PAGE === 'game' || PAGE === 'profile' || PAGE === 'grid' || PAGE === 'bg') API.list({ limit: 1 }).then(r => setCatCount(r.total)).catch(() => {});
+if (PAGE === 'guides' || PAGE === 'game' || PAGE === 'arcade' || PAGE === 'profile' || PAGE === 'grid' || PAGE === 'bg') API.list({ limit: 1 }).then(r => setCatCount(r.total)).catch(() => {});

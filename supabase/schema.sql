@@ -655,3 +655,46 @@ begin
        order by 1 limit 50) t), '[]'::json));
 end $$;
 grant execute on function public.game_board(int) to anon, authenticated;
+
+
+-- ---------- Мини-игры: лучший результат каждого игрока («Взлом замка», «Сапёр Сплин») ----------
+-- Хранится только рекорд: новый результат записывается, если он больше прежнего.
+-- Игры идут в браузере, поэтому потолок очков отсекает только явную подделку; призы по этой таблице не выдаём.
+create table if not exists public.arcade_scores (
+  user_id    uuid not null references auth.users(id) on delete cascade,
+  game       text not null,
+  score      int  not null,
+  updated_at timestamptz not null default now(),
+  primary key (user_id, game),
+  constraint arcade_scores_game check (game in ('lockpick', 'sweeper')),
+  constraint arcade_scores_score check (score between 0 and 1000000)
+);
+alter table public.arcade_scores enable row level security;
+revoke all on public.arcade_scores from anon, authenticated;
+
+create or replace function public.arcade_submit(p_game text, p_score int) returns json
+language plpgsql security definer set search_path = public as $$
+declare v_cap int := case p_game when 'lockpick' then 400000 when 'sweeper' then 60000 end;
+begin
+  if auth.uid() is null then raise exception 'not_signed_in'; end if;
+  if v_cap is null then raise exception 'arcade_game'; end if;
+  if p_score is null or p_score < 0 or p_score > v_cap then raise exception 'arcade_score'; end if;
+  insert into arcade_scores (user_id, game, score) values (auth.uid(), p_game, p_score)
+    on conflict (user_id, game) do update set score = excluded.score, updated_at = now()
+    where arcade_scores.score < excluded.score;
+  return json_build_object('saved', found);
+end $$;
+revoke all on function public.arcade_submit(text, int) from public, anon;
+grant execute on function public.arcade_submit(text, int) to authenticated;
+
+-- таблица рекордов игры: топ-50, при равенстве выше тот, кто набрал раньше
+create or replace function public.arcade_board(p_game text) returns json
+language sql stable security definer set search_path = public as $$
+  select coalesce(json_agg(t order by t.place), '[]'::json) from (
+    select row_number() over (order by a.score desc, a.updated_at) as place,
+           a.user_id as id, p.nick, p.avatar, a.score
+      from arcade_scores a join profiles p on p.id = a.user_id
+     where a.game = p_game and a.score > 0
+     order by a.score desc, a.updated_at limit 50) t;
+$$;
+grant execute on function public.arcade_board(text) to anon, authenticated;
