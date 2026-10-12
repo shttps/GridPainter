@@ -151,10 +151,12 @@ function renderAccount() {
   const p = ACC.profile(), u = ACC.user();
   const s = u && streak?.uid === u.id ? streak : null;
   box.innerHTML = u
-    ? `<a class="nav-user${PAGE === 'profile' && !new URLSearchParams(location.search).get('u') ? ' on' : ''}" href="profile.html" title="Мой профиль">${avatarHTML(p?.avatar, p?.nick || u.email)}<span class="nav-nick">${esc(p?.nick || 'Профиль')}</span>${s ? streakHTML(s) : ''}</a>`
+    ? `<a class="nav-user${s ? ' has-streak' : ''}${PAGE === 'profile' && !new URLSearchParams(location.search).get('u') ? ' on' : ''}" href="profile.html" title="Мой профиль">${avatarHTML(p?.avatar, p?.nick || u.email)}<span class="nav-nick">${esc(p?.nick || 'Профиль')}</span></a>${s ? streakHTML(s) : ''}`
     : `<a class="btn sm nav-login" href="profile.html${PAGE !== 'profile' && PAGE !== 'home' ? '?next=' + encodeURIComponent(location.pathname.split('/').pop() + location.search) : ''}">${icon('user')}Войти</a>`;
   if (u && !s) loadStreak(u.id).then(renderAccount);
   else if (s?.fresh) { s.fresh = false; celebrateStreak(box, s); }
+  const chip = $('.nav-streak', box);
+  if (chip) { chip.onclick = () => openStreak(s); $('.nav-user', box).style.setProperty('--sw', chip.offsetWidth + 'px'); }
 }
 
 // ---------- огонёк: сколько дней подряд заходишь на сайт ----------
@@ -176,7 +178,7 @@ function loadStreak(uid) {
       const n = mine?.day === dayKey(y) ? mine.streak + 1 : 1;
       r = { streak: n, best: Math.max(n, mine?.best || 0), prev: mine?.streak || 0 };
     }
-    const v = { uid, day: today, streak: +r.streak, best: +r.best, prev: +r.prev || 0 };
+    const v = { uid, day: today, streak: +r.streak, best: +r.best, prev: +r.prev || 0, days: +r.days || (mine?.days || 0) + 1 };
     writeJSON('gs.streak', v);
     return (streak = { ...v, fresh: v.streak !== v.prev });
   })();
@@ -187,7 +189,51 @@ const FLAME = '<svg viewBox="0 0 24 24" aria-hidden="true"><path class="fl-o" d=
 // чем длиннее серия, тем ярче: угольки → огонь → пламя → синее «аркановое» с 30 дней
 const streakTier = n => n >= 30 ? 4 : n >= 7 ? 3 : n >= 3 ? 2 : 1;
 const daysText = n => `${n} ${plural(n, 'день', 'дня', 'дней')}`;
-const streakHTML = (s, shown = s.streak) => `<span class="nav-streak t${streakTier(shown)}" title="${esc(`Огонёк: ${daysText(s.streak)} подряд на Grid Studio. Рекорд — ${daysText(s.best)}. Заходи каждый день, чтобы не погас.`)}"><i class="ns-flame">${FLAME}</i><b class="ns-num"><span>${shown}</span></b></span>`;
+const streakHTML = (s, shown = s.streak) => `<button class="nav-streak t${streakTier(shown)}" title="${esc(`Огонёк: ${daysText(s.streak)} подряд на Grid Studio. Рекорд — ${daysText(s.best)}. Нажми, чтобы посмотреть`)}" aria-label="${esc(`Огонёк: ${daysText(s.streak)} подряд`)}"><i class="ns-flame">${FLAME}</i><b class="ns-num"><span>${shown}</span></b></button>`;
+// окно огонька: большое живое пламя, счёт дней, последняя неделя, рекорд и сколько до следующего цвета
+const STREAK_TIERS = [[1, 'Угольки', 'Только разгорается'], [3, 'Огонь', 'Уже греет'], [7, 'Пламя', 'Горит ярко'], [30, 'Аркана', 'Синее пламя']];
+const STREAK_GOALS = [3, 7, 30, 100, 365];
+function openStreak(s) {
+  const n = s.streak, t = streakTier(n), [, tname, tnote] = STREAK_TIERS[t - 1];
+  const goal = STREAK_GOALS.find(g => g > n), from = [...STREAK_GOALS].reverse().find(g => g <= n) || 0;
+  const goalText = !goal ? 'Ты дошёл до вершины — просто не дай ему погаснуть'
+    : goal === 3 ? `Ещё ${daysText(goal - n)} — и угольки станут огнём`
+    : goal === 7 ? `Ещё ${daysText(goal - n)} — и огонь станет пламенем`
+    : goal === 30 ? `Ещё ${daysText(goal - n)} — и пламя станет синим`
+    : `Ещё ${daysText(goal - n)} до отметки в ${goal} ${plural(goal, 'день', 'дня', 'дней')}`;
+  // неделя, которая кончается сегодня: горят дни, что входят в серию
+  const WD = ['Вс', 'Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб'];
+  const week = Array.from({ length: 7 }, (_, i) => { const d = new Date(); d.setDate(d.getDate() - (6 - i)); return { wd: WD[d.getDay()], on: 6 - i < n, today: i === 6 }; });
+  const embers = Array.from({ length: 14 }, () => `<i style="--x:${(Math.random() * 90 - 45).toFixed(0)}px;--dx:${(Math.random() * 40 - 20).toFixed(0)}px;--dl:${(Math.random() * 2.4).toFixed(2)}s;--du:${(1.8 + Math.random() * 1.6).toFixed(2)}s;--sz:${(2 + Math.random() * 3).toFixed(1)}px"></i>`).join('');
+  const msg = n === 1 ? (s.prev > 1 ? `Серия на ${daysText(s.prev)} прервалась, но огонёк уже снова горит. Заходи завтра!` : 'Огонёк только зажёгся. Заходи завтра — станет 2.')
+    : `Ты заходишь на Grid Studio ${daysText(n)} подряд. Загляни завтра, чтобы он не погас!`;
+  const m = openSheet(`<div class="sh-body streak-sheet t${t}">
+    <div class="sk-fire" aria-hidden="true">
+      <i class="sk-glow"></i><span class="sk-embers">${embers}</span>
+      <svg class="sk-flame" viewBox="0 0 120 150">
+        <defs>
+          <linearGradient id="skG1" x1="0" y1="1" x2="0" y2="0"><stop offset="0" style="stop-color:var(--f0)"/><stop offset="1" style="stop-color:var(--f1)"/></linearGradient>
+          <linearGradient id="skG2" x1="0" y1="1" x2="0" y2="0"><stop offset="0" style="stop-color:var(--f1)"/><stop offset="1" style="stop-color:var(--f2)"/></linearGradient>
+          <linearGradient id="skG3" x1="0" y1="1" x2="0" y2="0"><stop offset="0" style="stop-color:var(--f2)"/><stop offset="1" style="stop-color:#fff"/></linearGradient>
+        </defs>
+        <path class="sk-l1" fill="url(#skG1)" d="M60 6c8 26 46 42 46 86a46 46 0 01-92 0c0-24 14-38 23-46 2 15 8 25 17 28C52 52 53 28 60 6z"/>
+        <path class="sk-l2" fill="url(#skG2)" d="M60 46c6 18 32 30 32 58a32 32 0 01-64 0c0-15 9-24 15-29 1.5 9 5 15 11 17-1-16 1-32 6-46z"/>
+        <path class="sk-l3" fill="url(#skG3)" d="M60 86c4 11 18 18 18 33a18 18 0 01-36 0c0-9 5-14 9-17 1 5 3 8 6 9 0-9 1-17 3-25z"/>
+      </svg>
+    </div>
+    <b class="sk-num" data-to="${n}">0</b>
+    <span class="sk-label">${plural(n, 'день', 'дня', 'дней')} подряд</span>
+    <span class="sk-tier">${esc(tname)} · ${esc(tnote)}</span>
+    <p class="sk-msg">${esc(msg)}</p>
+    <div class="sk-week">${week.map((d, i) => `<span class="${d.on ? 'on' : ''}${d.today ? ' today' : ''}" style="--i:${i}"><i>${d.on ? FLAME : ''}</i><small>${d.wd}</small></span>`).join('')}</div>
+    <div class="sk-goal"><div class="sk-goal-top"><span>${esc(goalText)}</span>${goal ? `<b>${n} / ${goal}</b>` : ''}</div><i class="sk-bar"><i style="--w:${goal ? ((n - from) / (goal - from) * 100).toFixed(1) : 100}%"></i></i></div>
+    <div class="sk-stats"><div><b>${num(s.best)}</b><span>Рекорд</span></div><div><b>${num(s.days || n)}</b><span>Всего дней</span></div></div>
+  </div>`);
+  // счёт бежит от нуля, пока пламя разгорается
+  const el = $('.sk-num', m.root), t0 = performance.now(), dur = Math.min(1400, 500 + n * 60);
+  const step = now => { const k = Math.min(1, (now - t0) / dur); el.textContent = Math.round(n * (1 - Math.pow(1 - k, 3))); if (k < 1 && el.isConnected) requestAnimationFrame(step); };
+  if (matchMedia('(prefers-reduced-motion: reduce)').matches) el.textContent = n; else { requestAnimationFrame(step); setTimeout(() => { el.textContent = n; }, dur + 200); }
+}
 function celebrateStreak(box, s) {
   const chip = $('.nav-streak', box); if (!chip) return;
   const grew = s.prev > 0 && s.streak === s.prev + 1, broke = s.prev > 0 && s.streak === 1;
