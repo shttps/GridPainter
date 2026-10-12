@@ -144,14 +144,72 @@ function renderNav() {
   renderAccount();
   ACC?.onChange(renderAccount);
 }
-// справа в меню: «Войти» или аватар с ником; без аккаунтов — просто «Создать сетку»
+// справа в меню: «Войти» или аватар с ником и огоньком; без аккаунтов — просто «Создать сетку»
 function renderAccount() {
   const box = $('#navAcc'); if (!box) return;
   if (!ACC?.enabled) { box.innerHTML = `<a class="btn primary sm" href="editor.html">Создать сетку${icon('arrow')}</a>`; return; }
   const p = ACC.profile(), u = ACC.user();
+  const s = u && streak?.uid === u.id ? streak : null;
   box.innerHTML = u
-    ? `<a class="nav-user${PAGE === 'profile' && !new URLSearchParams(location.search).get('u') ? ' on' : ''}" href="profile.html" title="Мой профиль">${avatarHTML(p?.avatar, p?.nick || u.email)}<span>${esc(p?.nick || 'Профиль')}</span></a>`
+    ? `<a class="nav-user${PAGE === 'profile' && !new URLSearchParams(location.search).get('u') ? ' on' : ''}" href="profile.html" title="Мой профиль">${avatarHTML(p?.avatar, p?.nick || u.email)}<span class="nav-nick">${esc(p?.nick || 'Профиль')}</span>${s ? streakHTML(s) : ''}</a>`
     : `<a class="btn sm nav-login" href="profile.html${PAGE !== 'profile' && PAGE !== 'home' ? '?next=' + encodeURIComponent(location.pathname.split('/').pop() + location.search) : ''}">${icon('user')}Войти</a>`;
+  if (u && !s) loadStreak(u.id).then(renderAccount);
+  else if (s?.fresh) { s.fresh = false; celebrateStreak(box, s); }
+}
+
+// ---------- огонёк: сколько дней подряд заходишь на сайт ----------
+// Серия живёт в базе (visit_ping) — одна на все устройства; пока функции нет — считаем в этом браузере.
+// В базу стучимся раз в день: сегодняшний ответ лежит в gs.streak. Новый день — огонёк в меню вспыхивает.
+const dayKey = (d = new Date()) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+const readJSON = k => { try { return JSON.parse(localStorage.getItem(k)); } catch { return null; } };
+const writeJSON = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} };
+let streak = null, streakP = null;
+function loadStreak(uid) {
+  if (streakP?.uid === uid) return streakP;
+  streakP = (async () => {
+    const today = dayKey(), was = readJSON('gs.streak'), mine = was?.uid === uid ? was : null;
+    if (mine?.day === today) return (streak = { ...mine, fresh: false });
+    let r;
+    try { r = await API.rpc('visit_ping', { p_day: today }); if (!r?.streak) throw new Error('no streak'); }
+    catch {
+      const y = new Date(); y.setDate(y.getDate() - 1);
+      const n = mine?.day === dayKey(y) ? mine.streak + 1 : 1;
+      r = { streak: n, best: Math.max(n, mine?.best || 0), prev: mine?.streak || 0 };
+    }
+    const v = { uid, day: today, streak: +r.streak, best: +r.best, prev: +r.prev || 0 };
+    writeJSON('gs.streak', v);
+    return (streak = { ...v, fresh: v.streak !== v.prev });
+  })();
+  streakP.uid = uid;
+  return streakP;
+}
+const FLAME = '<svg viewBox="0 0 24 24" aria-hidden="true"><path class="fl-o" d="M12 2.5c1.2 4 6.5 6.3 6.5 12a6.5 6.5 0 01-13 0c0-3.3 1.9-5.2 3.2-6.4.3 2.2 1.2 3.5 2.4 4C10.6 9.2 10.8 5.6 12 2.5z"/><path class="fl-i" d="M12 11.6c.7 2 3.1 3 3.1 5.6a3.1 3.1 0 01-6.2 0c0-1.6.9-2.5 1.5-3 .2 1 .6 1.6 1.2 1.9-.1-1.5 0-3.2.4-4.5z"/></svg>';
+// чем длиннее серия, тем ярче: угольки → огонь → пламя → синее «аркановое» с 30 дней
+const streakTier = n => n >= 30 ? 4 : n >= 7 ? 3 : n >= 3 ? 2 : 1;
+const daysText = n => `${n} ${plural(n, 'день', 'дня', 'дней')}`;
+const streakHTML = (s, shown = s.streak) => `<span class="nav-streak t${streakTier(shown)}" title="${esc(`Огонёк: ${daysText(s.streak)} подряд на Grid Studio. Рекорд — ${daysText(s.best)}. Заходи каждый день, чтобы не погас.`)}"><i class="ns-flame">${FLAME}</i><b class="ns-num"><span>${shown}</span></b></span>`;
+function celebrateStreak(box, s) {
+  const chip = $('.nav-streak', box); if (!chip) return;
+  const grew = s.prev > 0 && s.streak === s.prev + 1, broke = s.prev > 0 && s.streak === 1;
+  const msg = !s.prev ? ['Огонёк зажжён!', 'Заходи каждый день — он будет разгораться']
+    : broke ? ['Серия прервалась', `Было ${daysText(s.prev)} — зажигаем заново`]
+    : [`${daysText(s.streak)} подряд!`, s.streak >= s.best ? 'Это твой рекорд' : `Рекорд — ${daysText(s.best)}`];
+  // число «перекатывается» со вчерашнего на сегодняшнее, затем пламя вспыхивает
+  if (grew) {
+    chip.className = `nav-streak t${streakTier(s.prev)}`;
+    $('.ns-num', chip).innerHTML = `<span>${s.prev}</span><span>${s.streak}</span>`;
+  }
+  const bubble = document.createElement('span');
+  bubble.className = 'ns-bubble'; bubble.setAttribute('role', 'status');
+  bubble.innerHTML = `<i class="ns-flame">${FLAME}</i><span><b>${esc(msg[0])}</b><small>${esc(msg[1])}</small></span>`;
+  bubble.classList.add(`t${streakTier(s.streak)}`);
+  box.appendChild(bubble);
+  setTimeout(() => {
+    if (grew) { $('.ns-num', chip).classList.add('roll'); chip.className = `nav-streak t${streakTier(s.streak)} lit`; }
+    else chip.classList.add('lit');
+    bubble.classList.add('in');
+  }, 900);
+  setTimeout(() => { bubble.classList.add('out'); setTimeout(() => bubble.remove(), 400); }, 5200);
 }
 // Подсветка переезжает под ссылку под курсором и возвращается к текущей странице;
 // при прокрутке меню становится плотнее; на узком экране ссылки прячутся в «бургер».
@@ -2192,7 +2250,7 @@ async function renderMyProfile(box) {
   let works = [], pub = [], pubBg = [], liked = null, queue = null, home = null, tab = 'works', feats = null, loaded = false;
   const adm = isAdmin();
   // достижения считаются по тем же данным, что и шапка; поменял аватар или «о себе» — медаль может открыться сразу
-  const ach = () => { if (loaded) window.Achievements?.render($('#pfAch'), { profile: p, grids: pub, backgrounds: pubBg, feats, admin: adm }, { uid: ACC.user().id, me: true }); };
+  const ach = () => { if (loaded) window.Achievements?.render($('#pfAch'), { profile: p, grids: pub, backgrounds: pubBg, feats, admin: adm, streakBest: window.Achievements.myStreak(ACC.user().id) }, { uid: ACC.user().id, me: true }); };
   const head = () => {
     $('#pfHeadBox').innerHTML = profileHead(p, { me: true, grids: pub, backgrounds: pubBg, works });
     applyIcons($('#pfHeadBox'));

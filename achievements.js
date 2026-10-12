@@ -58,6 +58,8 @@ window.Achievements = (() => {
     ['beyond_godlike', 'Признание', 'arcana', 'infinity', 'Beyond Godlike', 'Твои работы скачали 1 000 раз', 1000, s => s.dls],
     ['own_style', 'Профиль', 'uncommon', 'sparkle', 'Свой стиль', 'Поставь аватар, баннер и напиши «о себе»', 3, s => s.style],
     ['in_touch', 'Профиль', 'common', 'link', 'На связи', 'Добавь в профиль Steam или Telegram', 1, s => s.contact],
+    ['on_fire', 'Профиль', 'uncommon', 'flame', 'В ударе', 'Заходи на сайт 7 дней подряд', 7, s => s.streak],
+    ['eternal_flame', 'Профиль', 'legendary', 'flame', 'Неугасимый', 'Заходи на сайт 30 дней подряд', 30, s => s.streak],
     ['veteran', 'Профиль', 'uncommon', 'clock', 'Ветеран', '30 дней в Grid Studio', 30, s => s.days],
     ['pioneer', 'Профиль', 'mythical', 'flag', 'Первопроходец', 'Заведи профиль в 2026 году, в первый год Grid Studio', 1, s => s.pioneer],
     ['seer', 'Игры', 'common', 'eye', 'Провидец', 'Угадай «Героя дня»', 1, s => s.wins],
@@ -70,7 +72,7 @@ window.Achievements = (() => {
   ].map(([id, group, rarity, ico, name, desc, need, have, secret]) => ({ id, group, rarity, ico, name, desc, need, have, secret: !!secret }));
 
   // сводка по профилю: всё, из чего считаются условия
-  function summary({ profile: p = {}, grids = [], backgrounds = [], feats = null, admin = false }) {
+  function summary({ profile: p = {}, grids = [], backgrounds = [], feats = null, admin = false, streakBest = 0 }) {
     const pubs = [...grids, ...backgrounds];
     const sum = k => pubs.reduce((a, x) => a + (+x[k] || 0), 0);
     const max = (arr, k) => arr.reduce((a, x) => Math.max(a, +x[k] || 0), 0);
@@ -82,7 +84,7 @@ window.Achievements = (() => {
       likes: sum('likes'), dls: sum('downloads'), maxLikes: max(pubs, 'likes'),
       style: [p.avatar, p.banner, p.bio].filter(Boolean).length, contact: +!!(p.steam || p.tg),
       days: born ? Math.floor((Date.now() - born) / 864e5) : 0, pioneer: +(born?.getFullYear() === 2026),
-      admin: +!!admin, games: !!feats,
+      admin: +!!admin, games: !!feats, streak: Math.max(+f.streak || 0, +streakBest || 0),
       played: +f.played || 0, wins: +f.wins || 0, aces: +f.aces || 0, lockpick: +f.lockpick || 0, sweeper: +f.sweeper || 0,
     };
   }
@@ -105,6 +107,8 @@ window.Achievements = (() => {
   }
   const freshOf = (uid, list) => { const s = readSeen(uid); return list.filter(a => a.done && !s.has(a.id)); };
 
+  // рекорд огонька из этого браузера (site.js кладёт его в gs.streak) — пока в базе нет visit_ping
+  const myStreak = uid => { try { const v = JSON.parse(localStorage.getItem('gs.streak')); return v?.uid === uid ? +v.best || 0 : 0; } catch { return 0; } };
   const feats = uid => (window.CatalogAPI?.rpc ? window.CatalogAPI.rpc('profile_feats', { p_uid: uid }) : Promise.reject()).catch(() => null);
 
   // ---------- витрина в профиле ----------
@@ -208,10 +212,10 @@ window.Achievements = (() => {
       feats(uid),
     ]);
     if (!grids) return;
-    const list = evaluate({ profile: ACC.profile() || {}, grids, backgrounds: bgs, feats: f, admin: ACC.isAdmin() });
+    const list = evaluate({ profile: ACC.profile() || {}, grids, backgrounds: bgs, feats: f, admin: ACC.isAdmin(), streakBest: myStreak(uid) });
     celebrate(freshOf(uid, list));
     markSeen(uid, list);
   }
 
-  return { LIST, RARITY, evaluate, render, celebrate, feats, watch };
+  return { LIST, RARITY, evaluate, render, celebrate, feats, watch, myStreak };
 })();

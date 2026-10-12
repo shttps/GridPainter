@@ -92,7 +92,7 @@ button:focus { outline: none; }
 .nav-user { display: flex; align-items: center; gap: 9px; height: 44px; padding: 0 16px 0 5px; border-radius: 99px; border: 1px solid oklch(1 0 0 / .1); background: oklch(1 0 0 / .04); color: var(--ink); text-decoration: none; font-size: 14.5px; font-weight: 600; transition: border-color .2s, background .2s; }
 .nav-user:hover, .nav-user.on { border-color: var(--accent-line); background: var(--accent-soft); }
 .nav-user .ava { width: 34px; height: 34px; }
-.nav-user span:last-child { max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.nav-user .nav-nick { max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .nav-burger { display: none; width: 44px; height: 44px; border: 0; border-radius: 12px; background: oklch(1 0 0 / .06); cursor: pointer; flex-direction: column; align-items: center; justify-content: center; gap: 5px; }
 .nav-burger i { display: block; width: 16px; height: 1.75px; border-radius: 2px; background: var(--ink); transition: transform .3s var(--ease); }
 .navbar.open .nav-burger i:first-child { transform: translateY(3.4px) rotate(45deg); }
@@ -1014,7 +1014,7 @@ textarea.pf-bio:focus { outline: 0; border-color: var(--accent); background: var
   .landing { padding-top: calc(var(--nav-h) + 10px); }
   .landing-device { height: 64vw; margin: 20px -16px 0; }
   .random-grid .rg-note { display: none; }
-  .nav-user span:last-child { display: none; }
+  .nav-user .nav-nick { display: none; }
   .nav-user { padding: 0 5px; }
   .bottom-bar { flex-direction: column; align-items: flex-start; }
   .fcard { grid-template-columns: 96px 1fr; }
@@ -1526,3 +1526,45 @@ body[data-page="grid"] { padding-top: calc(var(--nav-h) + 18px); background: rad
   .ach-pop *, .ach-item.fresh.play, .ach-item.fresh.play * { animation-duration: .01s !important; animation-delay: 0s !important; }
   .ach-rays, .ach-sparks, .ach-wave { display: none; }
 }
+
+/* ---------- огонёк в меню: дни подряд ----------
+   Пламя из двух слоёв (внешний и внутренний язык) чуть колышется; цвет растёт с серией:
+   t1 угольки, t2 огонь, t3 яркое пламя со свечением, t4 (30+ дней) — синее «аркановое». */
+.nav-acc { position: relative; }
+.nav-streak { --f1: #ff9a3c; --f2: #ffd36b; --glow: #ff7a1a; display: inline-flex; align-items: center; gap: 3px; height: 26px; margin: 0 -8px 0 2px; padding: 0 9px 0 5px; border-radius: 99px; background: color-mix(in oklab, var(--glow) 13%, transparent); box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--glow) 30%, transparent); font: 700 12.5px var(--mono); color: var(--f2); letter-spacing: -.02em; }
+.nav-streak.t1 { --f1: #c9773f; --f2: #f0b27a; --glow: #a8582a; }
+.nav-streak.t3 { --f1: #ff5a1f; --f2: #ffd23c; --glow: #ff4d12; }
+.nav-streak.t4 { --f1: #3d7bff; --f2: #a8e6ff; --glow: #4d8dff; }
+.ns-flame { position: relative; display: grid; place-items: center; width: 18px; height: 18px; }
+.ns-flame svg { width: 100%; height: 100%; overflow: visible; transform-origin: 50% 90%; animation: nsFlick 2.4s ease-in-out infinite; }
+.ns-flame .fl-o { fill: var(--f1); }
+.ns-flame .fl-i { fill: var(--f2); transform-origin: 50% 90%; animation: nsFlick 1.3s ease-in-out infinite reverse; }
+.nav-streak.t3 .ns-flame svg, .nav-streak.t4 .ns-flame svg { filter: drop-shadow(0 0 4px var(--glow)); }
+@keyframes nsFlick { 0%, 100% { transform: scale(1) skewX(0); } 30% { transform: scale(1.04, .96) skewX(-3deg); } 60% { transform: scale(.97, 1.05) skewX(2deg); } }
+/* число перекатывается: вчерашнее уезжает вверх, сегодняшнее приезжает снизу */
+.ns-num { display: inline-flex; flex-direction: column; height: 1.25em; line-height: 1.25em; overflow: hidden; font-variant-numeric: tabular-nums; }
+.ns-num span { display: block; transition: transform .55s var(--spring); }
+.ns-num.roll span { transform: translateY(-100%); }
+/* вспышка: пламя подпрыгивает, вокруг — кольцо жара */
+.nav-streak.lit { animation: nsPill 1.2s var(--ease); }
+.nav-streak.lit .ns-flame svg { animation: nsBurst .9s var(--spring), nsFlick 2.4s ease-in-out .9s infinite; }
+.nav-streak.lit .ns-flame::after { content: ""; position: absolute; inset: -4px; border-radius: 50%; border: 2px solid var(--f1); opacity: 0; animation: nsRing .8s var(--ease) .1s; pointer-events: none; }
+@keyframes nsBurst { 0% { transform: scale(1); } 35% { transform: scale(1.65) translateY(-2px); filter: drop-shadow(0 0 9px var(--glow)) brightness(1.3); } 100% { transform: scale(1); } }
+@keyframes nsRing { 0% { opacity: .9; transform: scale(.6); } 100% { opacity: 0; transform: scale(2.2); } }
+@keyframes nsPill { 30% { box-shadow: inset 0 0 0 1px var(--glow), 0 0 22px -2px var(--glow); background: color-mix(in oklab, var(--glow) 28%, transparent); } }
+/* подсказка под кнопкой профиля: «5 дней подряд!» */
+.ns-bubble { --f1: #ff9a3c; --f2: #ffd36b; --glow: #ff7a1a; position: absolute; z-index: 60; right: 0; top: calc(100% + 12px); display: flex; align-items: center; gap: 11px; width: max-content; max-width: 280px; padding: 11px 16px 11px 12px; border-radius: 14px;
+  border: 1px solid color-mix(in oklab, var(--glow) 40%, var(--line-strong)); background: radial-gradient(160px 80px at 10% 50%, color-mix(in oklab, var(--glow) 22%, transparent), transparent 80%), oklch(0.2 0.01 var(--h) / .97);
+  box-shadow: 0 22px 50px -18px #000c; pointer-events: none; opacity: 0; transform: translateY(-8px) scale(.94); transform-origin: 85% 0; transition: opacity .35s var(--ease), transform .55s var(--spring); }
+.ns-bubble::before { content: ""; position: absolute; right: 30px; top: -6px; width: 10px; height: 10px; border-left: 1px solid color-mix(in oklab, var(--glow) 40%, var(--line-strong)); border-top: 1px solid color-mix(in oklab, var(--glow) 40%, var(--line-strong)); background: oklch(0.2 0.01 var(--h)); transform: rotate(45deg); }
+.ns-bubble.t1 { --f1: #c9773f; --f2: #f0b27a; --glow: #a8582a; }
+.ns-bubble.t3 { --f1: #ff5a1f; --f2: #ffd23c; --glow: #ff4d12; }
+.ns-bubble.t4 { --f1: #3d7bff; --f2: #a8e6ff; --glow: #4d8dff; }
+.ns-bubble.in { opacity: 1; transform: none; }
+.ns-bubble.out { opacity: 0; transform: translateY(-4px); }
+.ns-bubble .ns-flame { width: 30px; height: 30px; }
+.ns-bubble .ns-flame svg { filter: drop-shadow(0 0 6px var(--glow)); }
+.ns-bubble b { display: block; color: var(--ink); font-size: 14px; font-weight: 700; }
+.ns-bubble small { display: block; margin-top: 2px; color: var(--muted); font-size: 12px; }
+@media (max-width: 640px) { .nav-streak { margin-right: 0; } .ns-bubble { max-width: calc(100vw - 32px); } }
+@media (prefers-reduced-motion: reduce) { .ns-flame svg, .ns-flame .fl-i, .nav-streak.lit, .nav-streak.lit .ns-flame svg { animation: none !important; } .ns-num span { transition: none; } }

@@ -700,7 +700,47 @@ $$;
 grant execute on function public.arcade_board(text) to anon, authenticated;
 
 
--- ---------- Достижения: игровые цифры профиля ----------
+-- ---------- Огонёк: сколько дней подряд игрок заходит на сайт ----------
+-- День — по часам игрока (сайт присылает свою дату; разница с UTC больше суток — берём UTC).
+-- Зашёл на следующий день — серия +1, пропустил день — серия заново с 1. best — рекорд, days — всего дней с заходами.
+create table if not exists public.visit_streaks (
+  user_id  uuid primary key references auth.users(id) on delete cascade,
+  last_day date not null,
+  streak   int  not null default 1,
+  best     int  not null default 1,
+  days     int  not null default 1
+);
+alter table public.visit_streaks enable row level security;
+revoke all on public.visit_streaks from anon, authenticated;
+
+create or replace function public.visit_ping(p_day date) returns json
+language plpgsql security definer set search_path = public as $$
+declare
+  v_utc date := (now() at time zone 'utc')::date;
+  v_day date := case when p_day between v_utc - 1 and v_utc + 1 then p_day else v_utc end;
+  r visit_streaks;
+  v_prev int;
+begin
+  if auth.uid() is null then raise exception 'not_signed_in'; end if;
+  select * into r from visit_streaks where user_id = auth.uid() for update;
+  if not found then
+    insert into visit_streaks (user_id, last_day) values (auth.uid(), v_day) returning * into r;
+    return json_build_object('streak', 1, 'best', 1, 'days', 1, 'prev', 0);
+  end if;
+  v_prev := r.streak;
+  if v_day > r.last_day then
+    update visit_streaks set
+      streak = case when v_day = r.last_day + 1 then r.streak + 1 else 1 end,
+      best = greatest(best, case when v_day = r.last_day + 1 then r.streak + 1 else 1 end),
+      days = days + 1, last_day = v_day
+      where user_id = auth.uid() returning * into r;
+  end if;
+  return json_build_object('streak', r.streak, 'best', r.best, 'days', r.days, 'prev', v_prev);
+end $$;
+revoke all on function public.visit_ping(date) from public, anon;
+grant execute on function public.visit_ping(date) to authenticated;
+
+-- ---------- Достижения: игровые цифры профиля и рекорд огонька ----------
 -- Остальные достижения сайт считает сам по публичным данным (работы, лайки, скачивания, профиль).
 -- Здесь — только то, что спрятано в закрытых таблицах игр; рекорды и так видны в таблицах, поэтому функция открыта всем.
 create or replace function public.profile_feats(p_uid uuid) returns json
@@ -710,6 +750,7 @@ language sql stable security definer set search_path = public as $$
     'wins',   (select count(*) from game_results where user_id = p_uid and won),
     'aces',   (select count(*) from game_results where user_id = p_uid and won and tries = 1),
     'lockpick', coalesce((select score from arcade_scores where user_id = p_uid and game = 'lockpick'), 0),
-    'sweeper',  coalesce((select score from arcade_scores where user_id = p_uid and game = 'sweeper'), 0));
+    'sweeper',  coalesce((select score from arcade_scores where user_id = p_uid and game = 'sweeper'), 0),
+    'streak',   coalesce((select best from visit_streaks where user_id = p_uid), 0));
 $$;
 grant execute on function public.profile_feats(uuid) to anon, authenticated;
