@@ -754,3 +754,28 @@ language sql stable security definer set search_path = public as $$
     'streak',   coalesce((select best from visit_streaks where user_id = p_uid), 0));
 $$;
 grant execute on function public.profile_feats(uuid) to anon, authenticated;
+
+-- ---------- Буст огонька: сетки игрока с серией от 3 дней выше в «Популярных» ----------
+-- Лайки остаются настоящими; в сортировке к ним добавляются «виртуальные»: 3–6 дней подряд +3, 7–29 дней +8, 30+ дней +20.
+-- Буст живёт, пока огонёк горит (заходил сегодня или вчера); пропустил день — сетки возвращаются на своё место.
+-- Колонку score читает только сортировка в Мастерской (catalog-api.js); скрытое жалобами клиент отсеивает сам (hidden = false).
+create or replace function public.streak_boost(p_streak int, p_last date) returns int
+language sql stable as $$
+  select case when p_last < (now() at time zone 'utc')::date - 1 then 0
+              when p_streak >= 30 then 20 when p_streak >= 7 then 8 when p_streak >= 3 then 3 else 0 end
+$$;
+
+create or replace view public.grids_ranked as
+  select g.id, g.title, g.author, g.description, g.kind, g.cats, g.heroes, g.likes, g.downloads, g.created_at,
+         g.user_id, g.tags, g.nsfw, g.hidden,
+         g.likes + coalesce(public.streak_boost(v.streak, v.last_day), 0) as score
+    from public.grids g left join public.visit_streaks v on v.user_id = g.user_id;
+grant select on public.grids_ranked to anon, authenticated;
+
+-- сколько буста у игрока сейчас — для окна огонька
+create or replace function public.my_boost() returns int
+language sql stable security definer set search_path = public as $$
+  select coalesce((select public.streak_boost(streak, last_day) from visit_streaks where user_id = auth.uid()), 0)
+$$;
+revoke all on function public.my_boost() from public, anon;
+grant execute on function public.my_boost() to authenticated;

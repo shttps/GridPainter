@@ -12,11 +12,12 @@ window.CatalogAPI = (() => {
   // config (сама сетка) в список не входит — его тянет живое превью карточки, когда та доезжает до экрана
   const BASE_COLS = 'id,title,author,description,kind,cats,heroes,likes,downloads,created_at';
   // колонки появляются по мере того, как в Supabase выполняют новые куски schema.sql; если какой-то нет — живём без неё
-  let userCol = remote && !!cfg.accounts, tagCols = remote;
+  let userCol = remote && !!cfg.accounts, tagCols = remote, rankView = remote;
   const cols = () => BASE_COLS + (userCol ? ',user_id' : '') + (tagCols ? ',tags,nsfw' : '');
   const missingCol = e => {
     if (userCol && /user_id/.test(e.message)) { userCol = false; return true; }
     if (tagCols && /tags|nsfw/.test(e.message)) { tagCols = false; return true; }
+    if (rankView && /grids_ranked|score/.test(e.message)) { rankView = false; return true; }
     return false;
   };
 
@@ -126,11 +127,13 @@ window.CatalogAPI = (() => {
         conds.push(`or(${own.join(',')})`);
       }
       if (conds.length) p.set('and', `(${conds.join(',')})`);
-      p.set('order', sort === 'popular' || sort === 'week' ? 'likes.desc,created_at.desc' : sort === 'downloads' ? 'downloads.desc,created_at.desc' : 'created_at.desc');
+      // в «популярных» сетки игроков с горящим огоньком идут выше (вью grids_ranked: лайки + буст за серию)
+      const ranked = rankView && (sort === 'popular' || sort === 'week');
+      p.set('order', ranked ? 'score.desc,likes.desc,created_at.desc' : sort === 'popular' || sort === 'week' ? 'likes.desc,created_at.desc' : sort === 'downloads' ? 'downloads.desc,created_at.desc' : 'created_at.desc');
       p.set('offset', offset); p.set('limit', limit);
-      return p;
+      return { p, table: ranked ? 'grids_ranked' : 'grids' };
     };
-    const r = await tolerant(async () => { const p = build(); return p ? rest('/grids?' + p, { count: true }) : { data: [], total: 0 }; });
+    const r = await tolerant(async () => { const b = build(); return b ? rest(`/${b.table}?` + b.p, { count: true }) : { data: [], total: 0 }; });
     return { items: r.data, total: r.total ?? r.data.length };
   }
 

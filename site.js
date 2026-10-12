@@ -193,6 +193,8 @@ const streakHTML = (s, shown = s.streak) => `<button class="nav-streak t${streak
 // окно огонька: большое живое пламя, счёт дней, последняя неделя, рекорд и сколько до следующего цвета
 const STREAK_TIERS = [[1, 'Угольки', 'Только разгорается'], [3, 'Огонь', 'Уже греет'], [7, 'Пламя', 'Горит ярко'], [30, 'Аркана', 'Синее пламя']];
 const STREAK_GOALS = [3, 7, 30, 100, 365];
+// награда за серию: опубликованные сетки получают «виртуальные лайки» в сортировке «Популярные» (вью grids_ranked в supabase/schema.sql)
+const streakBoost = n => n >= 30 ? 20 : n >= 7 ? 8 : n >= 3 ? 3 : 0;
 function openStreak(s) {
   const n = s.streak, t = streakTier(n), [, tname, tnote] = STREAK_TIERS[t - 1];
   const goal = STREAK_GOALS.find(g => g > n), from = [...STREAK_GOALS].reverse().find(g => g <= n) || 0;
@@ -227,6 +229,9 @@ function openStreak(s) {
     <p class="sk-msg">${esc(msg)}</p>
     <div class="sk-week">${week.map((d, i) => `<span class="${d.on ? 'on' : ''}${d.today ? ' today' : ''}" style="--i:${i}"><i>${d.on ? FLAME : ''}</i><small>${d.wd}</small></span>`).join('')}</div>
     <div class="sk-goal"><div class="sk-goal-top"><span>${esc(goalText)}</span>${goal ? `<b>${n} / ${goal}</b>` : ''}</div><i class="sk-bar"><i style="--w:${goal ? ((n - from) / (goal - from) * 100).toFixed(1) : 100}%"></i></i></div>
+    <div class="sk-boost${streakBoost(n) ? ' on' : ''}">${streakBoost(n)
+      ? `<b>+${streakBoost(n)}</b><span>Твои сетки в «Популярных» идут выше, пока горит огонёк — как будто у каждой на ${streakBoost(n)} ${plural(streakBoost(n), 'лайк', 'лайка', 'лайков')} больше</span>`
+      : '<span>Заходи 3 дня подряд — и твои сетки в «Популярных» поднимутся выше остальных</span>'}</div>
     <div class="sk-stats"><div><b>${num(s.best)}</b><span>Рекорд</span></div><div><b>${num(s.days || n)}</b><span>Всего дней</span></div></div>
   </div>`);
   // счёт бежит от нуля, пока пламя разгорается
