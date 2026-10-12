@@ -508,6 +508,54 @@ document.addEventListener('click', async e => {
 }, true);
 // «В Dota» на карточке фона — просто ссылка в сборщик: страницу фона при этом не открываем
 document.addEventListener('click', e => { if (e.target.closest('[data-bg-dota]') && !e.target.closest('.hide18')) e.stopPropagation(); }, true);
+// наведение на карточку в Мастерской и профиле: наклон за курсором, свет и параллакс превью (стили — community.css).
+// Курсор задаёт цель, а значения догоняют её экспоненциально в одном rAF на все карточки — без рывков на любом fps.
+if (/^(workshop|profile)$/.test(document.body.dataset.page) && matchMedia('(hover: hover) and (pointer: fine)').matches) {
+  const calm = matchMedia('(prefers-reduced-motion: reduce)'), live = new Map();
+  let raf = 0, last = 0;
+  const cardOf = el => el?.closest?.('.gcard:not(.sk), .bcard');
+  const aim = (s, e) => {
+    const r = s.card.getBoundingClientRect();
+    s.tx = Math.min(1, Math.max(0, (e.clientX - r.left) / r.width)); s.ty = Math.min(1, Math.max(0, (e.clientY - r.top) / r.height));
+  };
+  const tick = now => {
+    const dt = Math.min(.05, last ? (now - last) / 1000 : .016); last = now;
+    const kPos = 1 - Math.exp(-dt * 14), kHov = 1 - Math.exp(-dt * 9), kPrs = 1 - Math.exp(-dt * 22);
+    for (const s of live.values()) {
+      s.x += (s.tx - s.x) * kPos; s.y += (s.ty - s.y) * kPos; s.h += (s.th - s.h) * kHov; s.p += (s.tp - s.p) * kPrs;
+      const st = s.card.style;
+      if (!s.card.isConnected || (!s.th && s.h < .003 && s.p < .003)) {
+        for (const v of ['--hov', '--prs', '--rx', '--ry', '--px', '--py', '--mx', '--my']) st.removeProperty(v);
+        s.card.classList.remove('tilting'); live.delete(s.card); continue;
+      }
+      const px = s.x * 2 - 1, py = s.y * 2 - 1;
+      st.setProperty('--hov', s.h.toFixed(4)); st.setProperty('--prs', s.p.toFixed(4));
+      st.setProperty('--rx', `${(-py * 3.2 * s.h).toFixed(3)}deg`); st.setProperty('--ry', `${(px * 4 * s.h).toFixed(3)}deg`);
+      st.setProperty('--px', (px * s.h).toFixed(4)); st.setProperty('--py', (py * s.h).toFixed(4));
+      st.setProperty('--mx', `${(s.x * 100).toFixed(2)}%`); st.setProperty('--my', `${(s.y * 100).toFixed(2)}%`);
+    }
+    raf = live.size ? requestAnimationFrame(tick) : 0;
+    if (!raf) last = 0;
+  };
+  const wake = () => { if (!raf) raf = requestAnimationFrame(tick); };
+  document.addEventListener('pointermove', e => {
+    if (e.pointerType !== 'mouse' || calm.matches) return;
+    const card = cardOf(e.target); if (!card) return;
+    let s = live.get(card);
+    if (!s) {
+      s = { card, x: .5, y: .5, h: 0, p: 0, tx: .5, ty: .5, th: 1, tp: 0 };
+      aim(s, e); s.x = s.tx; s.y = s.ty; // свет появляется сразу под курсором, а не выезжает из центра
+      live.set(card, s); card.classList.add('tilting');
+    }
+    s.th = 1; aim(s, e); wake();
+  }, { passive: true });
+  document.addEventListener('pointerout', e => {
+    const card = cardOf(e.target), s = card && live.get(card);
+    if (s && !card.contains(e.relatedTarget)) { s.th = 0; s.tp = 0; wake(); }
+  });
+  document.addEventListener('pointerdown', e => { const s = live.get(cardOf(e.target)); if (s && e.button === 0) { s.tp = 1; wake(); } });
+  addEventListener('pointerup', () => { for (const s of live.values()) s.tp = 0; wake(); });
+}
 // карточка — <article>, поэтому Enter открывает её вручную
 document.addEventListener('keydown', e => {
   if (e.key === 'Enter' && e.target.matches?.('.gcard[data-id], .bcard[data-bg]')) e.target.click();

@@ -27,3 +27,49 @@
   :is([data-page="workshop"], [data-page="profile"]) .cards-empty { min-height: 220px; padding: 32px 18px; }
   :is([data-page="workshop"], [data-page="profile"]) .cards-empty b { font-size: 20px; }
 }
+
+/* Наведение на карточку: карточка чуть приподнимается и наклоняется за курсором, под курсором — мягкий свет
+   и светящийся край, превью внутри едет навстречу (параллакс) и ловит блик. Значения --hov/--rx/--ry/--px/--py/--mx/--my
+   плавно ведёт site.js (пружина в rAF), поэтому transform здесь без transition — иначе движение «вязнет».
+   Только мышь и только без «меньше анимации»: на тач-экранах остаётся простой подъём выше. */
+@media (hover: hover) and (pointer: fine) and (prefers-reduced-motion: no-preference) {
+  :is([data-page="workshop"], [data-page="profile"]) :is(.gcard, .bcard):not(.sk) {
+    --hov: 0; --prs: 0; --rx: 0deg; --ry: 0deg; --px: 0; --py: 0; --mx: 50%; --my: 50%;
+    isolation: isolate;
+    transform: perspective(1100px) translateY(calc(var(--hov) * -6px)) rotateX(var(--rx)) rotateY(var(--ry)) scale(calc(1 - var(--prs) * .016));
+    transition: border-color .45s var(--ease), background-color .45s var(--ease), box-shadow .6s var(--ease);
+  }
+  :is([data-page="workshop"], [data-page="profile"]) :is(.gcard, .bcard):not(.sk):hover {
+    transform: perspective(1100px) translateY(calc(var(--hov) * -6px)) rotateX(var(--rx)) rotateY(var(--ry)) scale(calc(1 - var(--prs) * .016));
+    border-color: color-mix(in oklab, var(--accent-line) 45%, var(--line-strong));
+    box-shadow: 0 34px 60px -34px #000e, 0 22px 50px -30px color-mix(in oklab, var(--c1) 60%, transparent);
+  }
+  :is(.gcard, .bcard).tilting { will-change: transform; }
+  /* свет под курсором — под содержимым карточки */
+  :is([data-page="workshop"], [data-page="profile"]) :is(.gcard, .bcard):not(.sk)::before {
+    content: ""; position: absolute; z-index: -1; inset: 0; border-radius: inherit; pointer-events: none; opacity: var(--hov);
+    background: radial-gradient(420px circle at var(--mx) var(--my), color-mix(in oklab, var(--c2) 13%, transparent), transparent 60%);
+  }
+  /* светящийся край: та же точка света, но только в рамке толщиной 1px */
+  :is([data-page="workshop"], [data-page="profile"]) :is(.gcard, .bcard):not(.sk)::after {
+    content: ""; position: absolute; inset: -1px; border-radius: inherit; padding: 1px; pointer-events: none; opacity: var(--hov);
+    background: radial-gradient(260px circle at var(--mx) var(--my), color-mix(in oklab, var(--accent-hi) 85%, transparent), transparent 70%);
+    -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor;
+    mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
+  }
+  /* превью: лёгкий зум и сдвиг против наклона — картинка будто лежит глубже рамки */
+  :is([data-page="workshop"], [data-page="profile"]) :is(.gthumb > canvas, .gthumb > img, .bpic > img, .bpic > video) {
+    transform: translate3d(calc(var(--px) * -7px), calc(var(--py) * -5px), 0) scale(calc(1.002 + var(--hov) * .055));
+    transition: opacity .4s;
+  }
+  :is([data-page="workshop"], [data-page="profile"]) :is(.gcard:hover .gthumb, .bcard:hover .bpic) > :is(canvas, img, video) {
+    transform: translate3d(calc(var(--px) * -7px), calc(var(--py) * -5px), 0) scale(calc(1.002 + var(--hov) * .055));
+  }
+  /* блик по превью */
+  :is([data-page="workshop"], [data-page="profile"]) :is(.gthumb, .bpic)::before {
+    content: ""; position: absolute; z-index: 1; inset: 0; pointer-events: none; opacity: calc(var(--hov) * .9); mix-blend-mode: soft-light;
+    background: radial-gradient(70% 90% at var(--mx) var(--my), #fff9, transparent 70%);
+  }
+  :is([data-page="workshop"], [data-page="profile"]) :is(.gtitle, .btitle) { transition: color .35s var(--ease); }
+  :is([data-page="workshop"], [data-page="profile"]) :is(.gcard, .bcard):hover :is(.gtitle, .btitle) { color: var(--accent-hi); }
+}
