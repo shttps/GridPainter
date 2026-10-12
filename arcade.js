@@ -72,12 +72,12 @@
   function intro() {
     inst?.destroy(); inst = null; audio?.stop(); audio?.pause(false); delete ov.dataset.done;
     ov.querySelector('#arRestart').hidden = true;
-    const g = cur, b = best(g.id), sh = ov.querySelector('#arShell');
+    const g = cur, b = best(g.id), sh = ov.querySelector('#arShell'), howOpen = load('gs.arcade.how', false);
     sh.className = 'ar-shell intro';
     sh.innerHTML = `<div class="ar-panel">
       <header class="ar-hero">${g.logo || `<h2 class="ar-title">${g.title}</h2>`}<p class="ar-sub">${g.subtitle}</p></header>
       <div class="ar-cols">
-        <section class="ar-how"><h3>Как играть</h3>${g.how}
+        <section class="ar-how${howOpen ? ' open' : ''}"><h3><button type="button" class="ar-fold" id="arFold" aria-expanded="${howOpen}">Как играть<i aria-hidden="true"></i></button></h3><div class="ar-how-body" id="arHow"${howOpen ? '' : ' hidden'}>${g.how}</div>
           ${g.scoring ? `<h3>Подсчёт очков</h3><div class="ar-scoring">${g.scoring.map(([a, b]) => `<div><span>${a}</span><b>${b}</b></div>`).join('')}</div>` : ''}
         </section>
         <section class="ar-rec"><h3>Рекорды</h3><div class="ar-board" id="arBoard"></div>
@@ -86,6 +86,10 @@
       <section class="ar-rewards"><h3>Награды</h3><div class="ar-rw">${g.rewards.map(r => `<div class="ar-rw-i${b >= r.at ? ' got' : ''}"><i class="ar-check">✓</i><b>${fmt(r.at)}</b><div class="ar-rw-pic">${r.pic}</div><small>${r.label}</small></div>`).join('')}</div></section>
       <div class="ar-play"><button class="ar-btn" id="arPlay">Играть</button></div>
     </div>`;
+    sh.querySelector('#arFold').onclick = e => {
+      const body = sh.querySelector('#arHow'), open = body.hidden;
+      body.hidden = !open; e.currentTarget.setAttribute('aria-expanded', String(open)); e.currentTarget.closest('.ar-how').classList.toggle('open', open); save('gs.arcade.how', open);
+    };
     sh.querySelector('#arPlay').onclick = start;
     sh.querySelector('#arPlay').focus({ preventScroll: true });
     loadBoard(g.id);
