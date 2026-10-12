@@ -101,7 +101,7 @@ html.ar-lock { overflow: hidden; }
 .ar-emo { width: 46px; height: 46px; border-radius: 50%; background: var(--img) center / 190% auto no-repeat, #2a3a4a; box-shadow: 0 0 0 2px #e0a040, 0 3px 8px rgba(0, 0, 0, .5); }
 .ar-hexes { display: flex; gap: 2px; }
 .ar-hexes i { display: grid; place-items: center; width: 28px; height: 31px; clip-path: polygon(50% 0, 100% 25%, 100% 75%, 50% 100%, 0 75%, 0 25%); background: linear-gradient(#5fb860, #2f7a3a); color: #eaffea; font: 700 15px "Philosopher", var(--font); font-style: normal; }
-.ar-play { display: flex; justify-content: center; margin-top: 26px; }
+.ar-play { position: sticky; bottom: -30px; z-index: 2; display: flex; justify-content: center; margin: 22px -44px -30px; padding: 16px 44px 22px; background: linear-gradient(transparent, var(--ar-bg, #121531) 38%); }
 .ar-btn { position: relative; min-width: 220px; height: 54px; padding: 0 34px; border-radius: 10px; border: 2px solid var(--ar-btn-line); background: var(--ar-btn); color: var(--ar-btn-ink); font: 700 20px "Philosopher", var(--font); letter-spacing: .12em; text-transform: uppercase; cursor: pointer; box-shadow: inset 0 1px 0 rgba(255, 255, 255, .12), 0 8px 24px -8px rgba(0, 0, 0, .8); transition: filter .15s, transform .2s var(--spring); }
 .ar-btn::before, .ar-btn::after { content: ""; position: absolute; top: 50%; width: 14px; height: 14px; margin-top: -7px; border-radius: 50%; background: radial-gradient(circle at 40% 35%, #d9b27a, #6e4f2a); box-shadow: 0 0 0 2px #2a2018; }
 .ar-btn::before { left: -9px; } .ar-btn::after { right: -9px; }
@@ -112,10 +112,10 @@ html.ar-lock { overflow: hidden; }
 .ar-btn.ghost::before, .ar-btn.ghost::after { display: none; }
 
 /* темы ивентов */
-.theme-carnival { --ar-line: #3a3f68; --ar-line-soft: #2a2f52; --ar-head: #d9b07a; --ar-ink: #eef0fb; --ar-text: #aab1d2; --ar-dim: #5f6585; --ar-row: rgba(255, 255, 255, .045); --ar-btn: linear-gradient(#2c3150, #1a1d33); --ar-btn-line: #8b6a3e; --ar-btn-ink: #e6d7bd; }
+.theme-carnival { --ar-bg: #121531; --ar-line: #3a3f68; --ar-line-soft: #2a2f52; --ar-head: #d9b07a; --ar-ink: #eef0fb; --ar-text: #aab1d2; --ar-dim: #5f6585; --ar-row: rgba(255, 255, 255, .045); --ar-btn: linear-gradient(#2c3150, #1a1d33); --ar-btn-line: #8b6a3e; --ar-btn-ink: #e6d7bd; }
 .theme-carnival .ar-panel, .theme-carnival .ar-result-card { background: radial-gradient(80% 50% at 50% 0%, rgba(110, 130, 220, .18), transparent 70%), radial-gradient(60% 40% at 50% 100%, rgba(110, 130, 220, .1), transparent 70%), linear-gradient(#1c2142, #121531); border: 1px solid #343a64; box-shadow: 0 40px 100px -30px rgba(0, 0, 0, .9); }
 .theme-carnival .ar-title { background: linear-gradient(180deg, #f2f4ff 10%, #b9c4f0 45%, #7e8fd0 75%, #c6cff5 100%); -webkit-background-clip: text; background-clip: text; color: transparent; filter: drop-shadow(0 3px 0 rgba(10, 12, 30, .8)); }
-.theme-crown { --ar-line: #33424f; --ar-line-soft: #293642; --ar-head: #d8a24a; --ar-ink: #eef2f5; --ar-text: #9fb0bd; --ar-dim: #56636e; --ar-row: rgba(255, 255, 255, .04); --ar-btn: linear-gradient(#2a3a48, #1b2631); --ar-btn-line: #9a7a40; --ar-btn-ink: #f0e2c4; }
+.theme-crown { --ar-bg: #18222b; --ar-line: #33424f; --ar-line-soft: #293642; --ar-head: #d8a24a; --ar-ink: #eef2f5; --ar-text: #9fb0bd; --ar-dim: #56636e; --ar-row: rgba(255, 255, 255, .04); --ar-btn: linear-gradient(#2a3a48, #1b2631); --ar-btn-line: #9a7a40; --ar-btn-ink: #f0e2c4; }
 .theme-crown .ar-panel, .theme-crown .ar-result-card { background: linear-gradient(#22303c, #18222b); border: 1px solid #2f3e4b; box-shadow: 0 40px 100px -30px rgba(0, 0, 0, .9); }
 .theme-crown .ar-hero { margin: -34px -44px 26px; padding: 26px 44px 20px; background: linear-gradient(#a5c0d4, #6f8ea4 60%, #22303c); }
 .theme-crown .ar-sub { color: #d6e2ea; font-size: 16px; }
@@ -220,6 +220,7 @@ html.ar-lock { overflow: hidden; }
 
 @media (max-width: 720px) {
   .ar-panel { padding: 24px 18px 22px; }
+  .ar-play { bottom: -22px; margin: 18px -18px -22px; padding: 14px 18px 18px; }
   .theme-crown .ar-hero { margin: -24px -18px 20px; padding: 20px 18px 16px; }
   .ar-cols { grid-template-columns: 1fr; gap: 20px; }
   .ar-rw { gap: 14px 22px; }

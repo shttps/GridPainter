@@ -174,6 +174,25 @@ svg.i { width: 16px; height: 16px; flex: none; stroke: currentColor; fill: none;
 .btn.box:hover { background: var(--field-hover); }
 .btn.primary.box { padding: 0 16px; background: var(--primary-bg); color: var(--primary-fg); }
 .btn.primary.box svg.i { stroke-width: 2; }
+/* одна высота и один контур у всех четырёх; команды и «Импорт» — группой, главное действие отдельно */
+.top-actions { align-items: center; gap: 6px; }
+.top-actions .box { box-sizing: border-box; height: 38px; border: 1px solid var(--line); border-radius: 11px; position: relative; overflow: visible; transition: background .18s, border-color .18s, color .18s, box-shadow .25s, transform .3s var(--spring); }
+.top-actions .btn.box { gap: 8px; }
+.top-actions .btn.primary.box { margin-left: 10px; border-color: transparent; overflow: hidden; box-shadow: 0 6px 18px -8px rgba(0, 0, 0, .7); }
+.top-actions .box:hover { transform: translateY(-2px); border-color: var(--line-strong, var(--line)); box-shadow: 0 10px 22px -12px rgba(0, 0, 0, .8); }
+.top-actions .box:active { transform: translateY(0) scale(.96); transition-duration: .08s; }
+.top-actions .box:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.top-actions .box svg.i { transition: transform .35s var(--spring); }
+.top-actions #btnCmd:hover svg.i { transform: scale(1.18) rotate(-12deg); }
+.top-actions #btnPublish:hover svg.i { animation: tbUp .7s var(--ease) infinite; }
+.top-actions #btnImport:hover svg.i { transform: translateY(-1px) rotate(-8deg) scale(1.1); }
+.top-actions #btnExport:hover svg.i { animation: tbDown .7s var(--ease) infinite; }
+.top-actions .btn.primary.box::after { content: ""; position: absolute; inset: 0; background: linear-gradient(105deg, transparent 35%, rgba(255, 255, 255, .55) 50%, transparent 65%); transform: translateX(-120%); pointer-events: none; }
+.top-actions .btn.primary.box:hover::after { transform: translateX(120%); transition: transform .65s var(--ease); }
+.top-actions .btn.primary.box:hover { opacity: 1; }
+@keyframes tbUp { 0%, 100% { transform: translateY(0); } 45% { transform: translateY(-3px); } }
+@keyframes tbDown { 0%, 100% { transform: translateY(0); } 45% { transform: translateY(3px); } }
+@media (prefers-reduced-motion: reduce) { .top-actions .box, .top-actions .box svg.i { transition: none; animation: none !important; } }
 
 /* ---------- категории (слева) ---------- */
 .layers { left: 16px; top: 84px; width: 220px; max-height: calc(100vh - 180px); display: flex; flex-direction: column; gap: 10px; padding: 12px; }

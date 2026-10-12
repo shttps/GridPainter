@@ -100,3 +100,57 @@ body[data-page="background"] { background: radial-gradient(ellipse at 10% 18%, #
 .bgb-picker-selected { position: absolute; top: 8px; right: 8px; padding: 3px 7px; background: #ed996d; color: #241309; border-radius: 5px; font-size: 10px; }
 .bgb-picker-more { margin-top: 18px; }
 @media (max-width: 600px) { .bgb-picker-list { grid-template-columns: repeat(2, minmax(0, 1fr)); } .bgb-picker { padding: 24px 16px; } }
+
+/* ---------- единый стиль с сайтом: токены темы, Unbounded-метки, градиент кнопок, аврора как в Мастерской ---------- */
+body[data-page="background"] { position: relative; background: transparent; }
+.bgb-heading { align-items: center; padding: 26px 30px; border-radius: 22px; background: linear-gradient(135deg, color-mix(in oklab, var(--c1) 10%, var(--card)), var(--card) 55%); border: 1px solid var(--line); position: relative; overflow: hidden; }
+.bgb-heading::after { content: ""; position: absolute; right: -80px; top: -120px; width: 380px; height: 380px; border-radius: 50%; background: radial-gradient(closest-side, color-mix(in oklab, var(--c2) 22%, transparent), transparent); pointer-events: none; }
+.bgb-heading > * { position: relative; z-index: 1; }
+.bgb-heading .kicker { margin-bottom: 12px; }
+.bgb-heading h1 { margin: 0 0 10px; font-size: clamp(30px, 3.4vw, 46px); font-weight: 750; letter-spacing: -.04em; line-height: 1.05; }
+.bgb-heading h1 span { color: var(--accent); }
+.bgb-heading h1 em { background: var(--grad); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.bgb-heading p { color: var(--muted); font-size: 15px; }
+.bgb-heading-tag { padding: 8px 14px; border-radius: 999px; border: 1px solid var(--line); background: color-mix(in oklab, var(--card) 80%, transparent); color: var(--ink-2); font: 600 10px var(--disp); letter-spacing: .08em; text-transform: uppercase; }
+.bgb-heading-tag i, .bgb-preview-label i { background: var(--accent); box-shadow: 0 0 12px color-mix(in oklab, var(--accent) 70%, transparent); }
+.bgb-stage, .bgb-panel { background: var(--card); border-color: var(--line); box-shadow: 0 30px 70px -40px #000; }
+.bgb-panel { background: linear-gradient(160deg, var(--card-2), var(--card) 60%); }
+.bgb-panel-title .kicker { margin-bottom: 6px; }
+.bgb-panel-title h2 { font-size: 22px; font-weight: 700; letter-spacing: -.03em; }
+.bgb-panel-title h2 .i, .bgb-discover .i { color: var(--accent); }
+.bgb-preview-label, .bgb-f > span, .bgb-formats, .bgb-drop-kicker { font-family: var(--disp); font-weight: 600; letter-spacing: .08em; text-transform: uppercase; }
+.bgb-preview-label { font-size: 10px; color: var(--ink-2); }
+.bgb-f > span { font-size: 10px; color: var(--ink-2); }
+.bgb-f > span em { font-family: var(--font); font-weight: 400; letter-spacing: 0; text-transform: none; font-size: 11px; color: var(--faint); }
+.bgb-drop-kicker { font-size: 9px; color: var(--accent-hi); }
+.bgb-formats { font-size: 9px; color: var(--faint); }
+.bgb-screen { border-color: var(--line-strong); }
+.bgb-screen.over { border-color: var(--accent); box-shadow: 0 0 0 4px color-mix(in oklab, var(--accent) 22%, transparent); }
+.bgb-drop { background: radial-gradient(ellipse at 50% 100%, color-mix(in oklab, var(--c1) 22%, transparent), transparent 64%), linear-gradient(125deg, var(--bg-2), var(--card)); }
+.bgb-drop::before { background: radial-gradient(ellipse, color-mix(in oklab, var(--c2) 24%, transparent), transparent 70%); }
+.bgb-drop-in > .bgb-upload-icon { border-color: color-mix(in oklab, var(--accent) 45%, transparent); background: linear-gradient(140deg, color-mix(in oklab, var(--c2) 22%, transparent), transparent); color: var(--accent-hi); }
+.bgb-drop-cta { background: var(--grad); background-size: 160% 100%; color: var(--accent-ink); box-shadow: 0 10px 26px -12px var(--c1); transition: background-position .5s var(--ease), box-shadow .25s, transform .3s var(--spring); }
+.bgb-drop:hover .bgb-drop-cta { background: var(--grad); background-size: 160% 100%; background-position: 100% 0; box-shadow: 0 14px 32px -10px var(--c1); transform: translateY(-2px); }
+.bgb-discover { border-top-color: var(--line); }
+.bgb-where a { border: 1px solid var(--line); color: var(--ink-2); background: var(--bg-2); }
+.bgb-where a:hover { border-color: var(--accent-line); color: var(--ink); background: var(--accent-soft); }
+.bgb-panel .seg, .bgb-top .seg { background: var(--bg-2); border-color: var(--line); }
+.bgb .seg-ind { background: var(--card-2); border-color: transparent; box-shadow: 0 0 0 1px var(--line-strong), 0 6px 16px -8px #000; }
+#bgbPick { border: 1px dashed var(--accent-line); background: var(--accent-soft); color: var(--ink); }
+#bgbPick:hover { border-color: var(--accent); background: color-mix(in oklab, var(--c2) 20%, transparent); }
+.bgb-row { border-block-color: var(--line); }
+.bgb-f input[type="range"] { background: linear-gradient(to right, var(--accent) var(--range-fill, 0%), var(--line-strong) var(--range-fill, 0%)); }
+.bgb-f input[type="range"]::-webkit-slider-thumb { background: var(--ink); border: 3px solid var(--bg); box-shadow: 0 0 0 1.5px var(--accent); }
+.bgb-f input[type="range"]::-moz-range-thumb { background: var(--ink); border: 2px solid var(--bg); }
+.bgb-f input[type="range"]:hover::-webkit-slider-thumb { box-shadow: 0 0 0 5px var(--accent-soft), 0 0 0 1.5px var(--accent); }
+.bgb-clean input { background: var(--line-strong); border-color: var(--line-strong); }
+.bgb-clean input:checked { background: var(--accent); border-color: var(--accent); }
+.bgb-clean input:checked::before { background: var(--accent-ink); }
+.bgb-go { border-top: 1px solid var(--line); }
+.bgb-go .btn.primary { background: var(--grad); background-size: 160% 100%; color: var(--accent-ink); min-height: 48px; font-size: 14px; border: 1px solid oklch(0.78 0.14 50 / .55); }
+.bgb-go .btn.primary:hover { background-position: 100% 0; }
+.bgb-links button { color: var(--muted); transition: color .2s; }
+.bgb-links button:hover { color: var(--accent-hi); }
+.bgb-picker-selected { background: var(--accent); }
+.bgb-picker-card:hover { border-color: var(--accent); }
+@media (max-width: 600px) { .bgb-heading { padding: 20px; } }

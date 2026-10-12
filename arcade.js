@@ -42,7 +42,7 @@
     ov = document.createElement('div');
     ov.className = `ar-ov theme-${g.theme}`; ov.setAttribute('role', 'dialog'); ov.setAttribute('aria-modal', 'true'); ov.setAttribute('aria-label', g.title);
     ov.innerHTML = `<div class="ar-backdrop"></div><div class="ar-shell" id="arShell"></div>
-      <div class="ar-tools"><button class="ar-tool" id="arMute" title="Звук">${muted ? '🔇' : '🔊'}</button><button class="ar-tool ar-close" id="arClose" title="Закрыть (Esc)" aria-label="Закрыть">✕</button></div>`;
+      <div class="ar-tools"><button class="ar-tool" id="arRestart" title="Начать заново" aria-label="Начать заново" hidden>↻</button><button class="ar-tool" id="arMute" title="Звук">${muted ? '🔇' : '🔊'}</button><button class="ar-tool ar-close" id="arClose" title="Закрыть (Esc)" aria-label="Закрыть">✕</button></div>`;
     document.body.appendChild(ov);
     document.documentElement.classList.add('ar-lock');
     ov.querySelector('#arClose').onclick = () => close();
@@ -50,6 +50,7 @@
     const muteUI = () => { muteButton.textContent = muted ? '🔇' : '🔊'; muteButton.setAttribute('aria-pressed', String(muted)); muteButton.setAttribute('aria-label', muted ? 'Включить звук' : 'Выключить звук'); };
     muteUI();
     muteButton.onclick = () => { muted = !muted; save('gs.arcade.mute', muted); audio?.unlock(); audio?.mute(muted); muteUI(); };
+    ov.querySelector('#arRestart').onclick = e => { e.currentTarget.blur(); if (inst && !ov.dataset.done) { inst.destroy(); start(); } };
     ov.querySelector('.ar-backdrop').onclick = () => { if (!inst) close(); };
     if (location.hash !== '#' + id) history.replaceState(null, '', '#' + id);
     intro();
@@ -70,6 +71,7 @@
   // экран описания: как в клиенте — заголовок, «Как играть» и «Рекорды», очки, награды, «Играть»
   function intro() {
     inst?.destroy(); inst = null; audio?.stop(); audio?.pause(false); delete ov.dataset.done;
+    ov.querySelector('#arRestart').hidden = true;
     const g = cur, b = best(g.id), sh = ov.querySelector('#arShell');
     sh.className = 'ar-shell intro';
     sh.innerHTML = `<div class="ar-panel">
@@ -93,6 +95,7 @@
     sfx('start');
     const sh = ov.querySelector('#arShell');
     sh.className = 'ar-shell play'; sh.innerHTML = ''; delete ov.dataset.done;
+    ov.querySelector('#arRestart').hidden = false;
     inst = cur.mount(sh, { sfx, end: finish, best: best(cur.id), muted: () => muted, pauseAudio: on => audio?.pause(on) });
   }
   // итог: очки, рекорд, какие награды взяты; у вошедших результат уходит в общую таблицу
@@ -102,6 +105,7 @@
     const g = cur, prev = best(g.id), rec = score > prev;
     if (rec) setBest(g.id, score);
     ov.dataset.done = '1';
+    ov.querySelector('#arRestart').hidden = true;
     const sh = ov.querySelector('#arShell');
     const box = document.createElement('div');
     box.className = 'ar-result';
