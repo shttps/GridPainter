@@ -2038,6 +2038,7 @@ function renderSignIn(box, next) {
       <label class="pf-field-label" for="authEmail">Электронная почта</label>
       <div class="auth-field">${icon('mail')}<input class="input" id="authEmail" type="email" required placeholder="you@example.com" autocomplete="email"></div>
       <button class="btn primary block" id="authGo">Получить ссылку для входа ${icon('arrow')}</button>
+      <button class="link" type="button" id="authHave">У меня уже есть письмо с кодом</button>
     </form>
     <div class="pf-auth-privacy">${icon('shield')}<span>Без пароля. Почта останется приватной — другие увидят только твой ник.</span></div>
   </section></div>`;
@@ -2046,14 +2047,28 @@ function renderSignIn(box, next) {
     e.preventDefault();
     const email = $('#authEmail').value.trim(), go = $('#authGo');
     go.disabled = true; go.textContent = 'Отправляю…';
+    // у почтового сервиса лимит писем в час: при отказе не тупик, а переход к вводу кода из уже полученного письма
     try { await ACC.sendLink(email, redirect); renderSent(box, email, next); }
-    catch (er) { toast(er.message, 'err'); go.disabled = false; go.textContent = 'Получить ссылку для входа'; }
+    catch (er) {
+      go.disabled = false; go.textContent = 'Получить ссылку для входа';
+      if (er.status === 429) { toast(er.message, 'err'); renderSent(box, email, next, true); }
+      else toast(er.message, 'err');
+    }
+  };
+  // письмо уже пришло раньше — сразу к вводу кода, не запрашивая новое
+  $('#authHave').onclick = () => {
+    const email = $('#authEmail').value.trim();
+    if (!$('#authEmail').checkValidity() || !email) { $('#authEmail').reportValidity(); return; }
+    renderSent(box, email, next, false, true);
   };
 }
-function renderSent(box, email, next) {
-  box.innerHTML = `<div class="auth-card pf-sent"><span class="pf-auth-symbol">${icon('mail')}</span><span class="pf-eyebrow">Остался один шаг</span>
-    <h1>Проверь почту</h1>
-    <p>Письмо со ссылкой отправлено на <b>${esc(email)}</b>. Открой ссылку в этом браузере — и сразу окажешься в профиле. Письма нет — загляни в «Спам».</p>
+function renderSent(box, email, next, limited = false, have = false) {
+  const lead = limited ? 'Новое письмо сейчас отправить не получится — почтовый сервис ограничивает частоту. Если на <b>' + esc(email) + '</b> недавно приходило письмо со ссылкой или кодом, введи код ниже или открой ссылку из него. Иначе попробуй позже или войди через соседнюю кнопку.'
+    : have ? 'Введи код из последнего письма, которое пришло на <b>' + esc(email) + '</b>.'
+    : `Письмо со ссылкой отправлено на <b>${esc(email)}</b>. Открой ссылку в этом браузере — и сразу окажешься в профиле. Письма нет — загляни в «Спам».`;
+  box.innerHTML = `<div class="auth-card pf-sent"><span class="pf-auth-symbol">${icon('mail')}</span><span class="pf-eyebrow">${limited ? 'Лимит писем' : 'Остался один шаг'}</span>
+    <h1>${limited || have ? 'Войти по коду' : 'Проверь почту'}</h1>
+    <p>${lead}</p>
     <form class="auth-form" id="codeForm">
       <label class="pf-field-label" for="authCode">Или введи код из письма, если он есть</label>
       <input class="input code" id="authCode" inputmode="numeric" autocomplete="one-time-code" maxlength="10" required placeholder="Код из письма">
