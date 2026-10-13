@@ -1098,10 +1098,10 @@ textarea.pf-bio:focus { outline: 0; border-color: var(--accent); background: var
 .pf-banner-edit .i { width: 15px; height: 15px; }
 .pf-banner-edit:hover { background: rgba(10, 8, 6, .82); transform: translateY(-1px); }
 .ban-sheet { gap: 12px; }
-.ban-prev { width: 100%; aspect-ratio: 4 / 1; border-radius: 12px; background: radial-gradient(320px 100px at 0% 0%, color-mix(in oklab, var(--c1) 30%, transparent), transparent 70%), var(--bg-2); overflow: hidden; }
+.ban-prev { width: 100%; aspect-ratio: 3 / 1; border-radius: 12px; background: radial-gradient(320px 100px at 0% 0%, color-mix(in oklab, var(--c1) 30%, transparent), transparent 70%), var(--bg-2); overflow: hidden; }
 .ban-prev img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .modal.sheet:has(.ban-crop) { width: min(720px, 100%); }
-.ban-crop .crop-cv { width: 100%; aspect-ratio: 4 / 1; border-radius: 12px; }
+.ban-crop .crop-cv { width: 100%; aspect-ratio: 3 / 1; border-radius: 12px; }
 .ban-crop .crop-zoom { width: min(360px, 100%); }
 
 /* ---------- Мастерская: фон как на главной, только за шапкой ---------- */

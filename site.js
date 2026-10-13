@@ -2084,8 +2084,9 @@ function profileHead(p, { me, grids = [], backgrounds = [], works = null }) {
   // чужой профиль глазами админа: убрать аватар или баннер
   const modBtns = !me && isAdmin() ? `${p.avatar ? `<button class="btn sm ghost danger" data-clear="avatar">${icon('trash')}Убрать аватар</button>` : ''}${p.banner ? `<button class="btn sm ghost danger" data-clear="banner">${icon('trash')}Убрать баннер</button>` : ''}` : '';
   const stat = (n, ic, label) => `<div class="pf-stat">${icon(ic)}<b>${num(n)}</b><span>${label}</span></div>`;
-  return `<div class="pf-pagebar"><span class="pf-eyebrow">${me ? 'Личное пространство' : 'Знакомься с автором'}</span><a href="workshop.html">Мастерская ${icon('arrow')}</a></div><section class="pf-head${me ? ' pf-own' : ''}" aria-label="${me ? 'Мой профиль' : 'Профиль автора'}">
-    <div class="pf-banner${p.banner ? ' on' : ''}">${p.banner ? `<img src="${esc(p.banner)}" alt="" onerror="this.remove()">` : ''}
+  return `<div class="pf-pagebar"><span class="pf-eyebrow">${me ? 'Личное пространство' : 'Знакомься с автором'}</span><a href="workshop.html">Мастерская ${icon('arrow')}</a></div><section class="pf-head${me ? ' pf-own' : ''}${p.banner ? ' has-ban' : ''}" aria-label="${me ? 'Мой профиль' : 'Профиль автора'}">
+    <div class="pf-hero">${p.banner ? `<div class="pf-hero-bg" aria-hidden="true"><img class="pf-hero-blur" src="${esc(p.banner)}" alt="" onerror="this.remove()"><img class="pf-hero-img" src="${esc(p.banner)}" alt="" onerror="this.remove()"></div>` : ''}
+    <div class="pf-banner${p.banner ? ' on' : ''}">
       <div class="pf-cover-art" aria-hidden="true"><i></i><i></i><i></i><span>GRID<br>STUDIO</span></div>
       <span class="pf-cover-label">${icon(me ? 'brush' : 'compass')}${me ? 'Твоя игра. Твой порядок.' : 'Автор Grid Studio'}</span>
       ${me && ACC.media() ? `<button class="pf-banner-edit" id="pfBanner">${icon('image')}${p.banner ? 'Сменить баннер' : 'Добавить баннер'}</button>` : ''}</div>
@@ -2107,6 +2108,7 @@ function profileHead(p, { me, grids = [], backgrounds = [], works = null }) {
         ${links ? `<div class="pf-links">${links}</div>` : me && ACC.ext() ? `<button class="pf-link add" id="pfLinksAdd">${icon('plus')}Добавить Steam или Telegram</button>` : ''}
         ${me ? `<span class="pf-private">${icon('lock')}<span>${esc(ACC.user()?.email || '')}<small>Почту видишь только ты</small></span></span>` : ''}
       </div>
+    </div>
     </div>
     <div class="pf-stats" aria-label="Статистика профиля">
       ${works ? stat(works.length, 'lock', 'Личные работы') : ''}
@@ -2207,7 +2209,7 @@ async function uploadMedia(m, kind, blob, onDone, back) {
   try { const np = await ACC.setMedia(kind, blob); m.close(); toast(kind === 'banner' ? 'Баннер обновлён' : 'Аватар обновлён', 'ok'); onDone(np); }
   catch (e) { toast(e.message, 'err'); back(); }
 }
-// баннер над профилем: картинку кадрируем в 4:1 (1600 × 400, webp), GIF — как есть, до 5 МБ
+// баннер на всю шапку профиля: картинку кадрируем в 3:1 (2400 × 800, webp — с запасом, чтобы не мылилась при растяжке), GIF — как есть, до 5 МБ
 function openBannerSheet(p, onDone) {
   const m = openSheet(`<div class="sh-body ban-sheet">
     <div class="ban-prev">${p.banner ? `<img src="${esc(p.banner)}" alt="">` : ''}</div>
@@ -2234,9 +2236,9 @@ function openBannerSheet(p, onDone) {
     }
     try {
       const img = await loadImage(f);
-      cropImage(m, img, { title: 'Кадр баннера', text: 'Двигай и приближай — так баннер встанет над профилем.', aspect: 4, outW: 1600, outH: 400 }, async out => {
-        let blob = await new Promise(ok => out.toBlob(ok, 'image/webp', 0.86));
-        if (!blob || blob.type !== 'image/webp') blob = await new Promise(ok => out.toBlob(ok, 'image/jpeg', 0.86)); // Safari не умеет webp
+      cropImage(m, img, { title: 'Кадр баннера', text: 'Двигай и приближай — так баннер встанет над профилем.', aspect: 3, outW: 2400, outH: 800 }, async out => {
+        let blob = await new Promise(ok => out.toBlob(ok, 'image/webp', 0.9));
+        if (!blob || blob.type !== 'image/webp') blob = await new Promise(ok => out.toBlob(ok, 'image/jpeg', 0.9)); // Safari не умеет webp
         await uploadMedia(m, 'banner', blob, onDone, back);
       }, back);
     } catch (er) { toast(er.message, 'err'); }
