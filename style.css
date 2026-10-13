@@ -429,16 +429,23 @@ input[type=range]::-moz-range-thumb { width: 14px; height: 14px; border-radius: 
 .drop.has span { display: flex; flex-direction: column; gap: 2px; min-width: 0; font: 11.5px var(--mono); }
 .drop.has span b { font: 600 13px var(--font); color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 /* группы настроек */
-.ip-ctl, .ip-col { display: flex; flex-direction: column; gap: 12px; }
-.ip-group { display: flex; flex-direction: column; gap: 12px; padding: 14px; border-radius: 14px; background: color-mix(in oklab, var(--field) 55%, transparent); border: 1px solid var(--line-soft); }
+.ip-ctl, .ip-col { display: flex; flex-direction: column; gap: 10px; }
+.ip-group { display: flex; flex-direction: column; gap: 10px; padding: 12px 14px; border-radius: 14px; background: color-mix(in oklab, var(--field) 55%, transparent); border: 1px solid var(--line-soft); }
 .ip-h { display: flex; align-items: center; gap: 8px; margin-bottom: -2px; font: 600 11px var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
 .ip-h::before { content: ""; width: 10px; height: 2px; border-radius: 2px; background: var(--accent); transform: rotate(-45deg); }
+.ip-adv { border-radius: 14px; border: 1px solid var(--line-soft); }
+.ip-adv summary { display: flex; align-items: center; gap: 8px; padding: 12px 14px; cursor: pointer; list-style: none; font: 600 12.5px var(--font); color: var(--muted); user-select: none; }
+.ip-adv summary::-webkit-details-marker { display: none; }
+.ip-adv summary::after { content: ""; margin-left: auto; width: 7px; height: 7px; border: solid currentColor; border-width: 0 2px 2px 0; transform: rotate(45deg) translateY(-2px); transition: transform .2s; }
+.ip-adv[open] summary::after { transform: rotate(-135deg); }
+.ip-adv summary:hover { color: var(--ink); }
+.ip-adv-body { display: flex; flex-direction: column; gap: 12px; padding: 2px 14px 14px; }
+.ip-sub { font: 600 11px var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
 .ip-modes { margin-left: 16px; }
 .ip-modes button { display: flex; align-items: center; gap: 7px; padding: 0 14px; }
 .ip-modes button svg.i { width: 15px; height: 15px; }
-.chips-row { display: grid; grid-template-columns: repeat(4, 1fr) 1.6fr; gap: 4px; padding: 3px; border-radius: 10px; background: var(--field); }
+.chips-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; padding: 3px; border-radius: 10px; background: var(--field); }
 .chips-row button { height: 30px; border: 0; border-radius: 8px; background: none; color: var(--muted); font: 600 12px var(--mono); cursor: pointer; transition: background .2s, color .2s, box-shadow .2s; }
-.chips-row button:last-child { font: 500 12px var(--font); }
 .chips-row button:hover { color: var(--ink); }
 .chips-row button.on { background: var(--accent); color: var(--accent-ink); box-shadow: 0 4px 14px -4px oklch(0.68 0.19 38 / .7); }
 .shade-chs { grid-template-columns: repeat(4, 1fr); }
@@ -648,3 +655,112 @@ textarea.input.plain { min-height: 76px; font: 13px/1.45 var(--font); white-spac
 .hp-actions .btn.primary { background: var(--accent); color: var(--accent-ink); }
 .hint-pop.out { animation: popOut .2s var(--ease) forwards; }
 @media (max-width: 640px) { .wl-grid { grid-template-columns: 1fr; } }
+
+/* ---------- вкладки холстов ---------- */
+.doc-tabs { left: 50%; top: 64px; transform: translateX(-50%); z-index: 25; display: flex; align-items: center; gap: 2px; padding: 3px; max-width: min(720px, calc(100vw - 460px)); overflow-x: auto; scrollbar-width: none; border-radius: 12px; }
+.doc-tabs::-webkit-scrollbar { display: none; }
+.doc-tabs[hidden] { display: none; }
+.dtab { display: flex; align-items: center; gap: 4px; flex: 0 0 auto; max-width: 180px; height: 30px; padding: 0 6px 0 12px; border-radius: 9px; color: var(--muted); font-size: 12.5px; font-weight: 500; cursor: pointer; transition: background .18s, color .18s; }
+.dtab span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dtab:not(:has(.dx)) { padding-right: 12px; }
+.dtab:hover { color: var(--ink); background: var(--field); }
+.dtab.on { color: var(--ink); background: var(--active); }
+:root[data-theme="light"] .dtab.on { background: #fff; box-shadow: var(--shadow-sm); }
+.dtab .dx { display: grid; place-items: center; width: 20px; height: 20px; padding: 0; border: 0; border-radius: 6px; background: none; color: var(--faint); cursor: pointer; opacity: 0; transition: opacity .15s, background .15s, color .15s; }
+.dtab.on .dx, .dtab:hover .dx { opacity: 1; }
+.dtab .dx:hover { background: var(--line); color: var(--ink); }
+.dtab .dx svg.i { width: 12px; height: 12px; }
+.dtab-add { flex: 0 0 auto; display: grid; place-items: center; width: 30px; height: 30px; border: 0; border-radius: 9px; background: none; color: var(--muted); cursor: pointer; transition: background .18s, color .18s; }
+.dtab-add:hover { background: var(--field); color: var(--accent); }
+.dtab-add svg.i { width: 16px; height: 16px; }
+body.previewing .doc-tabs { display: none; }
+@media (max-width: 1000px) { .doc-tabs { max-width: calc(100vw - 32px); } }
+@media (max-width: 800px) { .doc-tabs { top: 116px; } }
+
+/* ---------- стили line-art под превью ---------- */
+.pv-presets { display: none; position: absolute; left: 0; right: 0; bottom: 0; height: 112px; border-top: 1px solid var(--line); background: color-mix(in oklab, var(--panel) 85%, transparent); -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); user-select: none; }
+.split-preview[data-presets="1"] .pv-presets { display: block; }
+.split-preview[data-presets="1"] > canvas { bottom: 112px; height: calc(100% - 112px); }
+.split-preview[data-presets="1"] .pv-zoom, .split-preview[data-presets="1"] .pv-busy { bottom: 126px; }
+/* без скроллбара: листается колесом и свайпом, край гаснет, только когда за ним есть карточки */
+.pv-track { --fl: 0px; --fr: 0px; display: flex; gap: 8px; height: 100%; padding: 10px 14px; overflow-x: auto; overflow-y: hidden; scrollbar-width: none; overscroll-behavior-x: contain; -webkit-mask-image: linear-gradient(90deg, transparent, #000 var(--fl), #000 calc(100% - var(--fr)), transparent); mask-image: linear-gradient(90deg, transparent, #000 var(--fl), #000 calc(100% - var(--fr)), transparent); }
+.pv-track::-webkit-scrollbar { display: none; }
+.pv-track.fl { --fl: 40px; }
+.pv-track.fr { --fr: 40px; }
+.pcard { flex: 0 0 120px; display: flex; flex-direction: column; gap: 6px; padding: 0; border: 0; background: none; color: var(--muted); font: 600 12px/16px var(--font); cursor: pointer; text-align: left; animation: fadeUp .4s var(--ease) both; animation-delay: calc(var(--i) * 45ms); transition: color .18s; }
+.split-preview .pcard canvas { position: static; display: block; width: 100%; height: auto; aspect-ratio: 132 / 70; border-radius: 9px; background: var(--bg); box-shadow: 0 0 0 1px var(--line); cursor: pointer; touch-action: pan-x; transition: box-shadow .2s, transform .25s var(--spring); }
+.split-preview .pcard:not(.ready) canvas { background: linear-gradient(100deg, var(--field) 35%, var(--field-hover) 50%, var(--field) 65%) 0 0 / 300% 100%; animation: shimmer 1.3s linear infinite; }
+.pcard span { display: flex; align-items: center; gap: 6px; padding: 0 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pcard span::before { content: ""; flex: none; width: 0; height: 6px; margin-right: -6px; border-radius: 50%; background: var(--accent); transition: width .25s var(--spring), margin .25s var(--spring); }
+.pcard:hover, .pcard.on { color: var(--ink); }
+.split-preview .pcard:hover canvas { transform: translateY(-2px); box-shadow: 0 0 0 1px var(--field-hover), 0 8px 18px -10px rgba(0, 0, 0, .7); }
+.split-preview .pcard.on canvas { box-shadow: 0 0 0 2px var(--accent); }
+.pcard.on span::before { width: 6px; margin-right: 0; }
+@keyframes shimmer { from { background-position: 100% 0; } to { background-position: 0 0; } }
+
+/* «+» в панели категорий: мягкая акцентная плитка, счётчик — рядом с заголовком. Наведение доворачивает плюс,
+   открытое меню превращает его в «×»; на пустом холсте плюс «дышит» кольцом — подсказка, с чего начать */
+.layers-head { min-height: 28px; }
+.layers-head > span:first-child { margin-right: 0; font-weight: 500; color: var(--ink-2); }
+.layers-head #catCount { margin-right: auto; }
+.layers-head #btnAdd { position: relative; width: 28px; height: 28px; border-radius: 8px; background: var(--accent-soft); color: var(--accent); box-shadow: inset 0 0 0 1px oklch(0.68 0.19 38 / .3); transition: background .2s, color .2s, box-shadow .25s, transform .3s var(--spring); }
+.layers-head #btnAdd svg.i { width: 16px; height: 16px; stroke-width: 2.4; transition: transform .4s var(--spring); }
+.layers-head #btnAdd:hover, .layers-head #btnAdd.open { background: var(--accent); color: var(--accent-ink); box-shadow: inset 0 0 0 1px transparent, 0 6px 16px -6px oklch(0.68 0.19 38 / .8); }
+.layers-head #btnAdd:hover svg.i { transform: rotate(90deg); }
+.layers-head #btnAdd.open svg.i { transform: rotate(135deg); }
+.layers-head #btnAdd:active { transform: scale(.9); }
+.layers:has(.layers-list:empty) #btnAdd:not(.open)::after { content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none; animation: addRing 2.4s var(--ease) infinite; }
+@keyframes addRing { 0% { box-shadow: 0 0 0 0 oklch(0.68 0.19 38 / .45); } 70%, 100% { box-shadow: 0 0 0 9px oklch(0.68 0.19 38 / 0); } }
+
+/* ---------- импорт: заставка до картинки, потом окно раскрывается в редактор ---------- */
+.modal.ip { transition: width .5s var(--ease), height .5s var(--ease); }
+.modal.ip.ip-start { width: min(660px, calc(100vw - 32px)); height: min(540px, calc(100vh - 40px)); }
+.ip-intro { display: none; }
+.modal.ip-start .ip-intro { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 12px; padding: 2px 20px 20px; overflow: auto; }
+.modal.ip-start .split, .modal.ip-start .modal-foot { display: none; }
+.modal.ip-start .modal-head { border-bottom-color: transparent; }
+.modal.ip-start .ip-modes { visibility: hidden; }
+.modal.ip-leaving .ip-intro { animation: popOut .2s var(--ease) forwards; }
+.ipi-drop { flex: 1; min-height: 280px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; padding: 24px; border: 1.5px dashed var(--line); border-radius: 18px; text-align: center; cursor: pointer; outline: none; transition: border-color .25s, background .25s; animation: fadeUp .45s var(--ease) both; }
+.ipi-drop:hover, .ipi-drop:focus-visible, .ipi-drop.over { border-color: var(--accent); background: var(--accent-soft); }
+.ipi-stage { position: relative; width: 150px; height: 105px; margin-bottom: 14px; transition: transform .35s var(--spring); }
+.ipi-drop:hover .ipi-stage, .ipi-drop.over .ipi-stage { transform: translateY(-3px) scale(1.05); }
+.ipi-glow { position: absolute; inset: -34px; border-radius: 50%; background: radial-gradient(closest-side, oklch(0.68 0.19 38 / .22), transparent); animation: ipiGlow 5s ease-in-out infinite; }
+.ipi-art { position: relative; display: block; width: 100%; height: 100%; overflow: visible; animation: ipiFloat 5s ease-in-out infinite; }
+.ipi-frame { fill: color-mix(in oklab, var(--bg) 75%, transparent); stroke: var(--line); stroke-width: 1.5; }
+.ipi-line { fill: none; stroke: var(--accent); stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; stroke-dasharray: 1; animation: ipiDraw 5s var(--ease) infinite; }
+.ipi-dot { fill: var(--ink); transform-box: fill-box; transform-origin: center; animation: ipiDot 5s var(--ease) infinite both; animation-delay: calc(var(--i) * 16ms); }
+.ipi-badge { position: absolute; right: -10px; bottom: -10px; width: 34px; height: 34px; display: grid; place-items: center; border-radius: 50%; background: var(--accent); color: var(--accent-ink); box-shadow: 0 0 0 4px var(--panel-solid), 0 8px 20px -6px oklch(0.68 0.19 38 / .8); animation: ipiBob 2.4s ease-in-out infinite; }
+.ipi-badge svg.i { width: 17px; height: 17px; stroke-width: 2.4; }
+.ipi-drop h3 { margin: 0; font-size: 18px; font-weight: 600; letter-spacing: -.015em; color: var(--ink); }
+.ipi-drop p { margin: 0; font-size: 13px; color: var(--muted); }
+.ipi-drop .btn { margin-top: 12px; height: 36px; padding: 0 18px; pointer-events: none; }
+.ipi-drop small { margin-top: 4px; font: 10.5px var(--mono); letter-spacing: .06em; color: var(--faint); }
+.ipi-modes { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.ipi-modes button { display: grid; grid-template-columns: auto minmax(0, 1fr); column-gap: 10px; row-gap: 1px; align-items: center; padding: 10px 12px; border: 1px solid var(--line-soft); border-radius: 12px; background: color-mix(in oklab, var(--field) 55%, transparent); color: var(--ink-2); text-align: left; cursor: pointer; animation: fadeUp .45s var(--ease) both; transition: border-color .2s, background .2s, transform .25s var(--spring); }
+.ipi-modes button:nth-child(1) { animation-delay: .08s; }
+.ipi-modes button:nth-child(2) { animation-delay: .14s; }
+.ipi-modes button:nth-child(3) { animation-delay: .2s; }
+.ipi-modes i { grid-row: span 2; display: grid; place-items: center; width: 32px; height: 32px; border-radius: 9px; background: var(--field); color: var(--muted); transition: background .2s, color .2s; }
+.ipi-modes i svg.i { width: 16px; height: 16px; }
+.ipi-modes b { font-size: 13px; font-weight: 600; color: var(--ink); }
+.ipi-modes span { font-size: 11.5px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ipi-modes button:hover { border-color: var(--line); transform: translateY(-2px); }
+.ipi-modes button.on { border-color: var(--accent-line); background: var(--accent-soft); }
+.ipi-modes button.on i { background: var(--accent); color: var(--accent-ink); }
+.modal.ip-reveal .split-controls > * { animation: fadeUp .45s var(--ease) both; }
+.modal.ip-reveal .split-controls > :nth-child(2) { animation-delay: .06s; }
+.modal.ip-reveal .split-controls > :nth-child(3) { animation-delay: .12s; }
+.modal.ip-reveal .split-preview { animation: ipiPreviewIn .55s var(--ease) .05s both; }
+.modal.ip-reveal .modal-foot, .modal.ip-reveal .ip-modes { animation: fadeIn .4s var(--ease) .2s both; }
+@keyframes ipiDraw { 0% { stroke-dashoffset: 1; opacity: 1; } 34%, 50% { stroke-dashoffset: 0; opacity: 1; } 62%, 100% { stroke-dashoffset: 0; opacity: 0; } }
+@keyframes ipiDot { 0%, 44% { opacity: 0; transform: scale(0); } 52% { opacity: 1; transform: scale(1.5); } 58%, 88% { opacity: 1; transform: scale(1); } 96%, 100% { opacity: 0; transform: scale(.3); } }
+@keyframes ipiFloat { 50% { transform: translateY(-5px); } }
+@keyframes ipiGlow { 50% { opacity: .55; transform: scale(.9); } }
+@keyframes ipiBob { 50% { transform: translateY(-4px); } }
+@keyframes ipiPreviewIn { from { opacity: 0; transform: scale(.985); } }
+@media (max-width: 600px) { .ipi-modes { grid-template-columns: 1fr; } }
+@media (prefers-reduced-motion: reduce) {
+  .ipi-art, .ipi-glow, .ipi-badge, .ipi-line, .ipi-dot, .split-preview .pcard canvas, .layers-head #btnAdd::after { animation: none !important; }
+  .ipi-line { opacity: 0; }
+}

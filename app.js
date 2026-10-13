@@ -133,10 +133,11 @@ const st = {
 
 function load(key, def) { try { const v = localStorage.getItem(key); return v ? JSON.parse(v) : def; } catch { return def; } }
 function store(key, v) { try { localStorage.setItem(key, JSON.stringify(v)); return true; } catch { return false; } }
-let saveTimer = 0, saveWarned = false;
+let saveTimer = 0, saveWarned = false, tabsRender = () => {};
 function persist() {
   clearTimeout(saveTimer);
   setSaveState('сохраняю', true);
+  tabsRender();
   saveTimer = setTimeout(() => {
     store('gp2.settings', S);
     const ok = store('gp2.els', st.els);
@@ -278,7 +279,7 @@ function renderEls(c, list, o) {
   for (const e of list) {
     if (!e.name) continue;
     if (o.fade) c.globalAlpha = o.fade(e);
-    c.fillStyle = o.editor ? (e.t === 'glyph' ? INK.glyph : INK.text) : GAME.label;
+    c.fillStyle = o.editor ? (e.t === 'glyph' ? INK.glyph : INK.text) : (o.ink || GAME.label);
     drawLabel(c, e.name, e.x + LBL.dx, e.y + LBL.dy);
   }
   if (HAS_LS) c.letterSpacing = '0px';
@@ -1015,11 +1016,26 @@ function endDrag(e) {
 canvas.addEventListener('pointerup', endDrag);
 canvas.addEventListener('pointercancel', endDrag);
 canvas.addEventListener('contextmenu', e => e.preventDefault());
+// Колесо мыши (крупные целые шаги) — масштаб. Тачпад: два пальца двигают холст, щипок (приходит как Ctrl+колесо) — масштаб.
+const isMouseWheel = e => e.deltaMode !== 0 || (e.deltaX === 0 && Number.isInteger(e.deltaY) && Math.abs(e.deltaY) >= 50 && e.deltaY % 10 === 0);
 canvas.addEventListener('wheel', e => {
   e.preventDefault();
   const r = canvas.getBoundingClientRect();
-  zoomAt(Math.exp(-e.deltaY * (e.ctrlKey ? 0.01 : 0.0015)), e.clientX - r.left, e.clientY - r.top);
+  if (e.ctrlKey || isMouseWheel(e)) { zoomAt(Math.exp(-e.deltaY * (e.ctrlKey ? 0.01 : 0.0015)), e.clientX - r.left, e.clientY - r.top); return; }
+  cancelAnimationFrame(viewAnim);
+  st.panX -= e.shiftKey && !e.deltaX ? e.deltaY : e.deltaX; st.panY -= e.shiftKey && !e.deltaX ? 0 : e.deltaY;
+  requestRender();
 }, { passive: false });
+// Safari: щипок тачпада приходит как gesture-события
+{
+  let g0 = 1;
+  canvas.addEventListener('gesturestart', e => { e.preventDefault(); g0 = 1; });
+  canvas.addEventListener('gesturechange', e => {
+    e.preventDefault();
+    const r = canvas.getBoundingClientRect();
+    zoomAt(e.scale / g0, e.clientX - r.left, e.clientY - r.top); g0 = e.scale;
+  });
+}
 
 function updateCursor(w) {
   let c = '';
@@ -1309,30 +1325,82 @@ function openModal(html, { wide = false, cls = '', onClose } = {}) {
 const modalHead = (title, extra = '') => `<div class="modal-head"><h2>${title}</h2>${extra}<button class="icon-btn" data-close data-icon="x"></button></div>`;
 
 // ----- импорт картинки -----
+// import4: стили с тенями-«чернилами»; из прежних настроек берём всё, кроме стиля
 const IP = Object.assign({
   mode: 'lineart',
   brightness: 0, contrast: 0, saturation: 0, levels: true, sharpen: 0, frame: 'fit',
   cols: 36, fit: true, dither: false, bgRemove: false, tolerance: 18,
   amode: 'chars', step: 12, ramp: ' .:-=+*#%@', rampPreset: 'classic', invert: false, threshold: 128, autoThreshold: true, lineH: 14, bcols: 60,
   blur: 1.4, low: 8, high: 22, lstep: 7, limit: 3000, charset: 'lines', custom: '-\\|/', orient: true,
-  budget: 8000, shade: 0, shadeCh: '·',
-}, load('gp2.import', {}));
+  budget: 8000, shade: 0, shadeThr: 50, shadeCh: '.', minStep: 0, style: 'contour', advOpen: false,
+}, load('gp2.import4', null) || { ...load('gp2.import3', {}), shade: 0, blur: 1.2, low: 8, style: 'contour' });
+if (!IP.budget) IP.budget = 8000;
 const RAMPS = { classic: ' .:-=+*#%@', blocks: ' ░▒▓█', dots: ' .·•●', simple: ' .:*#' };
 // Детализация: сколько категорий можно потратить. Плотность подбирается сама — максимум деталей в этом бюджете.
-const BUDGETS = [[2000, '2k'], [5000, '5k'], [8000, '8k'], [12000, '12k'], [0, 'Вручную']];
-const SHADE_CHS = ['·', '.', '•', ':'];
+const BUDGETS = [[2000, '2k'], [5000, '5k'], [8000, '8k'], [12000, '12k']];
+// Стили line-art: символы контура, тени-«чернила» в тёмных местах, сглаживание и порог.
+// Каждый стиль задаёт все поля STYLE_BASE, чтобы выбор одного не тянул хвосты от предыдущего.
+// Под превью — карточки с живой миниатюрой каждого.
+const STYLE_BASE = { charset: 'dots', custom: '', orient: false, shade: 0, shadeThr: 50, shadeCh: '.', blur: 1.2, low: 8, minStep: 0 };
+const PRESETS = [
+  ['contour', 'Контур', {}],
+  ['strokes', 'Штрихи', { charset: 'lines', orient: true, blur: 0.8, low: 6 }],
+  ['sketch', 'Рисунок', { shade: 45, shadeThr: 70, shadeCh: '.·:', blur: 1.4, low: 10 }],
+  ['dashed', 'Пунктир', { blur: 1.2, low: 10, minStep: 8 }],
+  ['engraving', 'Тени', { charset: 'lines', orient: true, shade: 50, shadeThr: 75, shadeCh: '-/\\|', blur: 0.8 }],
+  ['photo', 'Фото', { shade: 60, shadeThr: 78, shadeCh: '.·:', blur: 1.6, low: 12 }],
+  ['silhouette', 'Силуэт', { shade: 85, shadeThr: 90, blur: 1, low: 12 }],
+  ['anime', 'Аниме', { shade: 30, shadeThr: 60, shadeCh: '.·', low: 6 }],
+  ['minimal', 'Минимализм', { blur: 2.2, low: 12, minStep: 7 }],
+  ['tattoo', 'Тату', { charset: 'lines', orient: true, shade: 40, shadeThr: 65, shadeCh: '.·:', blur: 0.8 }],
+  ['meme', 'Мем', { charset: 'lines', orient: true, blur: 0.8, low: 14, minStep: 7 }],
+  ['kanji', 'Иероглифы', { charset: 'custom', custom: 'あいうえおかきくけこ', shade: 25, shadeCh: '.·', minStep: 9 }],
+].map(([id, name, v]) => ({ id, name, v: { ...STYLE_BASE, ...v } }));
+const presetHigh = low => Math.min(80, Math.round(low * 2.75));
+// символы контура и теней берутся из выбранного стиля — ползунки их не меняют
+{ const s = PRESETS.find(s => s.id === IP.style) || PRESETS[0]; for (const k of ['charset', 'custom', 'orient', 'shadeCh', 'minStep']) IP[k] = s.v[k]; }
+IP.high = presetHigh(IP.low);
 let disabledHeroes = new Set(load('gp.disabled', []));
+// Заставка окна импорта: горы и солнце рисуются линией и рассыпаются на точки — ровно то, что делает line-art.
+function introArt() {
+  const pts = [[14, 68], [40, 38], [56, 54], [74, 30], [106, 68]], dots = [];
+  for (let i = 0; i < pts.length - 1; i++) {
+    const [x0, y0] = pts[i], [x1, y1] = pts[i + 1], n = Math.ceil(Math.hypot(x1 - x0, y1 - y0) / 6);
+    for (let k = 0; k < n; k++) dots.push([x0 + (x1 - x0) * k / n, y0 + (y1 - y0) * k / n]);
+  }
+  dots.push(pts[pts.length - 1]);
+  for (let a = 0; a < 10; a++) dots.push([36 + 7 * Math.cos(a * Math.PI / 5), 22 + 7 * Math.sin(a * Math.PI / 5)]);
+  return `<svg class="ipi-art" viewBox="0 0 120 84" aria-hidden="true">
+    <rect class="ipi-frame" x="1" y="1" width="118" height="82" rx="12"/>
+    <path class="ipi-line" pathLength="1" d="M${pts.join('L')}"/><circle class="ipi-line" pathLength="1" cx="36" cy="22" r="7"/>
+    ${dots.map(([x, y], i) => `<circle class="ipi-dot" cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="1.7" style="--i:${i}"/>`).join('')}
+  </svg>`;
+}
 
 function openImageModal(file) {
   let img = null, result = null, split = 0.5, timer = 0, steam = '';
   let src = null, rect = null, place = null, srcKey = 0, lastStep = 0;
   const fr = { zoom: 1, x: 0, y: 0 };        // кадр: масштаб и сдвиг картинки на холсте (доли холста)
   const view = { z: 1, x: 0, y: 0 };         // зум и сдвиг самого превью — рассмотреть детали
-  let tab = 'compare', ro = null;
+  let tab = 'compare', ro = null, thumbTimer = 0, thumbKey = -1;
   const edgeCache = new Map();
   const m = openModal(`
     ${modalHead('Импорт картинки', `<div class="seg ip-modes" id="ipMode">
       <button data-m="lineart" data-icon="pencil">Line-art</button><button data-m="ascii" data-icon="ascii">ASCII</button><button data-m="mosaic" data-icon="heroes">Мозаика из героев</button></div>`)}
+    <div class="ip-intro" id="ipIntro">
+      <div class="ipi-drop" id="ipiDrop" role="button" tabindex="0">
+        <div class="ipi-stage"><span class="ipi-glow"></span>${introArt()}<span class="ipi-badge">${icon('upload')}</span></div>
+        <h3>Перетащи картинку сюда</h3>
+        <p>или вставь из буфера <kbd>Ctrl V</kbd></p>
+        <span class="btn accent">Выбрать файл</span>
+        <small>PNG · JPG · WEBP · GIF</small>
+      </div>
+      <div class="ipi-modes" id="ipiModes">
+        <button data-m="lineart"><i>${icon('pencil')}</i><b>Line-art</b><span>контуры и тени точками</span></button>
+        <button data-m="ascii"><i>${icon('ascii')}</i><b>ASCII</b><span>символы или Брайль</span></button>
+        <button data-m="mosaic"><i>${icon('heroes')}</i><b>Мозаика</b><span>из иконок героев</span></button>
+      </div>
+    </div>
     <div class="split">
       <div class="split-controls">
         <div class="drop" id="ipDrop">${icon('image')}<b>Перетащи картинку</b><span>или кликни, или Ctrl+V</span></div>
@@ -1340,7 +1408,7 @@ function openImageModal(file) {
           <div class="ip-h">Кадр</div>
           <div class="seg" id="ipFit"><button data-v="fit">Вписать</button><button data-v="fill">Заполнить холст</button></div>
           ${slider('frZoom', 'Масштаб', 100, 400, 5, 100, '%')}
-          <div class="hint">Во вкладке «Кадр» на превью картинку можно двигать мышью, колесо — масштаб. <button class="link" id="frReset">Сбросить кадр</button></div>
+          <div class="hint">Двигать — вкладка «Кадр» · <button class="link" id="frReset">Сбросить</button></div>
         </div>
         <div id="ipCtl" class="ip-ctl"></div>
       </div>
@@ -1350,17 +1418,28 @@ function openImageModal(file) {
         <span class="tag pv-l" id="tagL">Оригинал</span><span class="tag pv-r" id="tagR">Результат</span>
         <div class="pv-zoom"><button class="icon-btn sm" id="pvOut" data-icon="minus"></button><button class="zoom-val" id="pvZoom" title="Вписать">100%</button><button class="icon-btn sm" id="pvIn" data-icon="plus"></button></div>
         <div class="pv-busy" id="pvBusy"><i></i>Считаю…</div>
+        <div class="pv-presets"><div class="pv-track" id="pvPresets"></div></div>
       </div>
     </div>
     <div class="modal-foot"><span class="ip-count" id="ipCount"></span><span class="info" id="ipInfo"></span><button class="btn" data-close>Отмена</button>
       ${st.els.length ? '<button class="btn" id="ipReplace" data-icon="layers" disabled>Заменить холст</button>' : ''}
-      <button class="btn primary" id="ipAdd" data-icon="plus" disabled>Добавить на холст</button></div>`, { wide: true, onClose: () => { pasteTarget = null; clearTimeout(timer); ro && ro.disconnect(); } });
+      <button class="btn primary" id="ipAdd" data-icon="plus" disabled>Добавить на холст</button></div>`, { wide: true, cls: file ? 'ip' : 'ip ip-start', onClose: () => { pasteTarget = null; clearTimeout(timer); clearTimeout(thumbTimer); thumbKey = -2; ro && ro.disconnect(); } });
+  const md = $('.modal', m.root);
 
+  // Пока картинки нет — только заставка по центру. Картинка пришла: заставка гаснет, окно раскрывается в редактор.
+  const reveal = () => {
+    if (!md.classList.contains('ip-start') || md.classList.contains('ip-leaving')) return;
+    md.classList.add('ip-leaving');
+    setTimeout(() => { md.classList.remove('ip-start', 'ip-leaving'); md.classList.add('ip-reveal'); redraw(); }, 200);
+  };
   const setImg = f => {
-    if (!f || !f.type.startsWith('image/')) return;
+    if (!f) return;
+    if (!f.type.startsWith('image/')) { toast('Это не картинка — нужен PNG, JPG, WEBP или GIF', 'err'); return; }
     const url = URL.createObjectURL(f), im = new Image();
+    im.onerror = () => toast('Не получилось открыть картинку', 'err');
     im.onload = () => {
       img = im;
+      reveal();
       Object.assign(fr, { zoom: 1, x: 0, y: 0 }); Object.assign(view, { z: 1, x: 0, y: 0 });
       lastStep = 0; edgeCache.clear(); syncFrame();
       $('#ipDrop').classList.add('has');
@@ -1376,61 +1455,66 @@ function openImageModal(file) {
   drop.ondragover = e => { e.preventDefault(); drop.classList.add('over'); };
   drop.ondragleave = () => drop.classList.remove('over');
   drop.ondrop = e => { e.preventDefault(); drop.classList.remove('over'); setImg(e.dataTransfer.files[0]); };
+  const intro = $('#ipIntro'), idrop = $('#ipiDrop');
+  idrop.onclick = () => drop.click();
+  idrop.onkeydown = e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); drop.click(); } };
+  intro.ondragover = e => { e.preventDefault(); idrop.classList.add('over'); };
+  intro.ondragleave = e => { if (!intro.contains(e.relatedTarget)) idrop.classList.remove('over'); };
+  intro.ondrop = e => { e.preventDefault(); idrop.classList.remove('over'); setImg(e.dataTransfer.files[0]); };
+  $('#ipiModes').onclick = e => { const b = e.target.closest('button'); if (!b) return; IP.mode = b.dataset.m; buildControls(); schedule(); };
 
   // ---- элементы управления ----
   const group = (title, body, extra = '') => `<div class="ip-group"${extra}><div class="ip-h">${title}</div>${body}</div>`;
-  const budgetCtl = manual => `<div class="chips-row" id="ipBudget">${BUDGETS.map(([v, l]) => `<button data-v="${v}" class="${IP.budget === v ? 'on' : ''}">${l}</button>`).join('')}</div>
-    <div class="hint" id="budgetHint">${IP.budget ? `Плотность подбирается сама: максимум деталей, но не больше ${IP.budget.toLocaleString('ru')} категорий.` : 'Плотность и лимит — вручную.'}</div>
-    <div id="ipManual" style="display:${IP.budget ? 'none' : 'flex'}" class="ip-col">${manual}</div>`;
-  const imageCtl = (extra = '') => group('Картинка', `${sw('levels', 'Авто-уровни', IP.levels)}${slider('sharpen', 'Резкость', 0, 100, 1, IP.sharpen)}
-    ${slider('brightness', 'Яркость', -100, 100, 1, IP.brightness)}${slider('contrast', 'Контраст', -100, 100, 1, IP.contrast)}${extra}`);
-  const bgCtl = () => group('Фон', `${sw('bgRemove', 'Убрать фон (цвет по краю)', IP.bgRemove)}${slider('tolerance', 'Допуск фона', 1, 100, 1, IP.tolerance)}`);
+  // Бюджет — главный (и единственный видимый) рычаг плотности; шаг подбирается сам.
+  const budgetCtl = () => `<div class="chips-row" id="ipBudget">${BUDGETS.map(([v, l]) => `<button data-v="${v}" class="${IP.budget === v ? 'on' : ''}">${l}</button>`).join('')}</div>
+    <div class="hint">Максимум деталей, но не больше выбранного числа категорий.</div>`;
+  // всё второстепенное — в сворачиваемой секции, чтобы главное помещалось на экран без прокрутки
+  const adv = body => `<details class="ip-adv"${IP.advOpen ? ' open' : ''}><summary>Ещё настройки</summary><div class="ip-adv-body">${body}</div></details>`;
+  const imageCtl = (extra = '') => `${sw('levels', 'Авто-уровни', IP.levels)}${slider('sharpen', 'Резкость', 0, 100, 1, IP.sharpen)}
+    ${slider('brightness', 'Яркость', -100, 100, 1, IP.brightness)}${slider('contrast', 'Контраст', -100, 100, 1, IP.contrast)}${extra}`;
+  const bgCtl = () => `${sw('bgRemove', 'Убрать фон (цвет по краю)', IP.bgRemove)}${slider('tolerance', 'Допуск фона', 1, 100, 1, IP.tolerance)}`;
   const controls = {
     mosaic: () => `
       ${group('Размер', slider('cols', 'Ширина, героев', 6, 120, 1, IP.cols))}
-      ${imageCtl(`${slider('saturation', 'Насыщенность', -100, 100, 1, IP.saturation)}${sw('fit', 'Подогнать яркость под палитру', IP.fit)}${sw('dither', 'Дизеринг', IP.dither)}`)}
-      ${bgCtl()}
-      ${group('Палитра', `<div class="hint">Клик исключает героя</div><div class="picker" id="ipPal" style="grid-template-columns:repeat(8,1fr)"></div>
+      ${adv(`${imageCtl(`${slider('saturation', 'Насыщенность', -100, 100, 1, IP.saturation)}${sw('fit', 'Подогнать яркость под палитру', IP.fit)}${sw('dither', 'Дизеринг', IP.dither)}`)}${bgCtl()}
+        <div class="ip-sub">Палитра · клик исключает героя</div><div class="picker" id="ipPal" style="grid-template-columns:repeat(8,1fr)"></div>
         <div class="row2"><button class="btn sm" id="palAll">Все</button><button class="btn sm" id="palNone">Никого</button></div>`)}`,
     ascii: () => `
-      <div class="seg" id="amode"><button data-v="chars">Символы по яркости</button><button data-v="braille">Брайль строками</button></div>
+      <div class="seg" id="amode"><button data-v="chars">Символы</button><button data-v="braille">Брайль</button></div>
       <div id="aChars" class="ip-col" ${IP.amode !== 'chars' ? 'hidden' : ''}>
-        ${group('Детализация', budgetCtl(slider('step', 'Плотность (шаг)', 3, 40, 0.5, IP.step)))}
-        ${group('Символы', `<label class="field"><select class="input" id="rampPreset">
-          <option value="classic">Классика  .:-=+*#%@</option><option value="blocks">Блоки ░▒▓█</option><option value="dots">Точки .·•●</option><option value="simple">Простой .:*#</option><option value="custom">Свой…</option></select></label>
-          <input class="input mono" id="ramp" value="${esc(IP.ramp)}" title="От тёмного к светлому; пробел = пусто" ${IP.rampPreset !== 'custom' ? 'hidden' : ''}>`)}
+        ${group('Детализация', budgetCtl())}
       </div>
       <div id="aBraille" class="ip-col" ${IP.amode !== 'braille' ? 'hidden' : ''}>
         ${group('Брайль', `${slider('bcols', 'Символов в строке', 10, 300, 1, IP.bcols)}
-          ${sw('autoThreshold', 'Авто-порог', IP.autoThreshold)}${slider('threshold', 'Порог', 1, 254, 1, IP.threshold)}
-          ${slider('lineH', 'Высота строки', 4, 40, 1, IP.lineH)}
-          <div class="hint">Каждая строка — одна категория: очень экономно по количеству категорий.</div>`)}
+          <div class="hint">Каждая строка — одна категория: очень экономно.</div>`)}
         <div class="steam-box">
           <div class="steam-head"><b>Steam · Custom Info Box</b><span class="badge" id="steamCount">—</span></div>
           <div class="row2"><button class="btn sm" id="steamW" title="Рекомендуемая ширина Брайль-арта для информационного поля">Ширина 60</button><button class="btn sm" id="steamFit" title="Уменьшить ширину, пока текст не влезет в лимит Steam">Влезть в 8000</button></div>
           <button class="btn primary block" id="steamCopy">Скопировать для Steam</button>
-          <div class="hint">Профиль → Редактировать → Витрины → «Своё информационное поле», вставь в поле текста. Если строки переносятся — уменьши ширину на 1–2 символа.</div>
+          <div class="hint">Профиль → Редактировать → Витрины → «Своё информационное поле» → вставь текст. Если строки переносятся — уменьши ширину на 1–2.</div>
         </div>
       </div>
-      ${imageCtl(`${sw('invert', 'Инвертировать', IP.invert)}${sw('dither', 'Дизеринг', IP.dither)}`)}${bgCtl()}`,
+      ${adv(`<div id="aCharsAdv" class="ip-col" ${IP.amode !== 'chars' ? 'hidden' : ''}><label class="field"><span class="lbl">Символы по яркости</span><select class="input" id="rampPreset">
+          <option value="classic">Классика  .:-=+*#%@</option><option value="blocks">Блоки ░▒▓█</option><option value="dots">Точки .·•●</option><option value="simple">Простой .:*#</option><option value="custom">Свой…</option></select></label>
+          <input class="input mono" id="ramp" value="${esc(IP.ramp)}" title="От тёмного к светлому; пробел = пусто" ${IP.rampPreset !== 'custom' ? 'hidden' : ''}></div>
+        <div id="aBrailleAdv" class="ip-col" ${IP.amode !== 'braille' ? 'hidden' : ''}>${sw('autoThreshold', 'Авто-порог', IP.autoThreshold)}${slider('threshold', 'Порог', 1, 254, 1, IP.threshold)}${slider('lineH', 'Высота строки', 4, 40, 1, IP.lineH)}</div>
+        ${sw('invert', 'Инвертировать', IP.invert)}${sw('dither', 'Дизеринг', IP.dither)}${imageCtl()}${bgCtl()}`)}`,
+    // символы контура и теней задаёт стиль (карточки под превью), здесь — только сила и пороги
     lineart: () => `
-      ${group('Детализация', budgetCtl(`${slider('lstep', 'Плотность (шаг)', 3, 30, 0.5, IP.lstep)}${slider('limit', 'Лимит категорий', 0, 20000, 100, IP.limit)}`))}
-      ${group('Контуры', `${slider('blur', 'Сглаживание', 0, 6, 0.1, IP.blur)}
-        ${slider('low', 'Нижний порог', 1, 60, 1, IP.low, '%')}${slider('high', 'Верхний порог', 1, 80, 1, IP.high, '%')}
-        <div class="hint">Ниже пороги — больше линий и мелких деталей. Сглаживание убирает шум и текстуру.</div>`)}
-      ${group('Тени точками', `${slider('shade', 'Сила теней', 0, 100, 1, IP.shade, '%')}
-        <div class="pens shade-chs" id="shadeChs">${SHADE_CHS.map(c => `<button data-ch="${esc(c)}" class="${IP.shadeCh === c ? 'on' : ''}">${esc(c)}</button>`).join('')}</div>
-        ${sw('invert', 'Точки в тёмных местах', IP.invert)}
-        <div class="hint">Точки рисуют тон картинки между контурами — объём, волосы, свет. 0 — только контуры.</div>`)}
-      ${group('Символы', `<label class="field"><select class="input" id="charset">
-        <option value="lines">Линии  - \\ | /</option><option value="dots">Только точки  .</option><option value="mid">Средние точки  ·</option><option value="custom">Свой…</option></select></label>
-        <input class="input mono" id="custom" value="${esc(IP.custom)}" title="4 символа: горизонталь, диагональ \\, вертикаль, диагональ /. Один символ — везде он." ${IP.charset !== 'custom' ? 'hidden' : ''}>
-        ${sw('orient', 'Автоориентация по углу линии', IP.orient)}`)}
-      ${imageCtl()}${bgCtl()}`,
+      ${group('Детализация', budgetCtl())}
+      ${group('Тени', `${slider('shade', 'Сила теней', 0, 100, 1, IP.shade, '%')}
+        ${slider('shadeThr', 'Сколько тона в тень', 5, 95, 1, IP.shadeThr, '%')}
+        <div class="hint">Символы там, где на картинке краска, — как штриховка карандашом. 0 — только контуры.</div>`)}
+      ${adv(`${slider('blur', 'Сглаживание контуров', 0, 6, 0.1, IP.blur)}
+        ${slider('low', 'Порог контуров', 1, 40, 1, IP.low, '%')}
+        <div class="hint">Ниже порог — больше линий и мелких деталей.</div>
+        ${sw('invert', 'Инвертировать тени', IP.invert)}
+        ${imageCtl()}${bgCtl()}`)}`,
   };
 
   function buildControls() {
-    $$('#ipMode button').forEach(b => b.classList.toggle('on', b.dataset.m === IP.mode));
+    $$('#ipMode button, #ipiModes button').forEach(b => b.classList.toggle('on', b.dataset.m === IP.mode));
+    $('#ipPreview').dataset.presets = IP.mode === 'lineart' ? '1' : '';
     const box = $('#ipCtl');
     box.innerHTML = controls[IP.mode]();
     applyIcons(box);
@@ -1441,22 +1525,26 @@ function openImageModal(file) {
     $$('input[type=checkbox]', box).forEach(el => el.addEventListener('change', () => { IP[el.id] = el.checked; schedule(); }));
     const sel = (id, fn) => { const el = document.getElementById(id); if (el) { el.value = IP[id]; el.onchange = () => { IP[id] = el.value; fn && fn(); schedule(); }; } };
     sel('rampPreset', () => { const r = $('#ramp'); r.hidden = IP.rampPreset !== 'custom'; if (IP.rampPreset !== 'custom') IP.ramp = r.value = RAMPS[IP.rampPreset]; });
-    sel('charset', () => { $('#custom').hidden = IP.charset !== 'custom'; });
-    for (const id of ['ramp', 'custom']) { const el = document.getElementById(id); if (el) el.oninput = () => { IP[id] = el.value; schedule(); }; }
+    for (const id of ['ramp']) { const el = document.getElementById(id); if (el) el.oninput = () => { IP[id] = el.value; schedule(); }; }
     const bud = $('#ipBudget');
     if (bud) bud.onclick = e => {
       const b = e.target.closest('button'); if (!b) return;
       IP.budget = +b.dataset.v; lastStep = 0;
       $$('button', bud).forEach(x => x.classList.toggle('on', x === b));
-      $('#ipManual').style.display = IP.budget ? 'none' : 'flex';
-      $('#budgetHint').textContent = IP.budget ? `Плотность подбирается сама: максимум деталей, но не больше ${IP.budget.toLocaleString('ru')} категорий.` : 'Плотность и лимит — вручную.';
       schedule();
     };
-    const sch = $('#shadeChs');
-    if (sch) sch.onclick = e => { const b = e.target.closest('button'); if (!b) return; IP.shadeCh = b.dataset.ch; $$('button', sch).forEach(x => x.classList.toggle('on', x === b)); if (!IP.shade) { IP.shade = 40; const s = $('#shade'); s.value = 40; syncRange(s); } schedule(); };
+    const dt = $('.ip-adv', box);
+    if (dt) dt.ontoggle = () => { IP.advOpen = dt.open; store('gp2.import4', IP); };
+    // один ползунок «Порог контуров» двигает оба порога Canny вместе (верхний ≈ 2.75 × нижнего)
+    const low = $('#low');
+    if (low) low.addEventListener('input', () => { IP.high = Math.min(80, Math.round(IP.low * 2.75)); });
     const am = $('#amode');
     if (am) {
-      const upd = () => { $$('button', am).forEach(b => b.classList.toggle('on', b.dataset.v === IP.amode)); $('#aChars').hidden = IP.amode !== 'chars'; $('#aBraille').hidden = IP.amode !== 'braille'; };
+      const upd = () => {
+        $$('button', am).forEach(b => b.classList.toggle('on', b.dataset.v === IP.amode));
+        const ch = IP.amode === 'chars';
+        for (const [id, on] of [['aChars', ch], ['aCharsAdv', ch], ['aBraille', !ch], ['aBrailleAdv', !ch]]) { const el = document.getElementById(id); if (el) el.hidden = !on; }
+      };
       upd();
       am.onclick = e => { const b = e.target.closest('button'); if (!b) return; IP.amode = b.dataset.v; upd(); schedule(); };
     }
@@ -1530,7 +1618,8 @@ function openImageModal(file) {
   // ---- расчёт ----
   let frameDirty = true;
   function schedule(frame = false) {
-    store('gp2.import', IP);
+    store('gp2.import4', IP);
+    markPresets();
     if (frame) frameDirty = true;
     clearTimeout(timer);
     if (img) $('#pvBusy').classList.add('on');
@@ -1578,13 +1667,14 @@ function openImageModal(file) {
         if (c) { c.textContent = `${n.toLocaleString('ru')} / 8 000`; c.classList.toggle('bad', n > STEAM_LIMIT); }
       }
     } else {
+      if (thumbKey !== srcKey) queueThumbs();
       result = Convert.lineart(src, { ...p, step: IP.lstep, startStep: lastStep ? lastStep / 1.15 : 0 }, area, measure, LBL.size, labelFont());
       toCategories(result.els);
       lastStep = result.step;
       info = IP.budget > 0 ? `шаг ${result.step.toFixed(1)}` : result.step > IP.lstep + 0.01 ? `шаг увеличен до ${result.step.toFixed(1)} из-за лимита` : '';
       // бюджет не набран даже на самом плотном шаге — подсказываем, откуда взять ещё деталей
       if (IP.budget > 0 && result.step <= 3.01 && result.els.length < IP.budget * 0.7)
-        info += IP.shade < 30 ? ' · это все контуры — добавь «Тени точками»' : IP.frame === 'fit' ? ' · больше деталей: «Заполнить холст» или ниже пороги' : ' · больше деталей: ниже пороги';
+        info += IP.shade < 30 ? ' · это все контуры — добавь тени' : IP.frame === 'fit' ? ' · больше деталей: «Заполнить холст» или ниже порог' : ' · больше деталей: ниже порог';
     }
     setCount(result.els.length);
     $('#ipInfo').textContent = (info ? info + ' · ' : '') + `${Math.round(performance.now() - t0)} мс`;
@@ -1634,7 +1724,8 @@ function openImageModal(file) {
     if (!img) return;
     const sx = tab === 'compare' ? S.areaW * split : 0;
     c.save(); c.beginPath(); c.rect(sx, 0, S.areaW - sx, S.areaH); c.clip();
-    if (result) renderEls(c, result.els, { editor: false, zoom: z });
+    // в окне импорта точки светлее, чем в игре, — иначе мелкие детали тонут на тёмном фоне
+    if (result) renderEls(c, result.els, { editor: false, zoom: z, ink: '#dbe4f2' });
     c.restore();
     if (tab !== 'compare') return;
     c.save(); c.beginPath(); c.rect(0, 0, sx, S.areaH); c.clip();
@@ -1690,6 +1781,12 @@ function openImageModal(file) {
   pv.addEventListener('wheel', e => {
     e.preventDefault();
     if (!img) return;
+    // тачпад: два пальца двигают превью (в «Кадре» — картинку), щипок и колесо мыши — масштаб
+    if (!e.ctrlKey && !isMouseWheel(e)) {
+      if (tab === 'frame') { fr.x -= e.deltaX / (xf().z * S.areaW); fr.y -= e.deltaY / (xf().z * S.areaH); computePlace(); redraw(); schedule(true); }
+      else { view.x -= e.deltaX; view.y -= e.deltaY; redraw(); }
+      return;
+    }
     const k = Math.exp(-e.deltaY * (e.ctrlKey ? 0.01 : 0.0018));
     if (tab === 'frame') { fr.zoom = clamp(fr.zoom * k, 1, 4); syncFrame(); computePlace(); redraw(); schedule(true); return; }
     const r = pv.getBoundingClientRect();
@@ -1701,7 +1798,59 @@ function openImageModal(file) {
   $('#pvZoom').onclick = () => { Object.assign(view, { z: 1, x: 0, y: 0 }); redraw(); };
   const setTab = v => { tab = v; $$('#pvTabs button').forEach(b => b.classList.toggle('on', b.dataset.v === v)); $('#ipPreview').dataset.tab = v; redraw(); };
   $('#pvTabs').onclick = e => { const b = e.target.closest('button'); if (b) setTab(b.dataset.v); };
-  ro = new ResizeObserver(redraw); ro.observe(pv);
+  ro = new ResizeObserver(() => { redraw(); presetEdges(); }); ro.observe(pv);
+
+  // ---- стили line-art: карточки с живыми миниатюрами ----
+  const TW = 132, TH = 70;
+  const pvp = $('#pvPresets');
+  pvp.innerHTML = PRESETS.map((s, i) => `<button class="pcard" data-i="${i}" style="--i:${i}"><canvas width="${TW * 2}" height="${TH * 2}"></canvas><span>${s.name}</span></button>`).join('');
+  // полоса без скроллбара: колесо листает её вбок, а край гаснет, только когда за ним что-то есть
+  function presetEdges() {
+    const max = pvp.scrollWidth - pvp.clientWidth;
+    pvp.classList.toggle('fl', pvp.scrollLeft > 2); pvp.classList.toggle('fr', pvp.scrollLeft < max - 2);
+  }
+  pvp.addEventListener('scroll', presetEdges, { passive: true });
+  pvp.addEventListener('wheel', e => {
+    if (pvp.scrollWidth <= pvp.clientWidth || Math.abs(e.deltaX) > Math.abs(e.deltaY)) return;
+    e.preventDefault(); pvp.scrollLeft += e.deltaY;
+  }, { passive: false });
+  // карточка горит, пока настройки совпадают со стилем; сдвинул ползунок — это уже свой вариант
+  function markPresets() {
+    $$('.pcard', pvp).forEach((b, i) => { const s = PRESETS[i]; b.classList.toggle('on', IP.style === s.id && Object.keys(s.v).every(k => IP[k] === s.v[k])); });
+  }
+  markPresets();
+  pvp.onclick = e => {
+    const b = e.target.closest('.pcard'); if (!b) return;
+    const s = PRESETS[+b.dataset.i];
+    Object.assign(IP, s.v, { style: s.id, high: presetHigh(s.v.low) });
+    for (const id of ['shade', 'shadeThr', 'blur', 'low']) { const el = document.getElementById(id); if (el) { el.value = IP[id]; syncRange(el); } }
+    lastStep = 0; schedule();
+  };
+  // миниатюры считаем по одной, в паузах между кадрами, и по пониженному бюджету — чтобы не тормозить основной расчёт
+  function queueThumbs() {
+    clearTimeout(thumbTimer);
+    const key = thumbKey = srcKey; let i = 0;
+    const area = { w: S.areaW, h: S.areaH };
+    const step = () => {
+      if (!pv.isConnected || thumbKey !== key || !src) return;
+      const { v } = PRESETS[i], cv = $$('.pcard canvas', pvp)[i];
+      try {
+        const r = Convert.lineart(src, { ...IP, ...v, high: presetHigh(v.low), rect, srcKey: key, cache: edgeCache, step: IP.lstep, startStep: 0, budget: 1500 }, area, measure, LBL.size, labelFont());
+        const c = cv.getContext('2d'), k = Math.min(cv.width / area.w, cv.height / area.h), ox = (cv.width - area.w * k) / 2, oy = (cv.height - area.h * k) / 2;
+        c.fillStyle = GAME.bg; c.fillRect(0, 0, cv.width, cv.height);
+        // точки — квадратиками (настоящая «.» в миниатюре меньше пикселя), штрихи и знаки — самими символами
+        c.fillStyle = '#dbe4f2'; c.font = `600 ${LBL.size * k * 1.3}px ${fontFamily()}`; c.textBaseline = 'top';
+        const d = Math.max(1.4, 1.8 * k * 3);
+        for (const e of r.els) {
+          if (e.name === '.' || e.name === '·' || e.name === ':') c.fillRect(ox + (e.x + 4) * k, oy + (e.y + (e.name === '.' ? 9 : 6)) * k, d, d);
+          else c.fillText(up(e.name), ox + e.x * k, oy + e.y * k);
+        }
+        cv.parentNode.classList.add('ready');
+      } catch {}
+      if (++i < PRESETS.length) thumbTimer = setTimeout(step, 40);
+    };
+    thumbTimer = setTimeout(step, 300);
+  }
 
   const commit = replace => {
     if (!result || !result.els.length) { toast('Результат пустой — подкрути настройки', 'err'); return; }
@@ -2125,7 +2274,7 @@ $('#btnCmd').onclick = openCommands;
 // выпадающие меню: «+» у категорий и стрелка у названия
 const addMenu = $('#addMenu'), mainMenu = $('#mainMenu');
 const menusOpen = () => addMenu.classList.contains('open') || mainMenu.classList.contains('open');
-function closeMenus() { addMenu.classList.remove('open'); mainMenu.classList.remove('open'); $('#btnMenu').classList.remove('open'); }
+function closeMenus() { addMenu.classList.remove('open'); mainMenu.classList.remove('open'); $('#btnMenu').classList.remove('open'); $('#btnAdd').classList.remove('open'); }
 function toggleMenu(m, btn) { const o = !m.classList.contains('open'); closeMenus(); m.classList.toggle('open', o); btn.classList.toggle('open', o); }
 $('#btnAdd').onclick = e => { e.stopPropagation(); toggleMenu(addMenu, e.currentTarget); };
 $('#btnMenu').onclick = e => {
@@ -2263,9 +2412,86 @@ document.addEventListener('keyup', e => { if (e.code === 'Space') { spaceDown = 
 window.addEventListener('blur', () => { spaceDown = false; });
 document.addEventListener('input', e => { if (e.target.type === 'range') syncRange(e.target); });
 
+// ---------- вкладки: несколько холстов ----------
+// Активный холст живёт там же, где и раньше (gp2.els, gp2.settings) — остальной код про вкладки не знает.
+// Неактивные лежат в gp2.tab.<id>; в памяти у каждого ещё история и положение вида.
+const Tabs = (() => {
+  const bar = $('#docTabs'), mem = new Map();
+  let list = [], active = '';
+  const cur = () => list.find(t => t.id === active);
+  const saveMeta = () => store('gp2.tabs', { active, list });
+  const label = t => (t.id === active ? S.configName : t.name) || 'Моя сетка';
+  let sig = '';
+  function render() {
+    // persist() зовётся на каждую правку — трогаем DOM и диск, только если вкладки правда изменились
+    const s = active + '|' + list.map(t => t.id + ':' + label(t)).join('|');
+    if (s === sig) return;
+    sig = s; saveMeta();
+    bar.hidden = false;
+    bar.innerHTML = list.map(t => `<div class="dtab${t.id === active ? ' on' : ''}" data-id="${t.id}" title="${esc(label(t))}"><span>${esc(label(t))}</span>${list.length > 1 ? '<button class="dx" data-x aria-label="Закрыть вкладку">' + icon('x') + '</button>' : ''}</div>`).join('')
+      + `<button class="dtab-add" data-add-tab data-tip="Новый холст" aria-label="Новый холст">${icon('plus')}</button>`;
+  }
+  // запомнить текущий холст перед уходом с него
+  function stash() {
+    const t = cur(); if (!t) return;
+    t.name = S.configName; t.project = load('gp2.project', null);
+    mem.set(t.id, { els: st.els, undo: st.undo, redo: st.redo, view: { zoom: st.zoom, panX: st.panX, panY: st.panY } });
+    store('gp2.tab.' + t.id, st.els);
+  }
+  function show(id) {
+    const t = list.find(x => x.id === id), m = mem.get(id);
+    active = id;
+    st.els = m ? m.els : load('gp2.tab.' + id, []);
+    st.undo = m?.undo || []; st.redo = m?.redo || [];
+    st.sel.clear(); st.hoverIds = null; reindex();
+    S.configName = t.name || 'Моя сетка'; $('#configName').value = S.configName;
+    store('gp2.project', t.project || null);
+    // всё сразу на диск, не дожидаясь отложенного persist: иначе перезагрузка в эти 600 мс потеряет холст
+    store('gp2.settings', S); store('gp2.els', st.els); saveMeta();
+    if (m?.view) Object.assign(st, m.view); else fitView(false);
+    changed(true); render();
+    document.dispatchEvent(new CustomEvent('gp:tabswitch'));
+  }
+  function open(id) { if (id === active || !list.some(t => t.id === id)) return; stash(); show(id); }
+  function add() {
+    stash();
+    const id = 't' + Date.now().toString(36);
+    let n = list.length + 1; while (list.some(t => t.name === `Сетка ${n}`)) n++;
+    list.push({ id, name: `Сетка ${n}`, project: null });
+    mem.set(id, { els: [], undo: [], redo: [] });
+    show(id);
+  }
+  function close(id) {
+    if (list.length < 2) return;
+    const i = list.findIndex(t => t.id === id); if (i < 0) return;
+    const els = id === active ? st.els : (mem.get(id)?.els ?? load('gp2.tab.' + id, []));
+    if (els.length && !confirm(`Закрыть «${label(list[i])}»? Несохранённый холст пропадёт.`)) return;
+    if (id === active) { const next = list[i + 1] || list[i - 1]; stash(); list.splice(i, 1); show(next.id); }
+    else { list.splice(i, 1); saveMeta(); render(); }
+    mem.delete(id); try { localStorage.removeItem('gp2.tab.' + id); } catch {}
+  }
+  bar.addEventListener('click', e => {
+    const tab = e.target.closest('.dtab');
+    if (e.target.closest('[data-add-tab]')) add();
+    else if (e.target.closest('[data-x]')) close(tab.dataset.id);
+    else if (tab) open(tab.dataset.id);
+  });
+  bar.addEventListener('auxclick', e => { const tab = e.target.closest('.dtab'); if (tab && e.button === 1) { e.preventDefault(); close(tab.dataset.id); } });
+  function init() {
+    const meta = load('gp2.tabs', null);
+    if (meta && Array.isArray(meta.list) && meta.list.some(t => t.id === meta.active)) { list = meta.list; active = meta.active; }
+    else { list = [{ id: 't1', name: S.configName, project: load('gp2.project', null) }]; active = 't1'; }
+    render(); saveMeta();
+  }
+  // имя вкладки обновляется вместе с названием сетки; метаданные пишем в тот же момент, что и холст
+  tabsRender = render;
+  return { init, open, add, close, render, get list() { return list; }, get active() { return active; } };
+})();
+
 // ---------- старт ----------
 (function init() {
   applyIcons();
+  Tabs.init();
   const saved = load('gp2.els', null);
   if (Array.isArray(saved) && saved.length) {
     st.els = saved;

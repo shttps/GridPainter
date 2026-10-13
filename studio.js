@@ -273,6 +273,9 @@
     return [...prevCommands(), ...extra];
   };
 
+  // вкладка сменилась — у каждого холста своя привязка к работе в профиле
+  document.addEventListener('gp:tabswitch', () => { renderAccountMenu(); setCloud(proj() ? 'в профиле' : ''); });
+
   // ======================= запуск =======================
   // ?import / ?steam — сразу окно импорта; ?new — чистый холст; ?project=<id> — работа из профиля
   const qs = new URLSearchParams(location.search);

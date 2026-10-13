@@ -567,25 +567,31 @@ window.Convert = (() => {
       return { els, pts };
     };
 
-    // Тени: точки по тону картинки поверх контуров. В игре символы светлые на тёмном,
-    // поэтому точек тем больше, чем светлее место (или наоборот — «Инвертировать»).
-    // Тон рассеивается змейкой по Флойду — Стейнбергу, рядом с линиями точки не ставятся.
-    const shadeCh = [...(p.shadeCh || '·')][0];
-    const shadeShape = glyphShape(shadeCh, 0, font, fontSize, measure);
+    // Тени — «чернила», как карандашом по бумаге: символы там, где на картинке краска, а не фон.
+    // Где бумага, решает край картинки: светлый край — тени в тёмных местах, тёмный — в светлых
+    // («Инвертировать тени» меняет сторону). Чем гуще тон, тем чаще символы и тем «тяжелее» символ
+    // из набора. Позиции слегка разбросаны хешем — без решётки и муара; у линий контура пусто.
+    const shadeSet = [...(p.shadeCh || '.')];
+    const shadeShapes = shadeSet.map((ch, k) => glyphShape(ch, k, font, fontSize, measure));
+    const hash = (x, y, s) => {
+      let h = (Math.imul(x, 374761393) + Math.imul(y, 668265263) + Math.imul(s, 982451653)) | 0;
+      h = Math.imul(h ^ (h >>> 13), 1274126177); h ^= h >>> 16;
+      return (h >>> 0) / 4294967296;
+    };
     const shade = (step, pts) => {
       const k = (p.shade || 0) / 100;
       if (k <= 0) return [];
-      const cols = Math.max(1, Math.floor(fit.w / step)), rows = Math.max(1, Math.floor(fit.h / step));
-      // слабые тени — точки только в самых светлых местах, сильные — по всему тону;
-      // почти чёрное (обычно фон) не рисуется вовсе, иначе по нему рассыпается редкий «песок»
-      const gamma = 2.6 - 1.9 * k, gain = 0.35 + 0.65 * k, floor = 0.2;
-      const v = lumOf(prep(sample(img, cols, rows), p), p.invert);
-      for (let i = 0; i < v.length; i++) {
-        if (v[i] < 0) continue;
-        const t = (v[i] / 255 - floor) / (1 - floor);
-        v[i] = t > 0 ? t ** gamma * gain : 0;
-      }
-      const G = step, R2 = (step * 0.85) ** 2, occ = new Map();
+      const g = Math.max(step, fontSize * 0.42);
+      const cols = Math.max(1, Math.floor(fit.w / g)), rows = Math.max(1, Math.floor(fit.h / g));
+      const v = lumOf(prep(sample(img, cols, rows), p), false);
+      let edge = 0, en = 0;
+      const ed = i => { if (v[i] >= 0) { edge += v[i]; en++; } };
+      for (let x = 0; x < cols; x++) { ed(x); ed((rows - 1) * cols + x); }
+      for (let y = 0; y < rows; y++) { ed(y * cols); ed(y * cols + cols - 1); }
+      const inkDark = (en ? edge / en : 255) >= 110 ? !p.invert : !!p.invert;
+      // тень начинается с этой доли тона (0 — только самое тёмное, 1 — всё, кроме чистой бумаги)
+      const t0 = 1 - clamp((p.shadeThr ?? 50) / 100, 0.05, 0.95);
+      const G = g, R2 = (Math.max(step, fontSize * 0.4) * 0.85) ** 2, occ = new Map();
       for (const q of pts) { const key = Math.floor(q.x / G) * 65536 + Math.floor(q.y / G); (occ.get(key) || occ.set(key, []).get(key)).push(q); }
       const near = (x, y) => {
         const gx = Math.floor(x / G), gy = Math.floor(y / G);
@@ -595,21 +601,19 @@ window.Convert = (() => {
         }
         return false;
       };
-      const ox = fit.x + (fit.w - cols * step) / 2, oy = fit.y + (fit.h - rows * step) / 2;
+      const ox = fit.x + (fit.w - cols * g) / 2, oy = fit.y + (fit.h - rows * g) / 2;
       const els = [];
-      const sp = (x, y, f, e) => { if (x >= 0 && x < cols && y < rows) { const i = y * cols + x; if (v[i] >= 0) v[i] += e * f; } };
-      for (let y = 0; y < rows; y++) {
-        const dir = y & 1 ? -1 : 1;
-        for (let t = 0; t < cols; t++) {
-          const x = dir > 0 ? t : cols - 1 - t, val = v[y * cols + x];
-          if (val < 0) continue;
-          const on = val >= 0.5 ? 1 : 0, e = val - on;
-          sp(x + dir, y, 7 / 16, e); sp(x - dir, y + 1, 3 / 16, e); sp(x, y + 1, 5 / 16, e); sp(x + dir, y + 1, 1 / 16, e);
-          if (!on) continue;
-          const cx = ox + (x + 0.5) * step, cy = oy + (y + 0.5) * step;
-          if (near(cx, cy)) continue;
-          els.push({ t: 'glyph', name: shadeCh, x: cx - shadeShape.cx, y: cy - shadeShape.cy });
-        }
+      for (let y = 0; y < rows; y++) for (let x = 0; x < cols; x++) {
+        const val = v[y * cols + x];
+        if (val < 0) continue;
+        const t = inkDark ? 1 - val / 255 : val / 255;
+        if (t <= t0) continue;
+        const u = (t - t0) / (1 - t0);
+        if (hash(x, y, 1) >= k * (0.35 + 0.65 * u)) continue;
+        const cx = ox + (x + 0.5 + (hash(x, y, 2) - 0.5) * 0.6) * g, cy = oy + (y + 0.5 + (hash(x, y, 3) - 0.5) * 0.6) * g;
+        if (near(cx, cy)) continue;
+        const j = Math.min(shadeSet.length - 1, Math.floor(u * shadeSet.length));
+        els.push({ t: 'glyph', name: shadeSet[j], x: cx - shadeShapes[j].cx, y: cy - shadeShapes[j].cy });
       }
       return els;
     };
@@ -624,7 +628,8 @@ window.Convert = (() => {
     // бюджета — это «максимум деталей». Без бюджета шаг только растёт от выбранного вручную.
     // Сначала грубая оценка шага по числу категорий (не больше двух расчётов Canny),
     // потом границы фиксируются и бинпоиском подбирается только шаг расстановки — это быстро.
-    const MIN = 3, budget = p.budget > 0, limit = budget ? p.budget : p.limit > 0 ? p.limit : 0;
+    // minStep — нижняя граница шага у разреженных стилей («Пунктир», «Минимализм»): бюджет их не уплотняет
+    const MIN = Math.max(3, p.minStep || 0), budget = p.budget > 0, limit = budget ? p.budget : p.limit > 0 ? p.limit : 0;
     const floorStep = budget ? MIN : p.step;
     let res = run(budget ? Math.max(MIN, p.startStep || MIN) : p.step);
     if (limit && (res.els.length > limit || (budget && res.step > MIN + 1e-6))) {

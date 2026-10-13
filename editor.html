@@ -14,7 +14,7 @@
 <link rel="icon" href="logo.svg" type="image/svg+xml">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap">
-<link rel="stylesheet" href="style.css?v=38">
+<link rel="stylesheet" href="style.css?v=41">
 <script>
   // тема до первой отрисовки — чтобы не мигало; по умолчанию тёмная, как в макете
   try { document.documentElement.dataset.theme = localStorage.getItem('gp2.theme') || 'dark'; } catch { document.documentElement.dataset.theme = 'dark'; }
@@ -77,6 +77,8 @@
     <button data-view="editor" class="on" data-icon="pencil" role="tab">Редактор</button>
     <button data-view="game" data-icon="eye" role="tab" data-tip="Как в игре · Tab">В игре</button>
   </div>
+  <!-- вкладки: несколько холстов, переключаются без потери правок -->
+  <nav class="float doc-tabs" id="docTabs" aria-label="Холсты" hidden></nav>
   <!-- в превью «В игре»: что под сеткой — фон Доты или свой фон меню (собирается на странице «Фон меню») -->
   <button class="float pill game-bg" id="gameBg" data-icon="image"><span>Фон: как в Dota</span></button>
 
@@ -159,12 +161,12 @@
 <input type="file" id="fileFont" accept=".ttf,.otf,.woff,.woff2" hidden>
 
 <script src="heroes.js?v=37"></script>
-<script src="convert.js?v=37"></script>
+<script src="convert.js?v=39"></script>
 <script src="config.js?v=41"></script>
 <script src="auth.js?v=37"></script>
 <script src="gridrender.js?v=37"></script>
 <script src="catalog-api.js?v=40"></script>
-<script src="app.js?v=38"></script>
-<script src="studio.js?v=37"></script>
+<script src="app.js?v=42"></script>
+<script src="studio.js?v=38"></script>
 </body>
 </html>
