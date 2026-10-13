@@ -30,6 +30,11 @@ body[data-page="profile"] {
 .profile .pf-banner.on + .pf-top { --ov: 46px; align-items: flex-start; margin-top: calc(var(--ov) * -1); }
 .profile .pf-banner.on + .pf-top > .pf-id, .profile .pf-banner.on + .pf-top > .pf-actions { padding-top: calc(var(--ov) + 16px); }
 @keyframes pf-ban-in { from { opacity: 0; transform: scale(1.025); } }
+/* цвет баннера мягко стекает вниз по плитке: картинка ужата в 4 раза, размыта и растянута — остаются только пятна цвета */
+.pf-glow { position: absolute; inset: 0; z-index: 0; overflow: hidden; pointer-events: none; }
+.pf-glow img { position: absolute; top: -4%; left: -4%; width: 27%; height: 27%; object-fit: fill; transform: scale(4); transform-origin: 0 0; filter: blur(16px) saturate(1.6); opacity: .62; -webkit-mask-image: linear-gradient(180deg, #000 40%, #0009 62%, transparent 92%); mask-image: linear-gradient(180deg, #000 40%, #0009 62%, transparent 92%); }
+.profile .pf-banner.on { z-index: 1; }
+.pf-glow ~ .pf-body, .pf-glow ~ .pf-stats { position: relative; z-index: 1; }
 .pf-cover-label { position: absolute; top: 27px; left: 32px; display: inline-flex; align-items: center; gap: 8px; color: #dfbda9; font-size: 12px; letter-spacing: .025em; }
 .pf-cover-label .i { width: 15px; height: 15px; color: var(--accent-hi); }
 .profile .pf-banner-edit { top: 20px; right: 24px; min-height: 36px; border: 1px solid #ffffff20; border-radius: 9px; background: #17131080; font-size: 12px; }

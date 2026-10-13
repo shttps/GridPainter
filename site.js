@@ -2100,6 +2100,7 @@ function profileHead(p, { me, grids = [], backgrounds = [], works = null }) {
   const modBtns = !me && isAdmin() ? `${p.avatar ? `<button class="btn sm ghost danger" data-clear="avatar">${icon('trash')}Убрать аватар</button>` : ''}${p.banner ? `<button class="btn sm ghost danger" data-clear="banner">${icon('trash')}Убрать баннер</button>` : ''}` : '';
   const stat = (n, ic, label) => `<div class="pf-stat">${icon(ic)}<b>${num(n)}</b><span>${label}</span></div>`;
   return `<div class="pf-pagebar"><span class="pf-eyebrow">${me ? 'Личное пространство' : 'Знакомься с автором'}</span><a href="workshop.html">Мастерская ${icon('arrow')}</a></div><section class="pf-head${me ? ' pf-own' : ''}" aria-label="${me ? 'Мой профиль' : 'Профиль автора'}">
+    ${p.banner ? `<div class="pf-glow" aria-hidden="true"><img src="${esc(p.banner)}" alt="" onerror="this.remove()"></div>` : ''}
     <div class="pf-banner${p.banner ? ' on' : ''}">${p.banner ? `<img class="pf-banner-blur" src="${esc(p.banner)}" alt="" aria-hidden="true" onerror="this.remove()"><img class="pf-banner-img" src="${esc(p.banner)}" alt="" onload="this.parentNode.style.aspectRatio = Math.min(5, Math.max(2.5, this.naturalWidth / this.naturalHeight))" onerror="this.remove()">` : ''}
       <div class="pf-cover-art" aria-hidden="true"><i></i><i></i><i></i><span>GRID<br>STUDIO</span></div>
       <span class="pf-cover-label">${icon(me ? 'brush' : 'compass')}${me ? 'Твоя игра. Твой порядок.' : 'Автор Grid Studio'}</span>
@@ -2344,6 +2345,16 @@ async function renderMyProfile(box) {
       try { p = await ACC.updateProfile({ nick: v }); toast('Ник сохранён', 'ok'); } catch (e) { toast(e.message, 'err'); nick.value = p.nick; }
     };
     nick.onkeydown = e => { if (e.key === 'Enter') nick.blur(); };
+    // поле ника — по ширине самого ника, чтобы карандаш стоял сразу за ним
+    const fitNick = () => {
+      const cs = getComputedStyle(nick), c = (fitNick.cx ||= document.createElement('canvas').getContext('2d'));
+      c.font = `${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`; c.letterSpacing = cs.letterSpacing;
+      const pad = parseFloat(cs.paddingLeft) + parseFloat(cs.paddingRight) + parseFloat(cs.borderLeftWidth) + parseFloat(cs.borderRightWidth);
+      nick.style.width = Math.ceil(c.measureText(nick.value || ' ').width + pad + 4) + 'px';
+    };
+    fitNick(); nick.addEventListener('input', fitNick);
+    document.fonts?.ready.then(() => nick.isConnected && fitNick());
+    if (!window.pfNickResize) { window.pfNickResize = true; addEventListener('resize', () => { const n = $('#pfNick'); if (n) n.dispatchEvent(new Event('input')); }); }
     const bio = $('#pfBio');
     if (bio) {
       const fit = () => { bio.style.height = 'auto'; bio.style.height = bio.scrollHeight + 'px'; };
