@@ -219,7 +219,12 @@
       const bob = FX.reduced() ? 0 : Math.sin(t * Math.PI / 2);
       g.save(); g.translate(300, 260 + bob * 1.5 - cheer * 14);
       g.rotate((bob + Math.sin(jolt * 45) * jolt * 14) * Math.PI / 180);
-      g.globalAlpha = .95; g.drawImage(img, -118, -110, 236, 236 * img.naturalHeight / img.naturalWidth); g.restore();
+      // портрет с запасом закрывает всю арку (и при покачивании), чтобы нигде не было видно его прямоугольных краёв
+      g.globalAlpha = .95; g.drawImage(img, -142, -152, 284, 284 * img.naturalHeight / img.naturalWidth); g.restore();
+      // края уходят в темноту камеры: свет только на лице
+      const dark = g.createRadialGradient(300, 248, 50, 300, 262, 175);
+      dark.addColorStop(0, 'rgba(9,8,12,0)'); dark.addColorStop(.6, 'rgba(9,8,12,.35)'); dark.addColorStop(1, 'rgba(9,8,12,.92)');
+      g.fillStyle = dark; g.fillRect(178, 114, 244, 258);
     }
     const shade = g.createLinearGradient(0, 130, 0, 372);
     shade.addColorStop(0, 'rgba(10,8,14,.55)'); shade.addColorStop(.45, 'rgba(10,8,14,0)'); shade.addColorStop(1, 'rgba(10,8,14,.5)');
