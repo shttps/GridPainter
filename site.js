@@ -138,7 +138,7 @@ function renderNav() {
     <a class="logo" href="index.html" aria-label="Grid Studio — на главную">${LOGO}<span>Grid<b>Studio</b></span></a>
     <div class="nav-links" id="navLinks">
       <span class="nav-hl" aria-hidden="true"></span>
-      ${NAV.map(([k, href, ic, label]) => `<a href="${href}"${k === (PAGE === 'grid' || PAGE === 'bg' ? 'workshop' : PAGE === 'game' ? 'arcade' : PAGE) ? ' aria-current="page"' : ''}>${icon(ic)}${label}${k === 'workshop' ? '<b class="nav-badge" data-cat-count hidden></b>' : ''}</a>`).join('')}
+      ${NAV.map(([k, href, ic, label]) => `<a href="${href}"${k === (PAGE === 'grid' || PAGE === 'bg' ? 'workshop' : PAGE === 'game' ? 'arcade' : PAGE) ? ' aria-current="page"' : ''}>${icon(ic)}${label}${k === 'workshop' ? '<b class="nav-badge" data-cat-count hidden></b>' : k === 'background' ? '<b class="nav-badge" data-bg-count hidden></b>' : ''}</a>`).join('')}
       <a href="editor.html" class="nav-studio">${icon('brush')}Редактор${icon('arrow')}</a>
     </div>
     ${SITE.telegram ? `<a class="nav-tg" href="${esc(SITE.telegram)}" target="_blank" rel="noopener" title="Telegram: чат и новости" aria-label="Telegram: чат и новости">${icon('telegram')}<span>Чат и новости</span></a>` : ''}
@@ -372,6 +372,11 @@ function initNav() {
 // число сеток в Мастерской — в меню и в блоках главной
 function setCatCount(total) {
   for (const el of $$('[data-cat-count]')) { el.textContent = num(total); el.hidden = !total && el.classList.contains('nav-badge'); }
+}
+
+// число фонов — бейдж у «Фона меню»
+function setBgCount(total) {
+  for (const el of $$('[data-bg-count]')) { el.textContent = num(total); el.hidden = !total; }
 }
 
 // ---------- полоса снизу: автор, поддержка, Telegram, реклама, GitHub, версия ----------
@@ -2802,3 +2807,5 @@ reveal();
 if (ACC?.enabled && PAGE !== 'profile') ACC.ready();
 // число сеток в меню на страницах, где Мастерская сама его не грузит
 if (PAGE === 'guides' || PAGE === 'game' || PAGE === 'arcade' || PAGE === 'profile' || PAGE === 'grid' || PAGE === 'bg') API.list({ limit: 1 }).then(r => setCatCount(r.total)).catch(() => {});
+// число фонов в меню — на каждой странице
+API.bg.list({ limit: 1 }).then(r => setBgCount(r.total)).catch(() => {});
