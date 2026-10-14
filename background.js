@@ -13,9 +13,28 @@
     tab: 'menu', screen: DotaBG.SCREENS.includes(pref.screen) ? pref.screen : DotaBG.guessScreen(),
     look: { fit: pref.fit === 'contain' ? 'contain' : 'cover', blur: 0, dim: 0 }, clean: !!pref.clean,
     grid: ['editor', 'workshop', 'none'].includes(pref.grid) ? pref.grid : 'editor',
-    blob: null, kind: '', name: '', bg: null, start: 0, el: null, cats: null, gridName: '', busy: false,
+    blob: null, kind: '', name: '', bg: null, start: 0, el: null, cats: null, gridName: '', busy: false, touched: false, built: false,
   };
   const cv = $('#bgbCanvas'), ctx = cv.getContext('2d'), screenBox = $('#bgbScreen');
+  // шаги в шапке: 1 — файл, 2 — настройки (не обязательны), 3 — сборка
+  const main = $('.bgb');
+  function setStep() {
+    const f = !!st.blob, t = st.touched, b = st.built;
+    main.dataset.step = b ? 3 : f ? 2 : 1;
+    const state = { 1: f ? 'done' : 'now', 2: !f ? '' : t || b ? 'done' : 'now', 3: b ? 'done' : f ? 'now' : '' };
+    $$('#bgbSteps li').forEach(li => { li.className = state[li.dataset.s]; });
+  }
+  const touch = () => { if (st.blob && !st.touched) { st.touched = true; setStep(); } };
+  $('#bgbSteps').onclick = e => {
+    const b = e.target.closest('[data-go]'); if (!b) return;
+    if (b.dataset.go === 'bgbGFile' && !st.blob) { $('#bgbFile').click(); return; }
+    const g = $('#' + b.dataset.go);
+    g.scrollIntoView({ behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'nearest' });
+    g.classList.remove('flash'); void g.offsetWidth; g.classList.add('flash');
+  };
+  // блик по экрану при смене фона, вкладки или пропорций; шторка — при новом фоне
+  const replay = (el, cls) => { el.classList.remove(cls); void el.offsetWidth; el.classList.add(cls); };
+  glyphField($('#bgbGlyphs'), { ox: 0.5, oy: 0.05, rx: 0.85, ry: 0.95, cx: 0.5, cy: 0.1, alpha: 0.7 });
   const saveTimer = () => { try { localStorage.setItem('gs.dotabg', JSON.stringify({ ...pref, screen: st.screen, fit: st.look.fit, clean: st.clean, grid: st.grid })); } catch {} };
 
   // ---------- переключатели ----------
@@ -27,19 +46,22 @@
   };
   const relayout = () => ['#bgbTabs', '#bgbScreens', '#bgbFit', '#bgbGrid'].forEach(s => segInd($(s)));
   document.fonts?.ready.then(relayout); addEventListener('resize', relayout);
-  seg($('#bgbTabs'), st.tab, v => { st.tab = v; showTab(); });
-  seg($('#bgbScreens'), st.screen, v => { st.screen = v; saveTimer(); fitScreen(); });
-  seg($('#bgbFit'), st.look.fit, v => { st.look.fit = v; $('#bgbFitNote').textContent = v === 'cover' ? 'края обрежутся, без чёрных полос' : 'вся картинка, по бокам чёрное'; saveTimer(); paint(); });
-  seg($('#bgbGrid'), st.grid, v => { if (v === 'workshop') { openGridPicker(); return false; } st.grid = v; saveTimer(); loadGrid(); });
+  seg($('#bgbTabs'), st.tab, v => { if (st.tab !== v) replay(screenBox, 'swap'); st.tab = v; showTab(); });
+  seg($('#bgbScreens'), st.screen, v => { if (st.screen !== v) replay(screenBox, 'swap'); st.screen = v; touch(); saveTimer(); fitScreen(); });
+  seg($('#bgbFit'), st.look.fit, v => { if (st.look.fit !== v) replay(screenBox, 'swap'); st.look.fit = v; touch(); $('#bgbFitNote').textContent = v === 'cover' ? 'края обрежутся, без чёрных полос' : 'вся картинка, по бокам чёрное'; saveTimer(); paint(); });
+  seg($('#bgbGrid'), st.grid, v => { if (v === 'workshop') { openGridPicker(); return false; } st.grid = v; touch(); saveTimer(); loadGrid(); });
   $('#bgbFitNote').textContent = st.look.fit === 'cover' ? 'края обрежутся, без чёрных полос' : 'вся картинка, по бокам чёрное';
   const pct = v => v ? Math.round(v * 100) + ' %' : 'нет';
   for (const k of ['blur', 'dim']) {
     const r = $(k === 'blur' ? '#bgbBlur' : '#bgbDim'), out = $(k === 'blur' ? '#bgbBlurV' : '#bgbDimV');
-    r.oninput = () => { st.look[k] = +r.value; out.textContent = pct(+r.value); r.style.setProperty('--range-fill', `${+r.value * 100}%`); paint(); };
+    r.oninput = () => {
+      st.look[k] = +r.value; out.textContent = pct(+r.value); r.style.setProperty('--range-fill', `${+r.value * 100}%`);
+      out.classList.toggle('on', +r.value > 0); replay(out, 'pop'); touch(); paint();
+    };
   }
   const clean = $('#bgbClean');
   clean.checked = st.clean;
-  clean.onchange = () => { st.clean = clean.checked; saveTimer(); $('#bgbNews').hidden = st.clean; };
+  clean.onchange = () => { st.clean = clean.checked; touch(); saveTimer(); $('#bgbNews').hidden = st.clean; };
   $('#bgbNews').hidden = st.clean;
   const myScreen = DotaBG.guessScreen();
   const noteScreen = () => { $('#bgbScreenNote').textContent = st.screen === myScreen ? 'как у этого монитора' : `у этого монитора ${myScreen}`; };
@@ -206,7 +228,8 @@
     // GIF в <img> анимируется сам — перерисовываем его постоянно, как видео
     if (kind === 'gif') { const tick = () => { if (st.el !== el) return; paint(); setTimeout(() => requestAnimationFrame(tick), 60); }; tick(); }
     $('#bgbDrop').classList.add('has');
-    screenBox.classList.add('has-media');
+    replay(screenBox, 'reveal'); replay(screenBox, 'swap');
+    st.built = false; setStep();
     $('#bgbBuild').disabled = false;
     $('#bgbPublish').hidden = !!bg;
     $('#bgbSrc').innerHTML = bg ? `${icon('compass')}«${esc(bg.title)}» из <a href="bg.html?id=${encodeURIComponent(bg.id)}">Мастерской</a>` : `${icon('file')}${esc(name.length > 40 ? name.slice(0, 38) + '…' : name)} · ${mb(blob.size)}`;
@@ -224,7 +247,8 @@
     r.max = Math.max(0, D - 1).toFixed(1); r.value = 0; r.disabled = D <= DotaBG.LIMIT.seconds;
     const time = s => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
     const label = () => { $('#bgbTime').textContent = `${time(st.start)}–${time(st.start + len())}${D > DotaBG.LIMIT.seconds ? ` из ${time(D)}` : ''}`; };
-    r.oninput = () => { st.start = +r.value; el.currentTime = st.start; label(); paint(); };
+    r.oninput = () => { st.start = +r.value; el.currentTime = st.start; r.style.setProperty('--range-fill', `${+r.value / (+r.max || 1) * 100}%`); label(); touch(); paint(); };
+    r.style.setProperty('--range-fill', '0%');
     el.ontimeupdate = () => { if (el.currentTime >= st.start + len() - 0.05 || el.currentTime < st.start - 0.5) el.currentTime = st.start; };
     el.onended = () => { el.currentTime = st.start; el.play().catch(() => {}); };
     el.onplay = kick; el.onseeked = paint;
@@ -284,6 +308,7 @@
       const res = await job.done;
       saveBlob('pak02_dir.vpk', res.blob);
       saveMine();
+      st.built = true; setStep();
       if (st.bg) API.bg.hit(st.bg.id);
       const m = openSheet(`<div class="sh-body db-body"><div class="sh-ico">${icon('check')}</div><h2>Файл скачан</h2>
         <p class="db-lead"><code>pak02_dir.vpk</code> · ${mb(res.blob.size)}. Осталось положить его в папку Доты:</p>
@@ -301,6 +326,6 @@
   $('#bgbPublish').onclick = () => openBgUpload(null, st.blob && !st.bg ? new File([st.blob], st.name || 'background', { type: st.blob.type }) : null);
   fillMenuDate(document);
 
-  fitScreen(); showTab(); applyIcons();
+  fitScreen(); showTab(); setStep(); applyIcons();
   if (qs.get('bg')) fromWorkshop(qs.get('bg'));
 })();
