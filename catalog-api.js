@@ -382,6 +382,16 @@ window.CatalogAPI = (() => {
     }),
   };
 
+  // вошёл в аккаунт — сетки, выложенные из этого браузера без входа, переходят в профиль (раз на аккаунт в этом браузере)
+  if (remote && cfg.accounts && window.Accounts?.enabled) {
+    const claim = async () => {
+      const uid = window.Accounts.user()?.id; if (!uid || load('gs.claimed', []).includes(uid) || !mine.size) return;
+      try { await rpc('claim_grids', { p_key: browserKey }); save('gs.claimed', [...load('gs.claimed', []), uid]); }
+      catch { /* в базе ещё нет claim_grids — попробуем в следующий раз */ }
+    };
+    window.Accounts.onChange(claim); setTimeout(claim, 1500);
+  }
+
   // буст огонька: игрок сам выбирает, какие свои сетки поднять в «Популярных» (места — по длине серии, см. schema.sql)
   const oldBase = e => { throw /boosted_at|set_boost/.test(e.message) ? new Error('Сначала выполни свежий supabase/schema.sql — в базе ещё нет выбора сеток для буста.') : e; };
   const boosts = {

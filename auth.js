@@ -129,12 +129,12 @@ window.Accounts = (() => {
     if (!p) p = (await prest('/profiles?select={cols}', { method: 'POST', headers: { Prefer: 'return=representation' },
       body: { id: u.id, nick: (u.meta.name || 'Игрок ' + u.id.replace(/-/g, '').slice(0, 4).toUpperCase()).slice(0, 32), avatar: /^https:\/\//.test(u.meta.avatar) ? u.meta.avatar.slice(0, 500) : '' } }))[0];
     admin = await isAdminId(u.id); save('gs.admin', admin);
-    profile = p; save('gs.profile', p); emit();
+    profile = p; save('gs.profile', p); people.set(p.id, Promise.resolve(p)); emit();   // свои работы — сразу под текущим ником
     return p;
   }
   async function updateProfile(fields) {
     const p = (await prest(`/profiles?id=eq.${session.user.id}&select={cols}`, { method: 'PATCH', headers: { Prefer: 'return=representation' }, body: fields }))[0];
-    profile = p; save('gs.profile', p); emit();
+    profile = p; save('gs.profile', p); people.set(p.id, Promise.resolve(p)); emit();   // свои работы — сразу под текущим ником
     // сменили аватар или баннер — старый файл из бакета больше не нужен
     if ('avatar' in fields || 'banner' in fields) tidyMedia();
     return p;

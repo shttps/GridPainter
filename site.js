@@ -107,15 +107,20 @@ function avatarHTML(url, nick, cls = 'ava') {
 }
 // аватары авторов на карточках и в окнах: разметка с data-uid, картинки подтягиваются пачкой (fillAvatars)
 const authorAva = (uid, nick) => uid && ACC?.enabled ? avatarHTML('', nick, 'ava gava').replace('<span class="ava gava"', `<span class="ava gava" data-uid="${esc(uid)}"`) : avatarHTML('', nick, 'ava gava');
+// имя автора у работы: в базе лежит ник на момент публикации, а показываем текущий ник из профиля (fillAvatars)
+const nickHTML = (uid, nick) => uid && ACC?.enabled ? `<span data-nick="${esc(uid)}">${esc(nick)}</span>` : esc(nick);
 async function fillAvatars() {
   if (!ACC?.enabled) return;
-  const els = $$('[data-uid]:not([data-av])'); if (!els.length) return;
+  const els = $$('[data-uid]:not([data-av])'), names = $$('[data-nick]:not([data-nk])');
+  if (!els.length && !names.length) return;
   for (const el of els) el.dataset.av = '1';
-  const map = await ACC.authors(els.map(el => el.dataset.uid));
+  for (const el of names) el.dataset.nk = '1';
+  const map = await ACC.authors([...els.map(el => el.dataset.uid), ...names.map(el => el.dataset.nick)]);
   for (const el of els) {
     const a = map.get(el.dataset.uid)?.avatar;
     if (a && el.isConnected) el.innerHTML = `<img src="${esc(a)}" alt="${esc(el.textContent)}" referrerpolicy="no-referrer" onerror="this.parentNode.textContent=this.alt">`;
   }
+  for (const el of names) { const n = map.get(el.dataset.nick)?.nick?.trim(); if (n && el.isConnected) el.textContent = n; }
 }
 const isAdmin = () => !!ACC?.enabled && ACC.isAdmin();
 // «Угадайка»: номер дня — сколько дней прошло с запуска игры (по местному времени), с единицы
@@ -635,7 +640,7 @@ function cardHTML(g, k = 0) {
       ${g.nsfw ? '<span class="g18">18+</span>' : ''}${boostHTML(g)}${hide ? nsfwCover() : ''}</span>
     <div class="ginfo">
       <div class="gmain"><a class="gtitle" href="${gridUrl(g.id)}" title="${esc(g.title)}">${esc(g.title)}</a>
-        <span class="gby">${authorAva(g.user_id, g.author)}${esc(g.author)}<i>· ${ago(g.created_at)}</i></span></div>
+        <span class="gby">${authorAva(g.user_id, g.author)}${nickHTML(g.user_id, g.author)}<i>· ${ago(g.created_at)}</i></span></div>
       <div class="gacts"><span class="gdl" title="Скачали: ${num(g.downloads)}">${icon('download')}${num(g.downloads)}</span>
         <button class="glike${API.isLiked(g.id) ? ' liked' : ''}" data-grid-like="${esc(g.id)}" data-likes aria-label="Лайк">${icon('heart')}${num(g.likes)}</button></div>
     </div>
@@ -829,7 +834,7 @@ async function initGridPage() {
   const uniq = new Set(cats.flatMap(c => Array.isArray(c.hero_ids) ? c.hero_ids : [])).size;
   const size = new Blob([gridJSON(g, cats)]).size;
   const kind = API.KINDS[g.kind] || 'Сетка', hide = g.nsfw && !API.adult();
-  const author = g.user_id && ACC?.enabled ? `<a href="profile.html?u=${encodeURIComponent(g.user_id)}">${esc(g.author)}</a>` : `<b>${esc(g.author)}</b>`;
+  const author = g.user_id && ACC?.enabled ? `<a href="profile.html?u=${encodeURIComponent(g.user_id)}">${nickHTML(g.user_id, g.author)}</a>` : `<b>${esc(g.author)}</b>`;
   const liked = () => API.isLiked(g.id);
   document.title = `${g.title} — сетка героев Dota 2 · Grid Studio`;
   $('meta[name="description"]').content = `«${g.title}» от ${g.author}: ${kind.toLowerCase()}, ${num(g.cats)} ${plural(g.cats, 'категория', 'категории', 'категорий')}. Живое превью, скачивание и правка в редакторе Grid Studio.`;
@@ -1715,7 +1720,7 @@ function bgCardHTML(b, k = 0) {
     </div>
     <div class="bbody">
       <a class="btitle" href="${bgPageUrl(b.id)}" title="${esc(b.title)}">${esc(b.title)}</a>
-      <span class="bby">${authorAva(b.user_id, b.author || 'Игрок')}<span>${esc(b.author || 'Игрок')} · ${ago(b.created_at)}</span></span>
+      <span class="bby">${authorAva(b.user_id, b.author || 'Игрок')}<span>${nickHTML(b.user_id, b.author || 'Игрок')} · ${ago(b.created_at)}</span></span>
       <div class="bacts">
         <button class="blike${API.bg.isLiked(b.id) ? ' liked' : ''}" data-bg-like="${esc(b.id)}" data-likes aria-label="Лайк">${icon('heart')}${num(b.likes)}</button>
         <a class="btn sm" href="background.html?bg=${encodeURIComponent(b.id)}" data-bg-dota title="Поставить на главный экран Доты: превью с сеткой и сборка">${icon('download')}В Dota</a>
@@ -1766,7 +1771,7 @@ async function initBgPage() {
 
   const video = b.kind === 'video', type = video ? 'Видео' : /\.gif$/i.test(b.file) ? 'GIF' : 'Картинка';
   const hide = b.nsfw && !API.adult(), aspect = b.aspect === 'other' ? `${b.width}×${b.height}` : b.aspect;
-  const author = b.user_id && ACC?.enabled ? `<a href="profile.html?u=${encodeURIComponent(b.user_id)}">${esc(b.author || 'Игрок')}</a>` : `<b>${esc(b.author || 'Игрок')}</b>`;
+  const author = b.user_id && ACC?.enabled ? `<a href="profile.html?u=${encodeURIComponent(b.user_id)}">${nickHTML(b.user_id, b.author || 'Игрок')}</a>` : `<b>${esc(b.author || 'Игрок')}</b>`;
   document.title = `${b.title} — фон главного меню Dota 2 · Grid Studio`;
   $('meta[name="description"]').content = `«${b.title}» — ${type.toLowerCase()} для главного меню Dota 2, ${aspect}. Посмотри в схеме меню, скачай файл или собери фон для игры в Grid Studio.`;
   const media = video

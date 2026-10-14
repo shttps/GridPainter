@@ -815,3 +815,55 @@ language sql stable security definer set search_path = public as $$
 $$;
 revoke all on function public.my_boost() from public, anon;
 grant execute on function public.my_boost() to authenticated;
+
+-- ---------- Ник автора у работ всегда текущий ----------
+-- В grids.author и backgrounds.author ник записывается при публикации. Сменил ник в профиле — работы переименовываются,
+-- а у новых сеток, выложенных из аккаунта, автор всегда берётся из профиля. Анонимные сетки (без user_id) не трогаем.
+create or replace function public.sync_author_nick() returns trigger
+language plpgsql security definer set search_path = public as $$
+begin
+  if btrim(new.nick) <> '' and new.nick is distinct from old.nick then
+    update grids set author = new.nick where user_id = new.id and author <> new.nick;
+    update backgrounds set author = new.nick where user_id = new.id and author <> new.nick;
+  end if;
+  return new;
+end $$;
+drop trigger if exists profiles_sync_author on public.profiles;
+create trigger profiles_sync_author after update of nick on public.profiles
+  for each row execute function public.sync_author_nick();
+
+create or replace function public.grid_author_from_profile() returns trigger
+language plpgsql security definer set search_path = public as $$
+declare v_nick text;
+begin
+  if new.user_id is not null then
+    select nullif(btrim(nick), '') into v_nick from profiles where id = new.user_id;
+    if v_nick is not null then new.author := v_nick; end if;
+  end if;
+  return new;
+end $$;
+drop trigger if exists grids_author_from_profile on public.grids;
+create trigger grids_author_from_profile before insert on public.grids
+  for each row execute function public.grid_author_from_profile();
+
+-- разово: уже выложенные работы — под текущим ником
+update public.grids g set author = p.nick from public.profiles p
+  where g.user_id = p.id and btrim(p.nick) <> '' and g.author <> p.nick;
+update public.backgrounds b set author = p.nick from public.profiles p
+  where b.user_id = p.id and btrim(p.nick) <> '' and b.author <> p.nick;
+
+-- Сетки, выложенные из браузера до входа в аккаунт: войдя, игрок забирает их в свой профиль.
+-- Доказательство — ключ браузера, которым сетку выкладывали (тот же, что даёт право удалить её). Чужие привязанные не трогаем.
+create or replace function public.claim_grids(p_key uuid) returns int
+language plpgsql security definer set search_path = public as $$
+declare v_nick text; v_n int;
+begin
+  if auth.uid() is null or p_key is null then return 0; end if;
+  select nullif(btrim(nick), '') into v_nick from profiles where id = auth.uid();
+  update grids g set user_id = auth.uid(), author = coalesce(v_nick, g.author)
+    where g.user_id is null and exists (select 1 from grid_owners o where o.grid_id = g.id and o.key = p_key);
+  get diagnostics v_n = row_count;
+  return v_n;
+end $$;
+revoke all on function public.claim_grids(uuid) from public, anon;
+grant execute on function public.claim_grids(uuid) to authenticated;
