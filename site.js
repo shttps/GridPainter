@@ -550,6 +550,8 @@ function gridFacts(g) {
   return g.heroes ? `${kind} · ${num(g.cats)} кат. · ${num(g.heroes)} ${plural(g.heroes, 'герой', 'героя', 'героев')}`
     : `${kind} · ${num(g.cats)} ${plural(g.cats, 'категория', 'категории', 'категорий')}`;
 }
+// огонёк автора: в «Популярных» сетка идёт выше (score из вью grids_ranked = лайки + буст за серию)
+const boostHTML = g => { const b = g.score - g.likes; return b > 0 ? `<span class="gboost" title="${esc(`У автора горит огонёк — в «Популярных» сетка идёт выше, как будто у неё на ${b} ${plural(b, 'лайк', 'лайка', 'лайков')} больше`)}"><i class="ns-flame">${FLAME}</i>+${b}</span>` : ''; };
 function cardHTML(g, k = 0) {
   const hide = g.nsfw && !API.adult();
   return `<article class="gcard${hide ? ' hide18' : ''}" data-id="${esc(g.id)}" tabindex="0" style="animation-delay:${Math.min(k, 12) * 40}ms">
@@ -559,7 +561,7 @@ function cardHTML(g, k = 0) {
     <div class="ginfo">
       <div class="gmain"><a class="gtitle" href="${gridUrl(g.id)}" title="${esc(g.title)}">${esc(g.title)}</a>
         <span class="gby">${authorAva(g.user_id, g.author)}${esc(g.author)}<i>· ${ago(g.created_at)}</i></span></div>
-      <div class="gacts"><span class="gdl" title="Скачали: ${num(g.downloads)}">${icon('download')}${num(g.downloads)}</span>
+      <div class="gacts">${boostHTML(g)}<span class="gdl" title="Скачали: ${num(g.downloads)}">${icon('download')}${num(g.downloads)}</span>
         <button class="glike${API.isLiked(g.id) ? ' liked' : ''}" data-grid-like="${esc(g.id)}" data-likes aria-label="Лайк">${icon('heart')}${num(g.likes)}</button></div>
     </div>
     <div class="gfoot"><span>${gridFacts(g)}</span>${g.tags?.length ? `<span class="gtagline">${g.tags.map(esc).join(', ')}</span>` : ''}</div>
@@ -620,7 +622,7 @@ document.addEventListener('click', e => { if (e.target.closest('[data-bg-dota]')
 // наведение на карточки (главная, Мастерская, профиль): наклон за курсором, свет и параллакс превью — стили в конце site.css.
 // Курсор задаёт цель, а значения догоняют её экспоненциально в одном rAF на все карточки — без рывков на любом fps.
 // Большие плитки наклоняются слабее: угол делится на ширину. При «меньше анимации» остаётся только свет.
-const TILT = { home: '.fcard, .fwide, .gcard:not(.sk), .guide-card.in, .tile.in:not(.t-compare)', workshop: '.gcard:not(.sk), .bcard', profile: '.gcard:not(.sk), .bcard, .ach-item' }[PAGE];
+const TILT = { home: '.fcard, .fwide, .gcard:not(.sk), .guide-card.in, .tile.in:not(.t-compare)', workshop: '.gcard:not(.sk), .bcard, .ws-head', profile: '.gcard:not(.sk), .bcard, .ach-item' }[PAGE];
 if (TILT && matchMedia('(hover: hover) and (pointer: fine)').matches) {
   const calm = matchMedia('(prefers-reduced-motion: reduce)'), live = new Map();
   let raf = 0, last = 0;

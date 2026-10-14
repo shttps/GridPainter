@@ -129,6 +129,7 @@ window.CatalogAPI = (() => {
       if (conds.length) p.set('and', `(${conds.join(',')})`);
       // в «популярных» сетки игроков с горящим огоньком идут выше (вью grids_ranked: лайки + буст за серию)
       const ranked = rankView && (sort === 'popular' || sort === 'week');
+      if (ranked) p.set('select', cols() + ',score');
       p.set('order', ranked ? 'score.desc,likes.desc,created_at.desc' : sort === 'popular' || sort === 'week' ? 'likes.desc,created_at.desc' : sort === 'downloads' ? 'downloads.desc,created_at.desc' : 'created_at.desc');
       p.set('offset', offset); p.set('limit', limit);
       return { p, table: ranked ? 'grids_ranked' : 'grids' };
