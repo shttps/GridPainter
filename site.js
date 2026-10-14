@@ -195,22 +195,10 @@ const STREAK_TIERS = [[1, 'Угольки', 'Только разгорается
 const STREAK_GOALS = [3, 7, 30, 100, 365];
 // награда за серию: опубликованные сетки получают «виртуальные лайки» в сортировке «Популярные» (вью grids_ranked в supabase/schema.sql)
 const streakBoost = n => n >= 30 ? 20 : n >= 7 ? 8 : n >= 3 ? 3 : 0;
-function openStreak(s) {
-  const n = s.streak, t = streakTier(n), [, tname, tnote] = STREAK_TIERS[t - 1];
-  const goal = STREAK_GOALS.find(g => g > n), from = [...STREAK_GOALS].reverse().find(g => g <= n) || 0;
-  const goalText = !goal ? 'Ты дошёл до вершины — просто не дай ему погаснуть'
-    : goal === 3 ? `Ещё ${daysText(goal - n)} — и угольки станут огнём`
-    : goal === 7 ? `Ещё ${daysText(goal - n)} — и огонь станет пламенем`
-    : goal === 30 ? `Ещё ${daysText(goal - n)} — и пламя станет синим`
-    : `Ещё ${daysText(goal - n)} до отметки в ${goal} ${plural(goal, 'день', 'дня', 'дней')}`;
-  // неделя, которая кончается сегодня: горят дни, что входят в серию
-  const WD = ['Вс', 'Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб'];
-  const week = Array.from({ length: 7 }, (_, i) => { const d = new Date(); d.setDate(d.getDate() - (6 - i)); return { wd: WD[d.getDay()], on: 6 - i < n, today: i === 6 }; });
+// большое живое пламя с искрами; цвета — из --f0/--f1/--f2/--glow окна
+function fireHTML() {
   const embers = Array.from({ length: 14 }, () => `<i style="--x:${(Math.random() * 90 - 45).toFixed(0)}px;--dx:${(Math.random() * 40 - 20).toFixed(0)}px;--dl:${(Math.random() * 2.4).toFixed(2)}s;--du:${(1.8 + Math.random() * 1.6).toFixed(2)}s;--sz:${(2 + Math.random() * 3).toFixed(1)}px"></i>`).join('');
-  const msg = n === 1 ? (s.prev > 1 ? `Серия на ${daysText(s.prev)} прервалась, но огонёк уже снова горит. Заходи завтра!` : 'Огонёк только зажёгся. Заходи завтра — станет 2.')
-    : `Ты заходишь на Grid Studio ${daysText(n)} подряд. Загляни завтра, чтобы он не погас!`;
-  const m = openSheet(`<div class="sh-body streak-sheet t${t}">
-    <div class="sk-fire" aria-hidden="true">
+  return `<div class="sk-fire" aria-hidden="true">
       <i class="sk-glow"></i><span class="sk-embers">${embers}</span>
       <svg class="sk-flame" viewBox="0 0 120 150">
         <defs>
@@ -222,7 +210,36 @@ function openStreak(s) {
         <path class="sk-l2" fill="url(#skG2)" d="M60 46c6 18 32 30 32 58a32 32 0 01-64 0c0-15 9-24 15-29 1.5 9 5 15 11 17-1-16 1-32 6-46z"/>
         <path class="sk-l3" fill="url(#skG3)" d="M60 86c4 11 18 18 18 33a18 18 0 01-36 0c0-9 5-14 9-17 1 5 3 8 6 9 0-9 1-17 3-25z"/>
       </svg>
-    </div>
+    </div>`;
+}
+// окно «что за буст»: по клику на значок на карточке. Серию автора мы не знаем — только размер буста, по нему и ступень.
+const BOOST_STEPS = [[3, 'от 3 дней'], [8, 'от 7 дней'], [20, 'от 30 дней']];
+function openBoost(b, author, mine) {
+  const t = b >= 20 ? 4 : b >= 8 ? 3 : 2, me = ACC?.enabled && ACC.user();
+  openSheet(`<div class="sh-body streak-sheet boost-sheet t${t}">
+    ${fireHTML()}
+    <b class="sk-num">+${b}</b>
+    <span class="sk-label">буст огонька</span>
+    <p class="sk-msg">${mine ? 'Ты заходишь на Grid Studio каждый день, поэтому в «Популярных» твоя сетка стоит выше' : `${esc(author || 'Автор')} заходит на Grid Studio каждый день, поэтому в «Популярных» эта сетка стоит выше`} — как будто у неё на ${b} ${plural(b, 'лайк', 'лайка', 'лайков')} больше. Настоящие лайки не меняются.</p>
+    <div class="bst-steps">${BOOST_STEPS.map(([v, txt], i) => `<span class="${v === b ? 'on' : ''}" style="--i:${i}"><b>+${v}</b><small>${txt} подряд</small></span>`).join('')}</div>
+    <div class="sk-boost on"><span>${mine ? 'Пропустишь' : 'Пропустит'} день — огонёк погаснет, и буст пропадёт, пока серия снова не наберётся.${mine ? '' : me ? ' Твой огонёк — рядом с ником в меню сверху.' : ' Войди и заходи каждый день — твои сетки тоже поднимутся.'}</span></div>
+  </div>`);
+}
+function openStreak(s) {
+  const n = s.streak, t = streakTier(n), [, tname, tnote] = STREAK_TIERS[t - 1];
+  const goal = STREAK_GOALS.find(g => g > n), from = [...STREAK_GOALS].reverse().find(g => g <= n) || 0;
+  const goalText = !goal ? 'Ты дошёл до вершины — просто не дай ему погаснуть'
+    : goal === 3 ? `Ещё ${daysText(goal - n)} — и угольки станут огнём`
+    : goal === 7 ? `Ещё ${daysText(goal - n)} — и огонь станет пламенем`
+    : goal === 30 ? `Ещё ${daysText(goal - n)} — и пламя станет синим`
+    : `Ещё ${daysText(goal - n)} до отметки в ${goal} ${plural(goal, 'день', 'дня', 'дней')}`;
+  // неделя, которая кончается сегодня: горят дни, что входят в серию
+  const WD = ['Вс', 'Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб'];
+  const week = Array.from({ length: 7 }, (_, i) => { const d = new Date(); d.setDate(d.getDate() - (6 - i)); return { wd: WD[d.getDay()], on: 6 - i < n, today: i === 6 }; });
+  const msg = n === 1 ? (s.prev > 1 ? `Серия на ${daysText(s.prev)} прервалась, но огонёк уже снова горит. Заходи завтра!` : 'Огонёк только зажёгся. Заходи завтра — станет 2.')
+    : `Ты заходишь на Grid Studio ${daysText(n)} подряд. Загляни завтра, чтобы он не погас!`;
+  const m = openSheet(`<div class="sh-body streak-sheet t${t}">
+    ${fireHTML()}
     <b class="sk-num" data-to="${n}">0</b>
     <span class="sk-label">${plural(n, 'день', 'дня', 'дней')} подряд</span>
     <span class="sk-tier">${esc(tname)} · ${esc(tnote)}</span>
@@ -551,17 +568,18 @@ function gridFacts(g) {
     : `${kind} · ${num(g.cats)} ${plural(g.cats, 'категория', 'категории', 'категорий')}`;
 }
 // огонёк автора: в «Популярных» сетка идёт выше (score из вью grids_ranked = лайки + буст за серию)
-const boostHTML = g => { const b = g.score - g.likes; return b > 0 ? `<span class="gboost" title="${esc(`У автора горит огонёк — в «Популярных» сетка идёт выше, как будто у неё на ${b} ${plural(b, 'лайк', 'лайка', 'лайков')} больше`)}"><i class="ns-flame">${FLAME}</i>+${b}</span>` : ''; };
+const BOOST_ICO = '<svg viewBox="0 0 24 24" aria-hidden="true"><path class="bi-tail" d="M9.6 15.2h4.8c0 3.4-1.2 5.6-2.4 7-1.2-1.4-2.4-3.6-2.4-7z"/><path class="bi-arrow" d="M12 1.8l7 8.2h-4.4v4.6H9.4V10H5z"/></svg>';
+const boostHTML = g => { const b = g.score - g.likes; return b > 0 ? `<button class="gboost" data-boost="${b}" title="Буст огонька — нажми, чтобы узнать" aria-label="${esc(`Буст огонька +${b}: что это?`)}">${BOOST_ICO}<b>+${b}</b></button>` : ''; };
 function cardHTML(g, k = 0) {
   const hide = g.nsfw && !API.adult();
   return `<article class="gcard${hide ? ' hide18' : ''}" data-id="${esc(g.id)}" tabindex="0" style="animation-delay:${Math.min(k, 12) * 40}ms">
     <span class="gthumb" data-live="${esc(g.id)}"><canvas aria-hidden="true"></canvas><span class="g-load">Загружаем сетку…</span>
       ${API.isMine(g.id, g.user_id) ? '<span class="gmine">моя</span>' : ''}
-      ${g.nsfw ? '<span class="g18">18+</span>' : ''}${hide ? nsfwCover() : ''}</span>
+      ${g.nsfw ? '<span class="g18">18+</span>' : ''}${boostHTML(g)}${hide ? nsfwCover() : ''}</span>
     <div class="ginfo">
       <div class="gmain"><a class="gtitle" href="${gridUrl(g.id)}" title="${esc(g.title)}">${esc(g.title)}</a>
         <span class="gby">${authorAva(g.user_id, g.author)}${esc(g.author)}<i>· ${ago(g.created_at)}</i></span></div>
-      <div class="gacts">${boostHTML(g)}<span class="gdl" title="Скачали: ${num(g.downloads)}">${icon('download')}${num(g.downloads)}</span>
+      <div class="gacts"><span class="gdl" title="Скачали: ${num(g.downloads)}">${icon('download')}${num(g.downloads)}</span>
         <button class="glike${API.isLiked(g.id) ? ' liked' : ''}" data-grid-like="${esc(g.id)}" data-likes aria-label="Лайк">${icon('heart')}${num(g.likes)}</button></div>
     </div>
     <div class="gfoot"><span>${gridFacts(g)}</span>${g.tags?.length ? `<span class="gtagline">${g.tags.map(esc).join(', ')}</span>` : ''}</div>
@@ -616,6 +634,13 @@ document.addEventListener('click', async e => {
     b.classList.toggle('liked', r.liked); b.lastChild.textContent = num(r.likes);
   } catch (er) { toast(er.message, 'err'); }
   b.disabled = false;
+}, true);
+// значок буста на карточке открывает окно с объяснением, а не страницу сетки
+document.addEventListener('click', e => {
+  const b = e.target.closest('[data-boost]'); if (!b) return;
+  e.stopPropagation(); e.preventDefault();
+  const c = b.closest('.gcard');
+  openBoost(+b.dataset.boost, $('.gby', c)?.textContent.split('·')[0].trim(), !!$('.gmine', c));
 }, true);
 // «В Dota» на карточке фона — просто ссылка в сборщик: страницу фона при этом не открываем
 document.addEventListener('click', e => { if (e.target.closest('[data-bg-dota]') && !e.target.closest('.hide18')) e.stopPropagation(); }, true);
