@@ -2049,13 +2049,34 @@ function openBgUpload(onDone, initial = null) {
     go.disabled = true;
     const bar = $('#upBar', m.root); bar.hidden = false;
     try {
-      await API.bg.upload({ file, poster: info.poster, meta: { title, tags: [...tags], nsfw: $('#up18', m.root).checked, aspect: info.aspect, width: info.w, height: info.h, duration: info.duration } },
+      const id = await API.bg.upload({ file, poster: info.poster, meta: { title, tags: [...tags], nsfw: $('#up18', m.root).checked, aspect: info.aspect, width: info.w, height: info.h, duration: info.duration } },
         p => { $('i', bar).style.width = Math.round(p * 100) + '%'; });
-      m.close(); toast(`«${title}» в Мастерской`, 'ok');
+      bgPublished(m, { id, title, preview: info.preview });
       onDone && onDone();
     } catch (e) { toast(e.message, 'err'); go.disabled = false; bar.hidden = true; }
   };
   return m;
+}
+
+// фон выложен: окно загрузки превращается в поздравление — галочка с волной и искрами, превью, ссылка;
+// сверху сыплются угольки, а через пару секунд проверяем, не открылось ли достижение за фоны
+function bgPublished(m, { id, title, preview }) {
+  const url = id ? new URL(bgPageUrl(id), location.href).href : '';
+  const sparks = Array.from({ length: 16 }, (_, i) => `<i style="--a:${(i * 22.5 + Math.random() * 10).toFixed(1)}deg;--d:${(48 + Math.random() * 30).toFixed(0)}px;--t:${(Math.random() * .12).toFixed(2)}s"></i>`).join('');
+  $('.sh-body', m.root).outerHTML = `<div class="sh-body bpub">
+    <span class="bpub-ok"><i class="bpub-wave"></i><span class="bpub-sparks">${sparks}</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span>
+    <span class="kicker">Опубликовано</span>
+    <h2>«${esc(title)}» — в Мастерской</h2>
+    <p>Фон уже видят все: его можно посмотреть, скачать и поставить в Доту в один клик. Поделись ссылкой — пусть соберут себе такой же.</p>
+    ${preview ? `<span class="bpub-prev"><img src="${esc(preview)}" alt=""></span>` : ''}
+    ${url ? `<div class="pub-link bpub-link"><input class="input" readonly value="${esc(url)}" aria-label="Ссылка на фон"><button class="btn" data-copy>${icon('link')}Копировать</button></div>` : ''}
+    <div class="sh-actions">${url ? `<a class="btn primary block" href="${esc(bgPageUrl(id))}">${icon('image')}Открыть страницу фона</a>` : ''}<a class="btn block" href="workshop.html?backgrounds">${icon('compass')}Фоны в Мастерской</a></div>
+  </div>`;
+  const copy = $('[data-copy]', m.root);
+  if (copy) copy.onclick = () => copyText(url, 'Ссылка скопирована');
+  if (!matchMedia('(prefers-reduced-motion: reduce)').matches) burst('embers');
+  try { localStorage.removeItem('gs.ach.at.' + ACC.user()?.id); } catch {}
+  setTimeout(() => window.Achievements?.watch(), 2200);
 }
 
 // «Как установить»: сетка — куда положить файл; фон — куда положить собранный пак

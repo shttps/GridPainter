@@ -14,7 +14,12 @@
     look: { fit: pref.fit === 'contain' ? 'contain' : 'cover', blur: 0, dim: 0 }, clean: !!pref.clean,
     grid: ['editor', 'workshop', 'none'].includes(pref.grid) ? pref.grid : 'editor',
     blob: null, kind: '', name: '', bg: null, start: 0, el: null, cats: null, gridName: '', busy: false, touched: false, built: false,
+    smooth: pref.smooth !== false, el2: null, handoff: false,
   };
+  // плавный повтор: столько секунд конец отрезка перетекает в начало — в превью и в собранном ролике (DotaBG.build fade)
+  const FADE = 1.5;
+  const segLen = () => Math.min(DotaBG.LIMIT.seconds, (st.el?.duration || 0) - st.start);
+  const fadeOf = () => st.kind === 'video' && st.smooth && segLen() >= FADE * 3 ? FADE : 0;
   const cv = $('#bgbCanvas'), ctx = cv.getContext('2d'), screenBox = $('#bgbScreen');
   // шаги в шапке: 1 — файл, 2 — настройки (не обязательны), 3 — сборка
   const main = $('.bgb');
@@ -35,7 +40,7 @@
   // блик по экрану при смене фона, вкладки или пропорций; шторка — при новом фоне
   const replay = (el, cls) => { el.classList.remove(cls); void el.offsetWidth; el.classList.add(cls); };
   glyphField($('#bgbGlyphs'), { ox: 0.5, oy: 0.05, rx: 0.85, ry: 0.95, cx: 0.5, cy: 0.1, alpha: 0.7 });
-  const saveTimer = () => { try { localStorage.setItem('gs.dotabg', JSON.stringify({ ...pref, screen: st.screen, fit: st.look.fit, clean: st.clean, grid: st.grid })); } catch {} };
+  const saveTimer = () => { try { localStorage.setItem('gs.dotabg', JSON.stringify({ ...pref, screen: st.screen, fit: st.look.fit, clean: st.clean, grid: st.grid, smooth: st.smooth })); } catch {} };
 
   // ---------- переключатели ----------
   $('#bgbScreens').insertAdjacentHTML('beforeend', DotaBG.SCREENS.map(v => `<button data-v="${v}">${v}</button>`).join(''));
@@ -96,6 +101,13 @@
     if (el && (st.kind !== 'video' || el.readyState >= 2)) {
       const sw = el.videoWidth || el.naturalWidth, sh = el.videoHeight || el.naturalHeight;
       DotaBG.drawFrame(ctx, (c, x, y, w, h) => c.drawImage(el, x, y, w, h), sw, sh, W, H, st.look);
+      const a = seamAlpha(), el2 = st.el2;
+      if (a > 0 && el2?.readyState >= 2) {
+        if (blend.width !== W || blend.height !== H) { blend.width = W; blend.height = H; }
+        DotaBG.drawFrame(blend.getContext('2d'), (c, x, y, w, h) => c.drawImage(el2, x, y, w, h), sw, sh, W, H, st.look);
+        ctx.globalAlpha = a; ctx.drawImage(blend, 0, 0); ctx.globalAlpha = 1;
+      }
+      if (st.kind === 'video') drawHead();
     } else {
       const g = ctx.createLinearGradient(0, 0, W, H);
       g.addColorStop(0, '#16120f'); g.addColorStop(1, '#0b0908');
@@ -121,9 +133,36 @@
     GridRender.draw(ctx, st.cats, { portraits: true, onLoad: () => requestAnimationFrame(paint), bg: 'none' });
     ctx.restore();
   }
+  // ---------- круг видео ----------
+  // Без плавного повтора отрезок просто начинается заново. С ним — как в собранном ролике: за FADE секунд до конца
+  // второй <video> (st.el2) играет начало отрезка и проявляется поверх; в конце основной перескакивает туда же,
+  // где сейчас второй (start + FADE), — и круг замыкается без рывка. Пока основной ищет кадр, виден второй.
+  const blend = document.createElement('canvas');
+  function seamAlpha() {
+    const F = fadeOf(), el = st.el; if (!F || !el) return 0;
+    if (st.handoff) return 1;
+    const s = st.start + segLen() - F;
+    return el.currentTime >= s ? Math.min(1, (el.currentTime - s) / F) : 0;
+  }
+  function syncLoop(ended = false) {
+    const el = st.el, el2 = st.el2; if (st.kind !== 'video' || !el || st.handoff || scrubbing) return;
+    const L = segLen(), end = st.start + L, F = fadeOf(), t = el.currentTime;
+    if (t < st.start - 0.3 || t > end + 0.3) { el.currentTime = st.start; el2?.pause(); return; }
+    if (!F) { if (ended || t >= end - 0.05) { el.currentTime = st.start; if (ended) el.play().catch(() => {}); } return; }
+    const s = end - F;
+    if (t < s) { if (!el2.paused) el2.pause(); return; }
+    const want = st.start + (t - s);
+    if (el2.paused) { el2.currentTime = want; if (!el.paused || ended) el2.play().catch(() => {}); }
+    else if (Math.abs(el2.currentTime - want) > 0.3) el2.currentTime = want;
+    if (ended || t >= end - 0.06) {
+      st.handoff = true;
+      el.currentTime = Math.max(st.start, el2.currentTime);
+      el.addEventListener('seeked', () => { st.handoff = false; el2.pause(); el.play().catch(() => {}); }, { once: true });
+    }
+  }
   // видео — перерисовка каждый кадр, пока играет и видно
-  let raf = 0;
-  const loop = () => { raf = 0; paint(); if (st.kind === 'video' && !st.el.paused && !document.hidden) raf = requestAnimationFrame(loop); };
+  let raf = 0, scrubbing = false;
+  const loop = () => { raf = 0; syncLoop(); paint(); if (st.kind === 'video' && (!st.el.paused || st.handoff) && !document.hidden) raf = requestAnimationFrame(loop); };
   const kick = () => { if (!raf) raf = requestAnimationFrame(loop); };
 
   // ---------- сетка в превью ----------
@@ -212,7 +251,7 @@
     let kind;
     try { kind = await DotaBG.sniff(blob); } catch (e) { toast(e.message, 'err'); return; }
     if (blob.size > 500 * 1048576) { toast('Файл больше 500 МБ — укороти видео', 'err'); return; }
-    if (st.el) { st.el.pause?.(); URL.revokeObjectURL(st.el.src); }
+    if (st.el) { st.el.pause?.(); st.el2?.pause(); URL.revokeObjectURL(st.el.src); }
     const url = URL.createObjectURL(blob);
     let el;
     if (kind === 'video') {
@@ -224,7 +263,9 @@
       el = new Image(); el.src = url;
       try { await el.decode(); } catch { toast('Картинка не открылась', 'err'); return; }
     }
-    Object.assign(st, { blob, kind: kind === 'gif' ? 'gif' : kind, name, bg, el, start: 0 });
+    let el2 = null;
+    if (kind === 'video') { el2 = document.createElement('video'); Object.assign(el2, { muted: true, playsInline: true, preload: 'auto', src: url }); }
+    Object.assign(st, { blob, kind: kind === 'gif' ? 'gif' : kind, name, bg, el, el2, start: 0, handoff: false });
     // GIF в <img> анимируется сам — перерисовываем его постоянно, как видео
     if (kind === 'gif') { const tick = () => { if (st.el !== el) return; paint(); setTimeout(() => requestAnimationFrame(tick), 60); }; tick(); }
     $('#bgbDrop').classList.add('has');
@@ -234,32 +275,90 @@
     $('#bgbPublish').hidden = !!bg;
     $('#bgbSrc').innerHTML = bg ? `${icon('compass')}«${esc(bg.title)}» из <a href="bg.html?id=${encodeURIComponent(bg.id)}">Мастерской</a>` : `${icon('file')}${esc(name.length > 40 ? name.slice(0, 38) + '…' : name)} · ${mb(blob.size)}`;
     $('#bgbPick').lastChild.textContent = 'Другой файл';
-    $('#bgbFileNote').textContent = kind === 'video' ? `Видео ${secs(el.duration)}. В фон пойдёт отрезок до 30 секунд — двигай начало под превью.` : kind === 'gif' ? 'GIF станет видео из своих кадров.' : 'Картинка станет неподвижным видео.';
+    $('#bgbFileNote').textContent = kind === 'video' ? `Видео ${secs(el.duration)}.${el.duration > DotaBG.LIMIT.seconds ? ' В фон пойдёт отрезок до 30 секунд — выбери его на полосе под превью.' : ' Полоса под превью — перемотка.'}` : kind === 'gif' ? 'GIF станет видео из своих кадров.' : 'Картинка станет неподвижным видео.';
     setupTrim();
     paint();
   }
-  // отрезок видео: начало ползунком, длина — до 30 с; превью крутит именно его
+  // полоса видео под превью: весь ролик, светлым — отрезок, который пойдёт в фон (до 30 с), штриховкой — стык
+  // плавного повтора, точка — где сейчас видео. Тянешь по полосе — перемотка; тянешь отрезок — двигаешь его
+  // (если ролик длиннее 30 с). Стрелки ← → — по секунде, Shift — по пять, пробел — пауза.
+  const time = s => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
+  function drawHead() {
+    const el = st.el, D = el.duration || 0; if (!D) return;
+    $('#bgbTlHead').style.left = `${Math.min(100, el.currentTime / D * 100)}%`;
+    const now = $('#bgbNow'), txt = time(el.currentTime);
+    if (now.textContent !== txt) now.textContent = txt;
+  }
+  function drawSeg() {
+    const D = st.el.duration || 0, L = segLen(), F = fadeOf();
+    const seg = $('#bgbTlSeg');
+    seg.style.left = `${st.start / D * 100}%`; seg.style.width = `${L / D * 100}%`;
+    seg.style.setProperty('--fade', `${F ? F / L * 100 : 0}%`);
+    seg.classList.toggle('whole', D <= DotaBG.LIMIT.seconds);
+    $('#bgbTime').textContent = D > DotaBG.LIMIT.seconds ? `отрезок ${time(st.start)}–${time(st.start + L)} из ${time(D)}` : time(D);
+    $('#bgbTl').setAttribute('aria-valuemax', D.toFixed(1));
+    $('#bgbSmoothRow').hidden = L < FADE * 3;
+    drawHead();
+  }
+  function seek(t) {
+    const el = st.el, D = el.duration || 0, L = segLen();
+    t = Math.max(0, Math.min(D, t));
+    // за пределами отрезка — отрезок едет за курсором
+    if (t < st.start || t > st.start + L) { st.start = Math.max(0, Math.min(D - Math.min(DotaBG.LIMIT.seconds, D), t < st.start ? t : t - L)); touch(); drawSeg(); }
+    st.handoff = false; st.el2?.pause();
+    el.currentTime = Math.min(t, st.start + segLen() - 0.1);
+    $('#bgbTl').setAttribute('aria-valuenow', t.toFixed(1)); $('#bgbTl').setAttribute('aria-valuetext', time(t));
+    drawHead(); paint();
+  }
   function setupTrim() {
-    const box = $('#bgbTrim'), el = st.el, r = $('#bgbStart');
+    const box = $('#bgbTrim'), el = st.el, tl = $('#bgbTl');
     box.hidden = st.kind !== 'video';
+    $('#bgbSmoothRow').hidden = st.kind !== 'video';
     if (st.kind !== 'video') return;
-    const D = el.duration || 0, len = () => Math.min(DotaBG.LIMIT.seconds, D - st.start);
-    r.max = Math.max(0, D - 1).toFixed(1); r.value = 0; r.disabled = D <= DotaBG.LIMIT.seconds;
-    const time = s => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
-    const label = () => { $('#bgbTime').textContent = `${time(st.start)}–${time(st.start + len())}${D > DotaBG.LIMIT.seconds ? ` из ${time(D)}` : ''}`; };
-    r.oninput = () => { st.start = +r.value; el.currentTime = st.start; r.style.setProperty('--range-fill', `${+r.value / (+r.max || 1) * 100}%`); label(); touch(); paint(); };
-    r.style.setProperty('--range-fill', '0%');
-    el.ontimeupdate = () => { if (el.currentTime >= st.start + len() - 0.05 || el.currentTime < st.start - 0.5) el.currentTime = st.start; };
-    el.onended = () => { el.currentTime = st.start; el.play().catch(() => {}); };
+    const D = el.duration || 0;
+    drawSeg();
+    el.ontimeupdate = () => { syncLoop(); if (document.hidden || el.paused) drawHead(); };
+    el.onended = () => syncLoop(true);
     el.onplay = kick; el.onseeked = paint;
+    // тянуть отрезок можно за середину, если ролик длиннее 30 с; иначе вся полоса — перемотка
+    let drag = null;
+    const at = e => { const r = tl.getBoundingClientRect(); return Math.max(0, Math.min(1, (e.clientX - r.left) / r.width)) * D; };
+    tl.onpointerdown = e => {
+      if (e.button) return;
+      tl.setPointerCapture(e.pointerId); tl.classList.add('drag'); scrubbing = true;
+      const t = at(e), onSeg = e.target.closest('.bgb-tl-seg') && D > DotaBG.LIMIT.seconds;
+      drag = onSeg ? { move: true, from: t, start: st.start } : { move: false };
+      drag.was = !el.paused; el.pause(); st.el2?.pause(); st.handoff = false;
+      if (!onSeg) seek(t);
+    };
+    tl.onpointermove = e => {
+      if (!drag) return;
+      const t = at(e);
+      if (drag.move) { st.start = Math.max(0, Math.min(D - segLen(), drag.start + t - drag.from)); touch(); drawSeg(); el.currentTime = st.start; paint(); }
+      else seek(t);
+    };
+    tl.onpointerup = tl.onpointercancel = () => {
+      if (!drag) return;
+      tl.classList.remove('drag'); scrubbing = false;
+      if (drag.was) el.play().catch(() => {});
+      drag = null;
+    };
     const play = $('#bgbPlay');
+    tl.onkeydown = e => {
+      const k = { ArrowLeft: -1, ArrowRight: 1, Home: -1e9, End: 1e9 }[e.key];
+      if (k) { e.preventDefault(); seek(el.currentTime + k * (e.shiftKey ? 5 : 1)); }
+      else if (e.key === ' ') { e.preventDefault(); play.click(); }
+    };
     const setBtn = () => { play.innerHTML = icon(el.paused ? 'play' : 'pause'); play.setAttribute('aria-label', el.paused ? 'Играть' : 'Пауза'); };
-    play.onclick = () => { el.paused ? el.play().catch(() => {}) : el.pause(); };
-    el.onpause = setBtn; el.addEventListener('play', setBtn);
-    label();
+    play.onclick = () => { if (el.paused) el.play().catch(() => {}); else { el.pause(); st.el2?.pause(); st.handoff = false; } };
+    el.onpause = () => { if (!st.handoff) setBtn(); };
+    el.addEventListener('play', setBtn);
     if (!matchMedia('(prefers-reduced-motion: reduce)').matches) el.play().catch(() => {});
     setBtn();
   }
+  const smooth = $('#bgbSmooth');
+  smooth.checked = st.smooth;
+  smooth.onchange = () => { st.smooth = smooth.checked; st.handoff = false; st.el2?.pause(); touch(); saveTimer(); if (st.kind === 'video') drawSeg(); paint(); };
   const pickFile = f => { if (f && !st.busy) useBlob(f, { name: f.name }); };
   $('#bgbFile').onchange = e => pickFile(e.target.files[0]);
   $('#bgbPick').onclick = () => $('#bgbFile').click();
@@ -303,7 +402,7 @@
     btn.disabled = true; prog.hidden = false;
     const was = st.kind === 'video' && !st.el.paused; if (was) st.el.pause();
     try {
-      const job = DotaBG.build(st.blob, { screen: st.screen, clean: st.clean, look: { ...st.look }, start: st.start,
+      const job = DotaBG.build(st.blob, { screen: st.screen, clean: st.clean, look: { ...st.look }, start: st.start, fade: fadeOf(),
         onProgress: (p, text) => { bar.style.width = Math.round(p * 100) + '%'; if (text) say.textContent = text; } });
       const res = await job.done;
       saveBlob('pak02_dir.vpk', res.blob);

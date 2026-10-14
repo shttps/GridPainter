@@ -12,8 +12,8 @@
 <link rel="icon" href="logo.svg" type="image/svg+xml">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600;700&family=Unbounded:wght@500;600;700&display=swap">
-<link rel="stylesheet" href="site.css?v=61">
-<link rel="stylesheet" href="background.css?v=4">
+<link rel="stylesheet" href="site.css?v=62">
+<link rel="stylesheet" href="background.css?v=5">
 </head>
 <body data-page="background">
 <!-- фон как в Мастерской: сполохи темы и поле ASCII-символов (рисует site.js), внизу гаснет в цвет страницы -->
@@ -71,8 +71,12 @@
       </div>
       <div class="bgb-trim" id="bgbTrim" hidden>
         <button class="icon-btn" id="bgbPlay" aria-label="Пауза" data-icon="play"></button>
-        <input type="range" id="bgbStart" min="0" max="0" step="0.1" value="0" aria-label="Начало отрезка">
-        <span class="bgb-time" id="bgbTime">0:00–0:30</span>
+        <span class="bgb-now" id="bgbNow">0:00</span>
+        <div class="bgb-tl" id="bgbTl" role="slider" tabindex="0" aria-label="Перемотка видео" aria-valuemin="0" aria-valuemax="0" aria-valuenow="0">
+          <i class="bgb-tl-seg" id="bgbTlSeg"><i class="bgb-tl-fade" title="Здесь конец перетекает в начало"></i></i>
+          <i class="bgb-tl-head" id="bgbTlHead"></i>
+        </div>
+        <span class="bgb-time" id="bgbTime">0:30</span>
       </div>
       <p class="bgb-cap" id="bgbCap">Главное меню Доты с выбранными пропорциями экрана — схема, как ляжет фон.</p>
     </section>
@@ -93,6 +97,7 @@
           <label class="bgb-f bgb-range"><span>Размытие <em id="bgbBlurV">нет</em></span><input type="range" id="bgbBlur" min="0" max="1" step="0.05" value="0"></label>
           <label class="bgb-f bgb-range"><span>Затемнение <em id="bgbDimV">нет</em></span><input type="range" id="bgbDim" min="0" max="1" step="0.05" value="0"></label>
         </div>
+        <label class="bgb-switch" id="bgbSmoothRow" hidden><span><b>Плавный повтор</b><small>Конец ролика перетекает в начало — без рывка</small></span><input type="checkbox" id="bgbSmooth" role="switch" checked></label>
         <label class="bgb-switch"><span><b>Только твой фон</b><small>Скрыть новости Valve справа</small></span><input type="checkbox" id="bgbClean" role="switch"></label>
         <div class="bgb-f bgb-gridpick"><span>Сетка в превью</span>
           <div class="seg sm" id="bgbGrid"><i class="seg-ind"></i><button data-v="editor">Из редактора</button><button data-v="workshop">Из Мастерской</button><button data-v="none">Без сетки</button></div>
@@ -133,9 +138,9 @@
 <script src="auth.js?v=38"></script>
 <script src="gridrender.js?v=37"></script>
 <script src="catalog-api.js?v=43"></script>
-<script src="dotabg.js?v=37"></script>
+<script src="dotabg.js?v=38"></script>
 <script src="achievements.js?v=2"></script>
-<script src="site.js?v=76"></script>
-<script src="background.js?v=42"></script>
+<script src="site.js?v=77"></script>
+<script src="background.js?v=43"></script>
 </body>
 </html>
