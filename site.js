@@ -1363,6 +1363,31 @@ async function dimFor(src) {
 // Фон первого экрана: фон из Мастерской, который админ отметил «На главную», а пока таких нет — туман с фонарями.
 // Любой фон тонируется под сайт (CSS .bg-media). На телефоне и при экономии трафика тяжёлое видео не грузим —
 // хватает постера; при «уменьшении движения» видео стоит на первом кадре.
+// Видео-фон без рывка на стыке: за FADE секунд до конца поверх запускается копия того же ролика с начала
+// и проявляется (opacity, 1.6 с — как в .bg-media), старая гаснет под ней и ждёт следующего круга.
+// Копия берёт файл из кэша браузера; играют обе только на время перехода. Короткие ролики (< 3 переходов) — обычный loop.
+function crossLoop(a) {
+  const FADE = 1.8;
+  const b = a.cloneNode(); b.removeAttribute('autoplay'); b.classList.remove('on', 'top'); b.preload = 'auto';
+  a.after(b);
+  let cur = a, next = b, busy = false;
+  const watch = () => {
+    if (busy) return;
+    const d = cur.duration;
+    if (!d || !isFinite(d) || d < FADE * 3) { cur.loop = true; return; }
+    if (cur.currentTime < d - FADE) return;
+    busy = true;
+    next.currentTime = 0;
+    next.play().then(() => {
+      next.classList.add('on', 'top'); cur.classList.remove('top');
+      setTimeout(() => { cur.classList.remove('on'); cur.pause(); [cur, next] = [next, cur]; busy = false; }, 1700);
+    }).catch(() => { cur.loop = true; cur.currentTime = 0; cur.play().catch(() => {}); busy = false; });
+  };
+  a.loop = b.loop = false;
+  for (const v of [a, b]) v.addEventListener('timeupdate', () => { if (v === cur) watch(); });
+  // запасной путь: если переход не успел (вкладка спала), ролик просто начинается заново
+  for (const v of [a, b]) v.addEventListener('ended', () => { if (v === cur && !busy) { v.currentTime = 0; v.play().catch(() => {}); } });
+}
 function heroBackdrop() {
   const box = $('#heroMedia'); if (!box) return;
   const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -1370,7 +1395,7 @@ function heroBackdrop() {
   const first = $('video', box);
   // туман с фонарями — запасной: показываем, только если фона «На главную» нет или он не загрузился (иначе он мелькает до фона)
   let done = false;
-  const fog = () => { if (done) return; done = true; first.classList.add('on'); if (!still) first.play().catch(() => {}); };
+  const fog = () => { if (done) return; done = true; first.classList.add('on'); if (!still) { crossLoop(first); first.play().catch(() => {}); } };
   const slow = setTimeout(fog, 6000);
   API.bg.featured().then(async list => {
     if (!list.length) return fog();
@@ -1385,6 +1410,7 @@ function heroBackdrop() {
     el.addEventListener(video ? 'playing' : 'load', () => {
       if (done) return; done = true; clearTimeout(slow);
       el.classList.add('on'); first.classList.remove('on');
+      if (video) crossLoop(el);
       setTimeout(() => { first.pause(); first.remove(); }, 1800);
     }, { once: true });
     el.addEventListener('error', fog, { once: true });
