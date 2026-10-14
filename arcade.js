@@ -28,6 +28,13 @@
   const audio = window.ArcadeAudio;
   audio?.mute(muted);
   const sfx = (name, options) => audio?.sound(name, options);
+  const amb = (name, options) => audio?.amb?.(name, options);
+  const ICON = {
+    on: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z" fill="currentColor"/><path d="M15.5 9a4 4 0 010 6M18 6.5a7.5 7.5 0 010 11" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></svg>',
+    off: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z" fill="currentColor"/><path d="M16 9.5l5 5M21 9.5l-5 5" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></svg>',
+    restart: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12a7 7 0 1 0 2.1-5M5 4.5V8h3.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+    close: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6.5 6.5l11 11M17.5 6.5l-11 11" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>',
+  };
 
   // ---------- оверлей ----------
   let ov = null, cur = null, inst = null;
@@ -42,12 +49,14 @@
     ov = document.createElement('div');
     ov.className = `ar-ov theme-${g.theme}`; ov.setAttribute('role', 'dialog'); ov.setAttribute('aria-modal', 'true'); ov.setAttribute('aria-label', g.title);
     ov.innerHTML = `<div class="ar-backdrop"></div><div class="ar-shell" id="arShell"></div>
-      <div class="ar-tools"><button class="ar-tool" id="arRestart" title="Начать заново" aria-label="Начать заново" hidden>↻</button><button class="ar-tool" id="arMute" title="Звук">${muted ? '🔇' : '🔊'}</button><button class="ar-tool ar-close" id="arClose" title="Закрыть (Esc)" aria-label="Закрыть">✕</button></div>`;
+      <div class="ar-tools"><button class="ar-tool" id="arRestart" title="Начать заново" aria-label="Начать заново" hidden>${ICON.restart}</button><button class="ar-tool" id="arMute" title="Звук">${ICON[muted ? 'off' : 'on']}</button><button class="ar-tool ar-close" id="arClose" title="Закрыть (Esc)" aria-label="Закрыть">${ICON.close}</button></div>`;
+    // кнопки сверху не держат фокус: иначе пробел в «Взломе замка» нажимал бы их, а не взлом
+    for (const b of ov.querySelectorAll('.ar-tool')) b.addEventListener('click', () => b.blur());
     document.body.appendChild(ov);
     document.documentElement.classList.add('ar-lock');
     ov.querySelector('#arClose').onclick = () => close();
     const muteButton = ov.querySelector('#arMute');
-    const muteUI = () => { muteButton.textContent = muted ? '🔇' : '🔊'; muteButton.setAttribute('aria-pressed', String(muted)); muteButton.setAttribute('aria-label', muted ? 'Включить звук' : 'Выключить звук'); };
+    const muteUI = () => { muteButton.innerHTML = ICON[muted ? 'off' : 'on']; muteButton.setAttribute('aria-pressed', String(muted)); muteButton.setAttribute('aria-label', muted ? 'Включить звук' : 'Выключить звук'); };
     muteUI();
     muteButton.onclick = () => { muted = !muted; save('gs.arcade.mute', muted); audio?.unlock(); audio?.mute(muted); muteUI(); };
     ov.querySelector('#arRestart').onclick = e => { e.currentTarget.blur(); if (inst && !ov.dataset.done) { inst.destroy(); start(); } };
@@ -59,6 +68,7 @@
     inst?.destroy(); inst = null; audio?.stop(); audio?.pause(false);
     ov?.remove(); ov = null; cur = null;
     document.documentElement.classList.remove('ar-lock');
+    previews(true);
     if (!silent && location.hash) history.replaceState(null, '', location.pathname + location.search);
     renderHub();
   }
@@ -100,7 +110,8 @@
     const sh = ov.querySelector('#arShell');
     sh.className = 'ar-shell play'; sh.innerHTML = ''; delete ov.dataset.done;
     ov.querySelector('#arRestart').hidden = false;
-    inst = cur.mount(sh, { sfx, end: finish, best: best(cur.id), muted: () => muted, pauseAudio: on => audio?.pause(on) });
+    previews(false);
+    inst = cur.mount(sh, { sfx, amb, end: finish, best: best(cur.id), muted: () => muted, pauseAudio: on => audio?.pause(on) });
   }
   // итог: очки, рекорд, какие награды взяты; у вошедших результат уходит в общую таблицу
   function finish(score, note = '') {
@@ -125,7 +136,8 @@
     box.querySelector('#arAgain').onclick = () => { inst?.destroy(); start(); };
     box.querySelector('#arBack').onclick = intro;
     box.querySelector('#arAgain').focus({ preventScroll: true });
-    sfx(note === 'Победа' ? 'win' : 'end');
+    // фанфары — если взял хотя бы первую награду, иначе грустный аккорд
+    sfx(note === 'Победа' || score >= g.rewards[0].at ? 'win' : 'end');
     submit(g.id, Math.max(score, prev), box.querySelector('#arSync'));
   }
   async function submit(id, score, el) {
@@ -158,8 +170,27 @@
   });
   addEventListener('hashchange', () => { const id = location.hash.slice(1); if (GAMES.has(id) && cur?.id !== id) open(id); });
 
+  // ---------- живые превью на карточках: игры рисуют сами себя, пока карточка на экране ----------
+  const prev = new Map();   // id → { view, visible }
+  const prevIO = 'IntersectionObserver' in window ? new IntersectionObserver(es => {
+    for (const e of es) { const p = prev.get(e.target.dataset.prev); if (!p) continue; p.visible = e.isIntersecting; p.visible && !ov ? p.view.play() : p.view.stop(); }
+  }) : null;
+  function mountPreview(g) {
+    const cv = document.querySelector(`canvas[data-prev="${g.id}"]`);
+    if (!cv || !g.preview || prev.has(g.id)) return;
+    try {
+      const view = g.preview(cv);
+      prev.set(g.id, { view, visible: !prevIO });
+      cv.closest('.ar-card')?.classList.add('has-prev');
+      prevIO ? prevIO.observe(cv) : view.play();
+      new ResizeObserver(() => view.resize()).observe(cv);
+    } catch (e) { console.warn('preview', g.id, e); }
+  }
+  // открыта игра — превью замирают (не тратят кадры), закрыта — оживают те, что видно
+  function previews(on) { for (const p of prev.values()) on && p.visible ? p.view.play() : p.view.stop(); }
+
   window.Arcade = {
-    register(g) { GAMES.set(g.id, g); if (location.hash.slice(1) === g.id && !ov) setTimeout(() => !ov && open(g.id)); },
+    register(g) { GAMES.set(g.id, g); mountPreview(g); if (location.hash.slice(1) === g.id && !ov) setTimeout(() => !ov && open(g.id)); },
     open, close, sfx, fmt, MOUSE, KEY,
     get current() { return inst; },   // для проверок из консоли
   };
