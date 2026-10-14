@@ -397,6 +397,34 @@ button:focus { outline: none; }
 .bst-steps small { font-size: 11.5px; }
 .bst-steps .on { border-color: color-mix(in oklab, var(--glow) 55%, transparent); background: color-mix(in oklab, var(--glow) 12%, transparent); color: var(--ink-2); box-shadow: 0 0 24px -8px var(--glow); }
 .bst-steps .on b { color: var(--f2); }
+.bst-steps em { font-style: normal; font: 600 10.5px var(--mono); color: var(--faint); }
+.bst-steps .on em { color: var(--ink-2); }
+.bst-pick { width: 100%; margin-top: 10px; }
+/* окно огонька: выбор своих сеток для буста */
+.sk-pick { width: 100%; margin-top: 8px; padding: 12px; border-radius: 16px; border: 1px solid color-mix(in oklab, var(--glow) 35%, transparent); background: color-mix(in oklab, var(--glow) 7%, transparent); text-align: left; animation: rise .6s var(--ease) .66s both; }
+.skp-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.skp-head b { display: flex; align-items: center; gap: 6px; font-size: 14px; }
+.skp-head b svg { width: 16px; height: 16px; fill: var(--f2); }
+.skp-head b svg .bi-tail { fill: var(--f1); }
+.skp-head i { font: 700 12px var(--mono); font-style: normal; color: var(--f2); }
+.skp-count { font: 700 12px var(--mono); color: var(--ink-2); padding: 3px 8px; border-radius: 999px; background: #0005; }
+.sk-pick p { margin: 6px 0 10px; color: var(--muted); font-size: 12.5px; line-height: 1.45; }
+.skp-list { display: flex; flex-direction: column; gap: 6px; max-height: 210px; overflow-y: auto; padding-right: 2px; }
+.skp-empty { color: var(--muted); font-size: 12.5px; }
+.skp-item { display: flex; align-items: center; gap: 10px; min-height: 40px; padding: 6px 10px 6px 6px; border: 1px solid var(--line); border-radius: 12px; background: var(--bg-2); color: var(--ink-2); font: 500 13.5px var(--font); text-align: left; cursor: pointer; transition: border-color .25s, background .25s, opacity .25s, transform .2s var(--ease); animation: rise .45s var(--ease) calc(.7s + var(--i) * .04s) both; }
+.skp-item span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.skp-item small { display: flex; align-items: center; gap: 4px; color: var(--faint); font: 11px var(--mono); }
+.skp-item small .i { width: 13px; height: 13px; }
+.skp-tick { display: grid; place-items: center; flex: none; width: 28px; height: 28px; border-radius: 9px; background: #ffffff0d; transition: background .3s, box-shadow .3s; }
+.skp-tick svg { width: 15px; height: 15px; fill: var(--faint); transition: fill .3s; }
+.skp-item:hover:not(:disabled) { border-color: var(--line-strong); }
+.skp-item.on { border-color: color-mix(in oklab, var(--glow) 60%, transparent); background: color-mix(in oklab, var(--glow) 14%, var(--bg-2)); color: var(--ink); }
+.skp-item.on .skp-tick { background: linear-gradient(135deg, #ffb340, #ff5a1f 55%, #d42d1a); box-shadow: 0 2px 12px -2px #ff5a1fa6; }
+.skp-item.on .skp-tick svg { fill: #fff; }
+.skp-item.on .skp-tick .bi-tail { fill: #ffe27a; }
+.skp-item:disabled { opacity: .45; cursor: not-allowed; }
+.skp-item.busy { opacity: .6; pointer-events: none; }
+.skp-item.wait::after { content: "ждёт места"; font: 10.5px var(--mono); color: var(--faint); }
 .ginfo { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; padding: 11px 4px 0; }
 .gmain { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
 .gtitle { color: inherit; text-decoration: none; font-size: 17px; font-weight: 700; letter-spacing: -.01em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }

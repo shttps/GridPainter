@@ -43,6 +43,9 @@ window.CatalogAPI = (() => {
     not_signed_in: 'Войди в профиль, чтобы выкладывать фоны.',
     not_yours: 'Удалить можно только свой фон.',
     not_admin: 'Это может только админ.',
+    not_your_grid: 'Поднять можно только свою сетку.',
+    no_streak: 'Буст открывается с 3 дней подряд — заходи каждый день.',
+    boost_full: 'Все места для буста заняты — сначала сними буст с другой сетки.',
   };
   function niceError(msg) {
     for (const k in ERRORS) if (String(msg).includes(k)) return ERRORS[k];
@@ -379,6 +382,13 @@ window.CatalogAPI = (() => {
     }),
   };
 
+  // буст огонька: игрок сам выбирает, какие свои сетки поднять в «Популярных» (места — по длине серии, см. schema.sql)
+  const oldBase = e => { throw /boosted_at|set_boost/.test(e.message) ? new Error('Сначала выполни свежий supabase/schema.sql — в базе ещё нет выбора сеток для буста.') : e; };
+  const boosts = {
+    mine: uid => rest(`/grids?select=id,title,likes,boosted_at&user_id=eq.${encodeURIComponent(uid)}&hidden=is.false&order=created_at.desc&limit=200`).then(r => r.data, oldBase),
+    set: (id, on) => rpc('set_boost', { p_id: id, p_on: !!on }).catch(oldBase),
+  };
+
   // теги: автор выбирает до 5 при публикации; «18+» — отдельная пометка
   const TAGS = {
     grid: ['Аниме', 'Милота', 'Рамки', 'С упором на героя', 'Мемы', 'Dead inside', 'Надписи', 'Игры'],
@@ -391,7 +401,7 @@ window.CatalogAPI = (() => {
     isMine: (id, userId) => mine.has(id) || (!!userId && userId === window.Accounts?.user()?.id), isLiked: id => liked.has(id), isReported: id => reported.has(id), mineCount: () => mine.size,
     author: () => load('gs.author', ''), setAuthor: a => save('gs.author', a),
     KINDS: { ascii: 'ASCII', mosaic: 'Мозаика', mixed: 'Смешанная' },
-    TAGS, bg, admin,
+    TAGS, bg, admin, boosts,
     // 18+: размытые карточки открываются по клику; «мне есть 18» запоминается
     adult: () => load('gs.adult', false), setAdult: v => save('gs.adult', !!v),
   };

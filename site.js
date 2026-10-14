@@ -195,6 +195,41 @@ const STREAK_TIERS = [[1, 'Угольки', 'Только разгорается
 const STREAK_GOALS = [3, 7, 30, 100, 365];
 // награда за серию: опубликованные сетки получают «виртуальные лайки» в сортировке «Популярные» (вью grids_ranked в supabase/schema.sql)
 const streakBoost = n => n >= 30 ? 20 : n >= 7 ? 8 : n >= 3 ? 3 : 0;
+// сколько своих сеток можно поднять (как boost_slots в schema.sql)
+const boostSlots = n => n >= 7 ? 3 : n >= 3 ? 2 : 0;
+// список своих сеток в окне огонька: нажал — сетка поднята или снята; мест не больше, чем даёт серия
+async function fillBoostPick(box, slots) {
+  const list = $('.skp-list', box), count = $('.skp-count', box), uid = ACC?.user()?.id;
+  let grids;
+  try { grids = await API.boosts.mine(uid); }
+  catch (er) { list.innerHTML = `<span class="skp-empty">${esc(er.message)}</span>`; return; }
+  if (!grids.length) { list.innerHTML = '<span class="skp-empty">Выложи сетку в Мастерскую — и её можно будет поднять.</span>'; return; }
+  // выбранные раньше идут первыми — им и достаются места, если их больше, чем мест
+  const on = new Set(grids.filter(g => g.boosted_at).sort((a, b) => a.boosted_at.localeCompare(b.boosted_at)).slice(0, slots).map(g => g.id));
+  const extra = new Set(grids.filter(g => g.boosted_at && !on.has(g.id)).map(g => g.id));
+  const paint = () => {
+    count.textContent = `${on.size} / ${slots}`;
+    for (const b of $$('.skp-item', list)) {
+      const id = b.dataset.id, sel = on.has(id);
+      b.classList.toggle('on', sel); b.classList.toggle('wait', extra.has(id));
+      b.disabled = !sel && !extra.has(id) && on.size >= slots; b.setAttribute('aria-pressed', sel);
+    }
+  };
+  list.innerHTML = grids.map((g, i) => `<button class="skp-item" data-id="${esc(g.id)}" style="--i:${Math.min(i, 8)}"><i class="skp-tick">${BOOST_ICO}</i><span>${esc(g.title)}</span><small>${icon('heart')}${num(g.likes)}</small></button>`).join('');
+  list.onclick = async e => {
+    const b = e.target.closest('.skp-item'); if (!b || b.classList.contains('busy')) return;
+    const id = b.dataset.id, want = !on.has(id) && !extra.has(id);   // «ждёт места» — нажатие снимает буст
+    b.classList.add('busy');
+    try {
+      await API.boosts.set(id, want);
+      want ? on.add(id) : on.delete(id); extra.delete(id);
+      if (want) b.animate([{ transform: 'scale(.96)' }, { transform: 'scale(1.03)' }, { transform: 'none' }], { duration: 380, easing: 'cubic-bezier(.34,1.4,.64,1)' });
+      toast(want ? 'Сетка поднята — в «Популярных» она теперь выше' : 'Буст снят');
+    } catch (er) { toast(er.message, 'err'); }
+    b.classList.remove('busy'); paint();
+  };
+  paint();
+}
 // большое живое пламя с искрами; цвета — из --f0/--f1/--f2/--glow окна
 function fireHTML() {
   const embers = Array.from({ length: 14 }, () => `<i style="--x:${(Math.random() * 90 - 45).toFixed(0)}px;--dx:${(Math.random() * 40 - 20).toFixed(0)}px;--dl:${(Math.random() * 2.4).toFixed(2)}s;--du:${(1.8 + Math.random() * 1.6).toFixed(2)}s;--sz:${(2 + Math.random() * 3).toFixed(1)}px"></i>`).join('');
@@ -213,17 +248,19 @@ function fireHTML() {
     </div>`;
 }
 // окно «что за буст»: по клику на значок на карточке. Серию автора мы не знаем — только размер буста, по нему и ступень.
-const BOOST_STEPS = [[3, 'от 3 дней'], [8, 'от 7 дней'], [20, 'от 30 дней']];
+const BOOST_STEPS = [[3, 2, 'от 3 дней'], [8, 3, 'от 7 дней'], [20, 3, 'от 30 дней']];
 function openBoost(b, author, mine) {
   const t = b >= 20 ? 4 : b >= 8 ? 3 : 2, me = ACC?.enabled && ACC.user();
-  openSheet(`<div class="sh-body streak-sheet boost-sheet t${t}">
+  const m = openSheet(`<div class="sh-body streak-sheet boost-sheet t${t}">
     ${fireHTML()}
     <b class="sk-num">+${b}</b>
     <span class="sk-label">буст огонька</span>
-    <p class="sk-msg">${mine ? 'Ты заходишь на Grid Studio каждый день, поэтому в «Популярных» твоя сетка стоит выше' : `${esc(author || 'Автор')} заходит на Grid Studio каждый день, поэтому в «Популярных» эта сетка стоит выше`} — как будто у неё на ${b} ${plural(b, 'лайк', 'лайка', 'лайков')} больше. Настоящие лайки не меняются.</p>
-    <div class="bst-steps">${BOOST_STEPS.map(([v, txt], i) => `<span class="${v === b ? 'on' : ''}" style="--i:${i}"><b>+${v}</b><small>${txt} подряд</small></span>`).join('')}</div>
-    <div class="sk-boost on"><span>${mine ? 'Пропустишь' : 'Пропустит'} день — огонёк погаснет, и буст пропадёт, пока серия снова не наберётся.${mine ? '' : me ? ' Твой огонёк — рядом с ником в меню сверху.' : ' Войди и заходи каждый день — твои сетки тоже поднимутся.'}</span></div>
+    <p class="sk-msg">${mine ? 'Ты выбрал эту сетку для буста и заходишь на Grid Studio каждый день, поэтому в «Популярных» она стоит выше' : `${esc(author || 'Автор')} заходит на Grid Studio каждый день и выбрал эту сетку для буста, поэтому в «Популярных» она стоит выше`} — как будто у неё на ${b} ${plural(b, 'лайк', 'лайка', 'лайков')} больше. Настоящие лайки не меняются, дальше — борьба с остальными сетками.</p>
+    <div class="bst-steps">${BOOST_STEPS.map(([v, k, txt], i) => `<span class="${v === b ? 'on' : ''}" style="--i:${i}"><b>+${v}</b><small>${txt} подряд</small><em>${k} ${plural(k, 'сетка', 'сетки', 'сеток')}</em></span>`).join('')}</div>
+    <div class="sk-boost on"><span>${mine ? 'Пропустишь' : 'Пропустит'} день — огонёк погаснет, и буст пропадёт, пока серия снова не наберётся.${mine ? '' : me ? ' Свои сетки для буста выбирай в окне огонька — он рядом с ником в меню сверху.' : ' Войди и заходи каждый день — сможешь поднять и свои сетки.'}</span></div>
+    ${mine && streak ? '<button class="btn primary bst-pick" id="bstPick">Выбрать сетки для буста</button>' : ''}
   </div>`);
+  $('#bstPick', m.root)?.addEventListener('click', () => openStreak(streak));
 }
 function openStreak(s) {
   const n = s.streak, t = streakTier(n), [, tname, tnote] = STREAK_TIERS[t - 1];
@@ -246,11 +283,14 @@ function openStreak(s) {
     <p class="sk-msg">${esc(msg)}</p>
     <div class="sk-week">${week.map((d, i) => `<span class="${d.on ? 'on' : ''}${d.today ? ' today' : ''}" style="--i:${i}"><i>${d.on ? FLAME : ''}</i><small>${d.wd}</small></span>`).join('')}</div>
     <div class="sk-goal"><div class="sk-goal-top"><span>${esc(goalText)}</span>${goal ? `<b>${n} / ${goal}</b>` : ''}</div><i class="sk-bar"><i style="--w:${goal ? ((n - from) / (goal - from) * 100).toFixed(1) : 100}%"></i></i></div>
-    <div class="sk-boost${streakBoost(n) ? ' on' : ''}">${streakBoost(n)
-      ? `<b>+${streakBoost(n)}</b><span>Твои сетки в «Популярных» идут выше, пока горит огонёк — как будто у каждой на ${streakBoost(n)} ${plural(streakBoost(n), 'лайк', 'лайка', 'лайков')} больше</span>`
-      : '<span>Заходи 3 дня подряд — и твои сетки в «Популярных» поднимутся выше остальных</span>'}</div>
+    ${boostSlots(n)
+      ? `<div class="sk-pick" id="skPick"><div class="skp-head"><b>${BOOST_ICO}Буст сеток <i>+${streakBoost(n)}</i></b><span class="skp-count"></span></div>
+          <p>Выбери до ${boostSlots(n)} своих сеток — в «Популярных» они пойдут выше, как будто у каждой на ${streakBoost(n)} ${plural(streakBoost(n), 'лайк', 'лайка', 'лайков')} больше.</p>
+          <div class="skp-list"><span class="skp-empty">Загружаем твои сетки…</span></div></div>`
+      : '<div class="sk-boost"><span>Заходи 3 дня подряд — и сможешь выбрать 2 свои сетки, которые поднимутся в «Популярных»</span></div>'}
     <div class="sk-stats"><div><b>${num(s.best)}</b><span>Рекорд</span></div><div><b>${num(s.days || n)}</b><span>Всего дней</span></div></div>
   </div>`);
+  if (boostSlots(n)) fillBoostPick($('#skPick', m.root), boostSlots(n));
   // счёт бежит от нуля, пока пламя разгорается
   const el = $('.sk-num', m.root), t0 = performance.now(), dur = Math.min(1400, 500 + n * 60);
   const step = now => { const k = Math.min(1, (now - t0) / dur); el.textContent = Math.round(n * (1 - Math.pow(1 - k, 3))); if (k < 1 && el.isConnected) requestAnimationFrame(step); };

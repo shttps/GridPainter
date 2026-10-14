@@ -756,7 +756,7 @@ $$;
 grant execute on function public.profile_feats(uuid) to anon, authenticated;
 
 -- ---------- Буст огонька: сетки игрока с серией от 3 дней выше в «Популярных» ----------
--- Лайки остаются настоящими; в сортировке к ним добавляются «виртуальные»: 3–6 дней подряд +3, 7–29 дней +8, 30+ дней +20.
+-- Лайки остаются настоящими; в сортировке к выбранным сеткам добавляются «виртуальные»: 3–6 дней подряд +3, 7–29 дней +8, 30+ дней +20.
 -- Буст живёт, пока огонёк горит (заходил сегодня или вчера); пропустил день — сетки возвращаются на своё место.
 -- Колонку score читает только сортировка в Мастерской (catalog-api.js); скрытое жалобами клиент отсеивает сам (hidden = false).
 create or replace function public.streak_boost(p_streak int, p_last date) returns int
@@ -765,12 +765,48 @@ language sql stable as $$
               when p_streak >= 30 then 20 when p_streak >= 7 then 8 when p_streak >= 3 then 3 else 0 end
 $$;
 
+-- Буст получают не все сетки игрока, а только выбранные им (boosted_at): с 3 дней подряд — 2 сетки, с 7 дней — 3.
+-- Серия упала и мест стало меньше — бустятся те, что выбраны раньше; остальные ждут, пока места снова появятся.
+alter table public.grids add column if not exists boosted_at timestamptz;
+create or replace function public.boost_slots(p_streak int, p_last date) returns int
+language sql stable as $$
+  select case when p_last < (now() at time zone 'utc')::date - 1 then 0
+              when p_streak >= 7 then 3 when p_streak >= 3 then 2 else 0 end
+$$;
+
 create or replace view public.grids_ranked as
+  with picked as (
+    select id, row_number() over (partition by user_id order by boosted_at) as n
+      from public.grids where boosted_at is not null and user_id is not null and not hidden)
   select g.id, g.title, g.author, g.description, g.kind, g.cats, g.heroes, g.likes, g.downloads, g.created_at,
          g.user_id, g.tags, g.nsfw, g.hidden,
-         g.likes + coalesce(public.streak_boost(v.streak, v.last_day), 0) as score
-    from public.grids g left join public.visit_streaks v on v.user_id = g.user_id;
+         g.likes + case when p.n <= public.boost_slots(v.streak, v.last_day)
+                        then coalesce(public.streak_boost(v.streak, v.last_day), 0) else 0 end as score
+    from public.grids g
+    left join public.visit_streaks v on v.user_id = g.user_id
+    left join picked p on p.id = g.id;
 grant select on public.grids_ranked to anon, authenticated;
+
+-- выбрать (p_on) или снять сетку с буста; только свою и только пока есть свободное место
+create or replace function public.set_boost(p_id uuid, p_on boolean) returns int
+language plpgsql security definer set search_path = public as $$
+declare v_slots int; v_used int;
+begin
+  if auth.uid() is null then raise exception 'not_signed_in'; end if;
+  if not exists (select 1 from grids where id = p_id and user_id = auth.uid()) then raise exception 'not_your_grid'; end if;
+  if not p_on then
+    update grids set boosted_at = null where id = p_id;
+  else
+    select coalesce((select boost_slots(streak, last_day) from visit_streaks where user_id = auth.uid()), 0) into v_slots;
+    if v_slots = 0 then raise exception 'no_streak'; end if;
+    select count(*) into v_used from grids where user_id = auth.uid() and boosted_at is not null and not hidden and id <> p_id;
+    if v_used >= v_slots then raise exception 'boost_full'; end if;
+    update grids set boosted_at = coalesce(boosted_at, now()) where id = p_id;
+  end if;
+  return v_slots;
+end $$;
+revoke all on function public.set_boost(uuid, boolean) from public, anon;
+grant execute on function public.set_boost(uuid, boolean) to authenticated;
 
 -- сколько буста у игрока сейчас — для окна огонька
 create or replace function public.my_boost() returns int
