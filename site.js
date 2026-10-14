@@ -1176,8 +1176,44 @@ function homeBgTile() {
     if (imgs.length > 1 && !matchMedia('(prefers-reduced-motion: reduce)').matches) setInterval(() => { if (!document.hidden) next(); }, 3200);
   }).catch(fallback);
 }
+// Заголовок главной меняется: 20 готовых фраз, по одной раз в 6 секунд, пока первый экран виден.
+// Разметка фразы: | — перенос строки, *слово* — градиентом. Первая — та, что в index.html; дальше — вперемешку.
+// Каждая фраза в две строки и не шире «Оформи Dota 2», чтобы шапка не прыгала. Для чтения с экрана заголовок
+// постоянный (aria-label), при «уменьшении движения» не меняется.
+const HERO_TITLES = [
+  'Оформи *Dota 2*|под себя.', 'Твоя *Дота*.|Твой стиль.', 'Сетка, что|*тащит*.', 'Собери пик|*мечты*.',
+  '*Мид* твой.|Сетка тоже.', 'Рисуй|*героями*.', 'Порядок|в *пике*.', 'Каждый герой|*на месте*.',
+  'Не фидь —|*оформляй*.', 'Аегис|за *стиль*.', 'Фон, сетка,|*арт*. Готово.', 'Красиво|за *минуту*.',
+  'Пик без|*паники*.', 'Твой экран.|*Твои* правила.', 'Профиль,|что *запомнят*.', 'Брайль|для *Steam*.',
+  'Все герои.|*Твой* порядок.', 'Лобби|*в огне*.', 'Меню —|только *твоё*.', 'Стиль —|*имба*.',
+];
+function heroTitles(h1) {
+  if (!h1 || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  h1.setAttribute('aria-label', h1.innerText.replace(/\s+/g, ' ').trim());
+  // слово — span.w; *Dota 2* — одно слово с неразрывным пробелом; точка после *слова* — отдельный span без отступа
+  const words = t => {
+    let i = 0;
+    const span = (txt, grad) => `<span class="w${grad ? ' grad' : ''}" style="--i:${i++}" aria-hidden="true">${esc(txt).replace(/ /g, '&nbsp;')}</span>`;
+    return t.split('|').map(line => line.match(/\*[^*]+\*\S*|\S+/g).map(w => {
+      const g = /^\*([^*]+)\*(.*)$/.exec(w);
+      return g ? span(g[1], true) + (g[2] ? span(g[2]) : '') : span(w);
+    }).join(' ')).join('<br>');
+  };
+  const order = [0, ...shuffled(HERO_TITLES.slice(1).map((_, k) => k + 1), 1 + Math.floor(Math.random() * 2e9))];
+  let at = 0, tm = 0, seen = true;
+  const next = () => {
+    if (document.hidden || !seen) return;
+    at = (at + 1) % order.length;
+    h1.classList.add('out');
+    setTimeout(() => { h1.classList.remove('out'); h1.innerHTML = words(HERO_TITLES[order[at]]); }, 560);
+  };
+  const run = () => { clearInterval(tm); tm = setInterval(next, 6000); };
+  new IntersectionObserver(es => { seen = es.some(e => e.isIntersecting); }).observe(h1);
+  run();
+}
 function initHome() {
   const heroes = window.HEROES || [], still = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  heroTitles($('.landing h1'));
 
   // карточки разделов: портреты героев, Брайль
   // «Сетка героев»: два ряда портретов бегут навстречу друг другу (ряд дублируем, чтобы лента была бесшовной)
@@ -2058,13 +2094,56 @@ function openBgUpload(onDone, initial = null) {
   return m;
 }
 
+// конфетти из центра элемента: веер бумажек цветов «Огня» вылетает во все стороны и чуть больше вверх,
+// дальше — сопротивление воздуха, гравитация и кувырок (сжатие по одной оси). Свой холст поверх всего, сам убирается.
+function confetti(from, n = 140) {
+  if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  const r = from.getBoundingClientRect(), ox = r.left + r.width / 2, oy = r.top + r.height / 2;
+  const cv = document.createElement('canvas'), d = Math.min(2, devicePixelRatio || 1);
+  cv.className = 'fx'; cv.setAttribute('aria-hidden', 'true');
+  cv.width = innerWidth * d; cv.height = innerHeight * d;
+  document.body.appendChild(cv);
+  const c = cv.getContext('2d'); c.scale(d, d);
+  const css = getComputedStyle(document.documentElement);
+  const cols = ['--c1', '--c2', '--c3', '--accent-hi'].map(v => css.getPropertyValue(v).trim()).filter(Boolean).concat('#fff4e6');
+  const rnd = (a, b) => a + Math.random() * (b - a);
+  const ps = Array.from({ length: n }, () => {
+    const a = rnd(0, Math.PI * 2), v = rnd(260, 820) * (Math.sin(a) < 0 ? 1 : 0.7);    // вверх летят дальше
+    return { x: ox + rnd(-8, 8), y: oy + rnd(-8, 8), vx: Math.cos(a) * v, vy: Math.sin(a) * v - rnd(80, 260),
+      w: rnd(5, 9), h: rnd(8, 14), rot: rnd(0, 6.28), vr: rnd(-9, 9), flip: rnd(0, 6.28), vf: rnd(6, 14),
+      col: cols[Math.floor(Math.random() * cols.length)], round: Math.random() < 0.25, life: rnd(1.9, 2.8) };
+  });
+  let last = performance.now(), t = 0;
+  const step = now => {
+    const dt = Math.min(0.05, (now - last) / 1000); last = now; t += dt;
+    c.clearRect(0, 0, innerWidth, innerHeight);
+    let alive = 0;
+    for (const p of ps) {
+      if (t > p.life) continue;
+      alive++;
+      const drag = Math.exp(-dt * 2.4);
+      p.vx *= drag; p.vy = p.vy * drag + 980 * dt;
+      p.x += p.vx * dt; p.y += p.vy * dt; p.rot += p.vr * dt; p.flip += p.vf * dt;
+      c.save(); c.globalAlpha = Math.min(1, (p.life - t) / 0.5);
+      c.translate(p.x, p.y); c.rotate(p.rot); c.scale(1, Math.cos(p.flip));
+      c.fillStyle = p.col;
+      if (p.round) { c.beginPath(); c.arc(0, 0, p.w / 2, 0, 6.283); c.fill(); }
+      else c.fillRect(-p.w / 2, -p.h / 2, p.w, p.h);
+      c.restore();
+    }
+    if (alive && cv.isConnected) requestAnimationFrame(step); else cv.remove();
+  };
+  requestAnimationFrame(step);
+  // если вкладка спит и кадры не идут — холст всё равно уберётся
+  setTimeout(() => cv.remove(), 4000);
+  return ps;
+}
 // фон выложен: окно загрузки превращается в поздравление — галочка с волной и искрами, превью, ссылка;
 // сверху сыплются угольки, а через пару секунд проверяем, не открылось ли достижение за фоны
 function bgPublished(m, { id, title, preview }) {
   const url = id ? new URL(bgPageUrl(id), location.href).href : '';
-  const sparks = Array.from({ length: 16 }, (_, i) => `<i style="--a:${(i * 22.5 + Math.random() * 10).toFixed(1)}deg;--d:${(48 + Math.random() * 30).toFixed(0)}px;--t:${(Math.random() * .12).toFixed(2)}s"></i>`).join('');
   $('.sh-body', m.root).outerHTML = `<div class="sh-body bpub">
-    <span class="bpub-ok"><i class="bpub-wave"></i><span class="bpub-sparks">${sparks}</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span>
+    <span class="bpub-ok"><i class="bpub-wave"></i><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5.5 12.5l4.2 4.2L18.5 7.8" pathLength="1"/></svg></span>
     <span class="kicker">Опубликовано</span>
     <h2>«${esc(title)}» — в Мастерской</h2>
     <p>Фон уже видят все: его можно посмотреть, скачать и поставить в Доту в один клик. Поделись ссылкой — пусть соберут себе такой же.</p>
@@ -2074,7 +2153,8 @@ function bgPublished(m, { id, title, preview }) {
   </div>`;
   const copy = $('[data-copy]', m.root);
   if (copy) copy.onclick = () => copyText(url, 'Ссылка скопирована');
-  if (!matchMedia('(prefers-reduced-motion: reduce)').matches) burst('embers');
+  // конфетти — из галочки, когда она уже «выскочила» (bpubPop ~ .3 с)
+  setTimeout(() => { const ok = $('.bpub-ok', m.root); if (ok?.isConnected) confetti(ok); }, 280);
   try { localStorage.removeItem('gs.ach.at.' + ACC.user()?.id); } catch {}
   setTimeout(() => window.Achievements?.watch(), 2200);
 }

@@ -173,15 +173,15 @@ button:focus { outline: none; }
   }
 .bg-vignette { position: absolute; inset: 0; background: radial-gradient(ellipse 130% 100% at 50% 35%, transparent 60%, oklch(0.09 0.008 var(--h) / .85)), linear-gradient(180deg, transparent 78%, var(--bg)); }
 /* заголовок: градиент темы медленно переливается */
-.landing h1 .grad { background-image: linear-gradient(100deg, var(--c1), var(--c2), var(--c3), var(--c2), var(--c1)); background-size: 300% 100%; animation: wordIn .8s var(--ease) .08s both, shine 9s ease-in-out 1s infinite alternate; }
+.landing h1 .grad { background-image: linear-gradient(100deg, var(--c1), var(--c2), var(--c3), var(--c2), var(--c1)); background-size: 300% 100%; animation: wordIn .8s var(--ease) calc(var(--i, 1) * .07s) both, shine 9s ease-in-out 1s infinite alternate; }
 @keyframes shine { to { background-position: 100% 0; } }
 .landing-grid { position: relative; z-index: 2; flex: 1; display: grid; grid-template-columns: minmax(0, 740px) minmax(0, 1fr); gap: 48px; align-items: center; width: min(1320px, 100% - 64px); }
 .landing-copy { position: relative; z-index: 3; padding: 16px 0 0; }
 .landing h1 { margin: 0 0 18px; font-size: clamp(46px, 5.9vw, 88px); line-height: .94; letter-spacing: -.055em; font-weight: 800; }
-.landing h1 .w { display: inline-block; animation: wordIn .8s var(--ease) both; }
-.landing h1 .w:nth-child(2) { animation-delay: .08s; }
-.landing h1 .w:nth-child(4) { animation-delay: .16s; }
-.landing h1 .w:nth-child(5) { animation-delay: .22s; }
+.landing h1 .w { display: inline-block; animation: wordIn .8s var(--ease) calc(var(--i, 0) * .07s) both; }
+/* заголовки сменяют друг друга (heroTitles в site.js): слова улетают вверх по очереди, новые выезжают снизу */
+.landing h1.out .w { animation: wordOut .38s var(--ease) calc(var(--i, 0) * .04s) both; }
+@keyframes wordOut { to { opacity: 0; transform: translateY(-.35em) rotate(-2deg); filter: blur(8px); } }
 .lead { margin: 0 0 26px; max-width: 480px; color: var(--muted); font-size: 18.5px; line-height: 1.5; animation: rise .7s var(--ease) .28s both; }
 .grad { background: var(--grad); -webkit-background-clip: text; background-clip: text; color: transparent; padding-bottom: .06em; }
 .btn.lg { height: 48px; padding: 0 22px; font-size: 15px; border-radius: 14px; }
@@ -1669,16 +1669,15 @@ body[data-page="grid"] { padding-top: calc(var(--nav-h) + 18px); background: rad
 .bpub h2 { margin: 0; font-size: 22px; letter-spacing: -.02em; }
 .bpub .kicker { margin: 6px 0 0; }
 .bpub p { margin: 0; max-width: 400px; color: var(--muted); font-size: 14px; line-height: 1.55; }
-.bpub-ok { position: relative; display: grid; place-items: center; width: 72px; height: 72px; margin: 4px 0; border-radius: 50%; background: var(--grad); color: var(--accent-ink); box-shadow: 0 14px 40px -12px var(--c1); animation: bpubPop .6s var(--spring) both; }
-.bpub-ok svg { width: 34px; height: 34px; fill: none; stroke: currentColor; stroke-width: 2.6; stroke-linecap: round; stroke-linejoin: round; stroke-dasharray: 24; stroke-dashoffset: 24; animation: bpubDraw .45s var(--ease) .3s forwards; }
+.bpub-ok { position: relative; display: grid; place-items: center; width: 80px; height: 80px; margin: 4px 0; border-radius: 50%; background: var(--grad); color: #fff; box-shadow: inset 0 1px 0 #ffffff55, 0 16px 44px -12px var(--c1); animation: bpubPop .6s var(--spring) both; }
+.bpub-ok::before { content: ""; position: absolute; inset: 6px; border-radius: 50%; border: 1.5px solid #ffffff4d; }
+.bpub-ok svg { position: relative; width: 40px; height: 40px; overflow: visible; fill: none; stroke: currentColor; stroke-width: 3.2; stroke-linecap: round; stroke-linejoin: round; stroke-dasharray: 1; stroke-dashoffset: 0; filter: drop-shadow(0 2px 3px #6a1a0a88); animation: bpubDraw .5s var(--ease) .35s both; }
 .bpub-wave { position: absolute; inset: 0; border-radius: 50%; border: 2px solid var(--c2); animation: bpubWave 1s var(--ease) .15s both; }
-.bpub-sparks i { position: absolute; left: 50%; top: 50%; width: 5px; height: 5px; margin: -2.5px; border-radius: 50%; background: var(--c3); box-shadow: 0 0 8px var(--c2); opacity: 0; animation: bpubSpark .8s var(--ease) calc(.2s + var(--t)) both; }
 .bpub-prev { display: block; width: 100%; max-width: 360px; aspect-ratio: 16 / 9; margin-top: 6px; overflow: hidden; border: 1px solid var(--line-strong); border-radius: 12px; background: var(--bg-2); box-shadow: 0 24px 50px -30px #000; }
 .bpub-prev img { width: 100%; height: 100%; object-fit: cover; display: block; animation: bpubZoom 6s var(--ease) both; }
 .bpub-link { display: flex; gap: 8px; width: 100%; margin-top: 4px; }
 .bpub-link .input { flex: 1; min-width: 0; font: 12px var(--mono); }
 @keyframes bpubPop { from { transform: scale(.3) rotate(-30deg); opacity: 0; } }
-@keyframes bpubDraw { to { stroke-dashoffset: 0; } }
+@keyframes bpubDraw { from { stroke-dashoffset: 1; } }
 @keyframes bpubWave { from { transform: scale(1); opacity: .9; } to { transform: scale(2.1); opacity: 0; } }
-@keyframes bpubSpark { 0% { opacity: 1; transform: rotate(var(--a)) translateY(0) scale(1); } 100% { opacity: 0; transform: rotate(var(--a)) translateY(calc(var(--d) * -1)) scale(.3); } }
 @keyframes bpubZoom { from { transform: scale(1.12); } }
