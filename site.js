@@ -1054,18 +1054,11 @@ function shuffled(list, seed = 7) {
   return a;
 }
 
-// ---------- гайды: список (статьи — в guides.html) ----------
-const GUIDES = [
-  ['start', 'Старт', 'Как поставить свою сетку в Доту', 'Где лежит hero_grid_config.json, как не потерять старые сетки и где выбрать новую в игре.', 4],
-  ['lineart', 'Картинки', 'Line-art, который читается в игре', 'Какую картинку брать, как выставить кадр, детализацию и тени, чтобы арт не превратился в кашу.', 6],
-  ['limits', 'Производительность', 'Сколько категорий можно', 'Почему экран героев думает дольше и как сэкономить категории без потери картинки.', 3],
-  ['mosaic', 'Мозаика', 'Мозаика из портретов героев', 'Как Дота раскладывает портреты, какую ширину выбрать и зачем исключать героев из палитры.', 4],
-  ['steam', 'Steam', 'Брайль-арт для профиля Steam', 'Арт для «Своего информационного поля»: ширина, лимит 8000 символов и почему строки переносятся.', 3],
-  ['text', 'Текст', 'Подписи и текст в сетке', 'Как Дота показывает названия категорий и как сделать надписи ровными.', 3],
-  ['share', 'Мастерская', 'Профиль, «Мои работы» и Мастерская', 'Как хранить работы приватно, возвращаться к ним и выкладывать сетки от своего имени.', 3],
-];
-const guideCard = ([id, tag, title, desc, min], k) => `<a class="guide-card" href="guides.html#${id}" data-reveal style="--d:${(k % 3) * 0.06}s">
-  <span class="gc-tag">${esc(tag)}</span><b>${esc(title)}</b><span>${esc(desc)}</span><small>${icon('clock')}${min} мин чтения</small></a>`;
+// ---------- гайды: карточка (сами гайды — guides-data.js, страница — guides.js) ----------
+const GUIDES = window.GUIDES_OFFICIAL || [];
+const guideCard = (g, k) => `<a class="guide-card" href="guides.html#${esc(g.id)}" data-reveal style="--d:${(k % 3) * 0.06}s">
+  <span class="gc-cover"><img src="${esc(g.cover)}" alt="" loading="lazy" decoding="async"></span>
+  <span class="gc-body"><span class="gc-tag">${esc(g.tag)}</span><b>${esc(g.title)}</b><span>${esc(g.subtitle)}</span><small>${icon('clock')}${g.minutes} мин чтения</small></span></a>`;
 
 // ---------- главная ----------
 // Брайль-арт для панели «Профиль Steam» (сделан из docs/art-white-src.webp тем же способом, что в редакторе:
@@ -2203,20 +2196,6 @@ function saveBlob(name, blob) {
   setTimeout(() => URL.revokeObjectURL(a.href), 60000);
 }
 
-// ---------- гайды ----------
-function initGuides() {
-  $('#guideList').innerHTML = GUIDES.map(guideCard).join('');
-  // оглавление сбоку подсвечивает статью, которую сейчас читают
-  const toc = $('#guideToc');
-  toc.innerHTML = GUIDES.map(([id, , title]) => `<a href="#${id}" data-id="${id}">${esc(title)}</a>`).join('');
-  const links = new Map($$('a', toc).map(a => [a.dataset.id, a]));
-  const io = new IntersectionObserver(es => {
-    for (const e of es) if (e.isIntersecting) { for (const a of links.values()) a.classList.remove('on'); links.get(e.target.id)?.classList.add('on'); }
-  }, { rootMargin: '-30% 0px -60% 0px' });
-  for (const id of links.keys()) { const el = document.getElementById(id); if (el) io.observe(el); }
-  document.addEventListener('click', e => { const b = e.target.closest('[data-copy]'); if (b) copyText(b.dataset.copy, 'Скопировано'); });
-}
-
 // ---------- профиль ----------
 async function initProfile() {
   const box = $('#profile'), qs = new URLSearchParams(location.search);
@@ -2793,7 +2772,6 @@ if (PAGE === 'home') initHome();
 if (PAGE === 'workshop') initWorkshop();
 if (PAGE === 'grid') initGridPage();
 if (PAGE === 'bg') initBgPage();
-if (PAGE === 'guides') initGuides();
 if (PAGE === 'profile') initProfile();
 // новые достижения празднуем на любой странице сайта, а не только в профиле — чуть позже, чтобы не мешать загрузке
 else setTimeout(() => window.Achievements?.watch(), 2500);

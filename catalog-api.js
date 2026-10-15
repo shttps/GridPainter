@@ -46,6 +46,9 @@ window.CatalogAPI = (() => {
     not_your_grid: 'Поднять можно только свою сетку.',
     no_streak: 'Буст открывается с 3 дней подряд — заходи каждый день.',
     boost_full: 'Все места для буста заняты — сначала сними буст с другой сетки.',
+    bad_guide_title: 'Заголовок гайда — от 3 до 90 символов.',
+    bad_body: 'В гайде нет текста или он слишком большой.',
+    not_your_guide: 'Править можно только свой гайд.',
   };
   function niceError(msg) {
     for (const k in ERRORS) if (String(msg).includes(k)) return ERRORS[k];
@@ -250,10 +253,10 @@ window.CatalogAPI = (() => {
   const withUrls = b => ({ ...b, path: b.file, posterPath: b.poster, file: bgUrl(b.file), poster: bgUrl(b.poster) });
   const EXT = { 'image/png': 'png', 'image/jpeg': 'jpg', 'image/webp': 'webp', 'image/gif': 'gif', 'video/mp4': 'mp4', 'video/webm': 'webm' };
   // один файл в Storage; XMLHttpRequest, а не fetch — ради полоски прогресса
-  function put(path, blob, token, onProgress) {
+  function put(path, blob, token, onProgress, bucket = 'backgrounds') {
     return new Promise((resolve, reject) => {
       const x = new XMLHttpRequest();
-      x.open('POST', `${storage}/backgrounds/${path}`);
+      x.open('POST', `${storage}/${bucket}/${path}`);
       x.setRequestHeader('apikey', cfg.key);
       x.setRequestHeader('Authorization', 'Bearer ' + token);
       x.setRequestHeader('Content-Type', blob.type);
@@ -270,8 +273,8 @@ window.CatalogAPI = (() => {
       x.send(blob);
     });
   }
-  async function unlink(paths, token) {
-    await fetch(`${storage}/backgrounds`, {
+  async function unlink(paths, token, bucket = 'backgrounds') {
+    await fetch(`${storage}/${bucket}`, {
       method: 'DELETE', headers: { apikey: cfg.key, Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' }, body: JSON.stringify({ prefixes: paths }),
     }).catch(() => {});
   }
@@ -363,6 +366,95 @@ window.CatalogAPI = (() => {
     isMine: b => !!b.user_id && b.user_id === window.Accounts?.user()?.id,
   };
 
+  // ---------- гайды игроков ----------
+  // Тело гайда — список блоков (см. schema.sql); картинки лежат в бакете guides, в базе — пути внутри него.
+  const gLiked = new Set(load('gs.g.liked', []));
+  const gReported = new Set(load('gs.g.reported', []));
+  const gViewed = new Set(load('gs.g.viewed', []));
+  const G_COLS = 'id,created_at,updated_at,user_id,author,title,subtitle,tag,cover,minutes,likes,views';
+  const guideUrl = path => `${storage}/public/guides/${String(path).split('/').map(encodeURIComponent).join('/')}`;
+  const gMissing = e => /guides|save_guide|guide_/.test(e.message);
+  // пути картинок гайда — чтобы стереть их из бакета вместе с гайдом
+  const guideFiles = (cover, body) => [cover, ...(body || []).flatMap(b => [b.src, b.a, b.b])].filter(Boolean);
+  const guides = {
+    enabled: remote,
+    canWrite: () => remote && !!window.Accounts?.enabled,
+    url: guideUrl,
+    async list({ q = '', tag = '', sort = 'new', offset = 0, limit = 24, userId = '', queue = false } = {}) {
+      if (!remote) return { items: [], total: 0 };
+      q = clean(q);
+      const p = new URLSearchParams({ select: G_COLS + (queue ? ',reports,hidden' : '') });
+      if (queue) p.set('or', '(reports.gt.0,hidden.is.true)');
+      else if (!userId) p.set('hidden', 'is.false');
+      if (tag) p.set('tag', 'eq.' + tag);
+      if (userId) p.set('user_id', 'eq.' + userId);
+      if (q && !queue) p.set('or', `(title.ilike.*${q}*,author.ilike.*${q}*,subtitle.ilike.*${q}*)`);
+      p.set('order', sort === 'popular' ? 'likes.desc,created_at.desc' : 'created_at.desc');
+      p.set('offset', offset); p.set('limit', limit);
+      try {
+        const r = await rest('/guides?' + p, { count: true });
+        return { items: r.data, total: r.total ?? r.data.length };
+      } catch (e) {
+        if (gMissing(e)) return { items: [], total: 0, missing: true };
+        throw e;
+      }
+    },
+    async get(id) {
+      const r = await rest(`/guides?select=${G_COLS},body,reports,hidden&id=eq.${encodeURIComponent(id)}`);
+      if (!r.data?.length) throw new Error('Гайд не найден — возможно, автор его удалил.');
+      return r.data[0];
+    },
+    // картинка для гайда: в свою папку бакета; возвращает путь внутри бакета
+    async upload(blob, onProgress) {
+      if (!guides.canWrite()) throw new Error('Публикация гайдов ещё не подключена.');
+      const token = await window.Accounts.token(), uid = window.Accounts.user()?.id;
+      if (!token || !uid) throw new Error(ERRORS.not_signed_in.replace('фоны', 'гайды'));
+      const ext = EXT[blob.type]; if (!ext || blob.type.startsWith('video/')) throw new Error('Нужна картинка: PNG, JPEG, WebP или GIF.');
+      if (blob.size > 5242880) throw new Error('Картинка больше 5 МБ — сожми её или возьми поменьше.');
+      const path = `${uid}/${uuid()}.${ext}`;
+      try { await put(path, blob, token, onProgress, 'guides'); }
+      catch (e) { throw /bucket|not found/i.test(e.message) ? new Error('Хранилище гайдов ещё не настроено: выполни свежий supabase/schema.sql.') : e; }
+      return path;
+    },
+    // сохранить: id нет — новый гайд; вернёт id
+    async save({ id = null, title, subtitle, tag, cover, body, minutes }) {
+      if (!window.Accounts?.user()) throw new Error('Войди в профиль, чтобы выкладывать гайды.');
+      try {
+        return await rpc('save_guide', { p_id: id, p_title: title, p_subtitle: subtitle || '', p_tag: tag, p_cover: cover || '', p_body: body, p_minutes: minutes | 0 });
+      } catch (e) { throw gMissing(e) && !/bad_|rate_|not_/.test(e.message) ? new Error('Сначала выполни свежий supabase/schema.sql — в базе ещё нет гайдов.') : e; }
+    },
+    async remove(id) {
+      const token = await window.Accounts?.token();
+      if (!token) throw new Error('Войди в профиль, чтобы удалить гайд.');
+      const r = await rpc('delete_guide', { p_id: id });
+      if (!r) throw new Error('Удалить можно только свой гайд.');
+      await unlink(guideFiles(r.cover, r.body), token, 'guides');
+    },
+    // убрать загруженные, но так и не попавшие в гайд картинки
+    async forget(paths) { const token = await window.Accounts?.token(); if (token && paths.length) await unlink(paths, token, 'guides'); },
+    async like(id) {
+      const r = await rpc('guide_like', { p_id: id, p_key: browserKey });
+      r.liked ? gLiked.add(id) : gLiked.delete(id); remember(gLiked, 'gs.g.liked');
+      return r;
+    },
+    // просмотр считаем раз на браузер
+    async view(id) {
+      if (gViewed.has(id)) return;
+      gViewed.add(id); remember(gViewed, 'gs.g.viewed');
+      try { await rpc('guide_view', { p_id: id }); } catch { /* счётчик */ }
+    },
+    async report(id) {
+      if (gReported.has(id)) return;
+      await rpc('guide_report', { p_id: id, p_key: browserKey });
+      gReported.add(id); remember(gReported, 'gs.g.reported');
+    },
+    isLiked: id => gLiked.has(id),
+    isReported: id => gReported.has(id),
+    isMine: g => !!g.user_id && g.user_id === window.Accounts?.user()?.id,
+    files: guideFiles,
+    TAGS: ['Старт', 'Картинки', 'Мозаика', 'Текст', 'Steam', 'Фон меню', 'Производительность', 'Идеи', 'Другое'],
+  };
+
   // ---------- модерация (только админы: права проверяет база) ----------
   const admin = {
     // всё, на что жаловались, и всё скрытое: сначала скрытое, потом по числу жалоб
@@ -411,7 +503,7 @@ window.CatalogAPI = (() => {
     isMine: (id, userId) => mine.has(id) || (!!userId && userId === window.Accounts?.user()?.id), isLiked: id => liked.has(id), isReported: id => reported.has(id), mineCount: () => mine.size,
     author: () => load('gs.author', ''), setAuthor: a => save('gs.author', a),
     KINDS: { ascii: 'ASCII', mosaic: 'Мозаика', mixed: 'Смешанная' },
-    TAGS, bg, admin, boosts,
+    TAGS, bg, guides, admin, boosts,
     // 18+: размытые карточки открываются по клику; «мне есть 18» запоминается
     adult: () => load('gs.adult', false), setAdult: v => save('gs.adult', !!v),
   };

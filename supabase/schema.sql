@@ -867,3 +867,193 @@ begin
 end $$;
 revoke all on function public.claim_grids(uuid) from public, anon;
 grant execute on function public.claim_grids(uuid) to authenticated;
+
+-- =====================================================================
+-- Гайды игроков (3.0): статьи в стиле Telegraph — заголовок, обложка, текст и картинки.
+-- Текст хранится не HTML, а списком блоков (jsonb): сайт сам собирает из них страницу и экранирует всё,
+-- так что вставить в гайд скрипт нельзя. Картинки и GIF лежат в публичном бакете guides,
+-- у каждого автора своя папка <id аккаунта>/ — в гайде можно сослаться только на файлы из своей папки.
+-- Писать и править — только свои гайды и только войдя в профиль; читать — всем.
+-- Лайки, просмотры и жалобы — как у сеток (5 жалоб прячут гайд), админ прячет и возвращает.
+-- =====================================================================
+
+insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+values ('guides', 'guides', true, 5242880, array['image/png', 'image/jpeg', 'image/webp', 'image/gif'])
+on conflict (id) do update set public = excluded.public, file_size_limit = excluded.file_size_limit, allowed_mime_types = excluded.allowed_mime_types;
+
+-- сколько файлов уже в папке автора (security definer — считаем мимо RLS самого storage.objects)
+create or replace function public._guide_files(p_uid uuid) returns int
+language sql stable security definer set search_path = public, storage as $$
+  select count(*)::int from storage.objects where bucket_id = 'guides' and name like p_uid::text || '/%'
+$$;
+revoke all on function public._guide_files(uuid) from public, anon;
+grant execute on function public._guide_files(uuid) to authenticated;
+
+drop policy if exists "guides: upload to own folder" on storage.objects;
+create policy "guides: upload to own folder" on storage.objects for insert to authenticated
+  with check (bucket_id = 'guides' and (storage.foldername(name))[1] = auth.uid()::text and public._guide_files(auth.uid()) < 300);
+drop policy if exists "guides: see own files" on storage.objects;
+create policy "guides: see own files" on storage.objects for select to authenticated
+  using (bucket_id = 'guides' and ((storage.foldername(name))[1] = auth.uid()::text or (select public.is_admin())));
+drop policy if exists "guides: delete own files" on storage.objects;
+create policy "guides: delete own files" on storage.objects for delete to authenticated
+  using (bucket_id = 'guides' and ((storage.foldername(name))[1] = auth.uid()::text or (select public.is_admin())));
+
+create table if not exists public.guides (
+  id         uuid primary key default gen_random_uuid(),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  user_id    uuid not null references auth.users(id) on delete cascade,
+  author     text not null default '',
+  title      text not null,
+  subtitle   text not null default '',
+  tag        text not null default 'Другое',
+  cover      text not null default '',          -- путь в бакете guides: <id аккаунта>/<uuid>.webp
+  body       jsonb not null default '[]',       -- блоки: [{ "t": "p", "x": "текст" }, { "t": "img", "src": "<путь>", "cap": "подпись" }, …]
+  minutes    int  not null default 1,
+  likes      int  not null default 0,
+  views      int  not null default 0,
+  reports    int  not null default 0,
+  hidden     boolean not null default false
+);
+create index if not exists guides_new_idx  on public.guides (created_at desc) where not hidden;
+create index if not exists guides_top_idx  on public.guides (likes desc, created_at desc) where not hidden;
+create index if not exists guides_user_idx on public.guides (user_id, created_at desc);
+
+create table if not exists public.guide_likes (
+  guide_id uuid references public.guides(id) on delete cascade,
+  key      uuid not null,
+  primary key (guide_id, key)
+);
+create table if not exists public.guide_reports (
+  guide_id uuid references public.guides(id) on delete cascade,
+  key      uuid not null,
+  primary key (guide_id, key)
+);
+
+alter table public.guides        enable row level security;
+alter table public.guide_likes   enable row level security;
+alter table public.guide_reports enable row level security;
+drop policy if exists "guides are public" on public.guides;
+create policy "guides are public" on public.guides for select to anon, authenticated using (not hidden);
+drop policy if exists "authors see own hidden guides" on public.guides;
+create policy "authors see own hidden guides" on public.guides for select to authenticated using (user_id = auth.uid());
+drop policy if exists "admins see hidden guides" on public.guides;
+create policy "admins see hidden guides" on public.guides for select to authenticated using ((select public.is_admin()));
+grant select on public.guides to anon, authenticated;
+revoke insert, update, delete on public.guides from anon, authenticated;
+revoke all on public.guide_likes, public.guide_reports from anon, authenticated;
+
+-- проверка тела гайда: только известные блоки, разумный размер, картинки — только из своей папки бакета
+create or replace function public._guide_body_ok(p_body jsonb, p_dir text) returns boolean
+language plpgsql immutable set search_path = public as $$
+declare b jsonb; v_src text;
+begin
+  if jsonb_typeof(p_body) <> 'array' or jsonb_array_length(p_body) not between 1 and 400 or octet_length(p_body::text) > 120000 then return false; end if;
+  for b in select value from jsonb_array_elements(p_body) loop
+    if jsonb_typeof(b) <> 'object' or coalesce(b ->> 't', '') not in ('p', 'h', 'h3', 'quote', 'ul', 'ol', 'img', 'compare', 'tip', 'warn', 'code', 'hr') then return false; end if;
+    foreach v_src in array array[coalesce(b ->> 'src', ''), coalesce(b ->> 'a', ''), coalesce(b ->> 'b', '')] loop
+      if v_src <> '' and (left(v_src, char_length(p_dir)) <> p_dir or v_src ~ '\.\.' or char_length(v_src) > 200) then return false; end if;
+    end loop;
+  end loop;
+  return true;
+end $$;
+
+-- сохранить гайд: p_id = null — новый (не больше 5 в сутки), иначе — правка своего
+create or replace function public.save_guide(p_id uuid, p_title text, p_subtitle text, p_tag text, p_cover text, p_body jsonb, p_minutes int)
+returns uuid
+language plpgsql security definer set search_path = public as $$
+declare
+  v_uid   uuid := auth.uid();
+  v_dir   text;
+  v_title text := btrim(coalesce(p_title, ''));
+  v_sub   text := btrim(coalesce(p_subtitle, ''));
+  v_cover text := coalesce(p_cover, '');
+  v_tag   text := coalesce(p_tag, '');
+  v_nick  text;
+  v_id    uuid;
+begin
+  if v_uid is null then raise exception 'not_signed_in'; end if;
+  v_dir := v_uid::text || '/';
+  if char_length(v_title) not between 3 and 90 then raise exception 'bad_guide_title'; end if;
+  if char_length(v_sub) > 200 then raise exception 'bad_description'; end if;
+  if v_cover <> '' and (left(v_cover, char_length(v_dir)) <> v_dir or v_cover ~ '\.\.') then raise exception 'bad_file'; end if;
+  if not public._guide_body_ok(p_body, v_dir) then raise exception 'bad_body'; end if;
+  if v_tag not in ('Старт', 'Картинки', 'Мозаика', 'Текст', 'Steam', 'Фон меню', 'Производительность', 'Идеи', 'Другое') then v_tag := 'Другое'; end if;
+  select nullif(btrim(nick), '') into v_nick from profiles where id = v_uid;
+  if p_id is null then
+    if (select count(*) from guides where user_id = v_uid and created_at > now() - interval '1 day') >= 5 then raise exception 'rate_limit'; end if;
+    insert into guides (user_id, author, title, subtitle, tag, cover, body, minutes)
+    values (v_uid, coalesce(v_nick, 'Игрок'), v_title, v_sub, v_tag, v_cover, p_body, least(greatest(coalesce(p_minutes, 1), 1), 120))
+    returning id into v_id;
+  else
+    update guides set title = v_title, subtitle = v_sub, tag = v_tag, cover = v_cover, body = p_body,
+      minutes = least(greatest(coalesce(p_minutes, 1), 1), 120), author = coalesce(v_nick, author), updated_at = now()
+      where id = p_id and user_id = v_uid returning id into v_id;
+    if v_id is null then raise exception 'not_your_guide'; end if;
+  end if;
+  return v_id;
+end $$;
+
+-- удалить свой гайд (админ — любой); возвращает обложку и тело, чтобы сайт стёр картинки из бакета
+create or replace function public.delete_guide(p_id uuid) returns json
+language plpgsql security definer set search_path = public as $$
+declare v_cover text; v_body jsonb;
+begin
+  delete from guides where id = p_id and (user_id = auth.uid() or public.is_admin()) returning cover, body into v_cover, v_body;
+  if not found then return null; end if;
+  return json_build_object('cover', v_cover, 'body', v_body);
+end $$;
+
+create or replace function public.guide_like(p_id uuid, p_key uuid) returns json
+language plpgsql security definer set search_path = public as $$
+declare v_liked boolean; v_likes int;
+begin
+  if p_key is null or not exists (select 1 from guides where id = p_id and not hidden) then raise exception 'not_found'; end if;
+  delete from guide_likes where guide_id = p_id and key = p_key;
+  if found then v_liked := false;
+  else insert into guide_likes (guide_id, key) values (p_id, p_key); v_liked := true;
+  end if;
+  update guides set likes = (select count(*) from guide_likes where guide_id = p_id) where id = p_id returning likes into v_likes;
+  return json_build_object('likes', v_likes, 'liked', v_liked);
+end $$;
+
+create or replace function public.guide_view(p_id uuid) returns void
+language sql security definer set search_path = public as $$
+  update guides set views = views + 1 where id = p_id and not hidden;
+$$;
+
+create or replace function public.guide_report(p_id uuid, p_key uuid) returns void
+language plpgsql security definer set search_path = public as $$
+begin
+  if p_key is null then return; end if;
+  insert into guide_reports (guide_id, key) values (p_id, p_key) on conflict do nothing;
+  if found then
+    update guides set reports = reports + 1, hidden = hidden or reports + 1 >= 5 where id = p_id;
+  end if;
+end $$;
+
+revoke all on function public.save_guide(uuid, text, text, text, text, jsonb, int), public.delete_guide(uuid),
+  public.guide_like(uuid, uuid), public.guide_view(uuid), public.guide_report(uuid, uuid), public._guide_body_ok(jsonb, text)
+  from public, anon, authenticated;
+grant execute on function public.save_guide(uuid, text, text, text, text, jsonb, int), public.delete_guide(uuid) to authenticated;
+grant execute on function public.guide_like(uuid, uuid), public.guide_view(uuid), public.guide_report(uuid, uuid) to anon, authenticated;
+
+-- модерация: к сеткам и фонам добавились гайды (p_kind = 'guide')
+create or replace function public.admin_moderate(p_kind text, p_id uuid, p_hidden boolean) returns boolean
+language plpgsql security definer set search_path = public as $$
+begin
+  if not public.is_admin() then raise exception 'not_admin'; end if;
+  if p_kind = 'grid' then
+    update grids set hidden = p_hidden, reports = case when p_hidden then reports else 0 end where id = p_id;
+  elsif p_kind = 'bg' then
+    update backgrounds set hidden = p_hidden, reports = case when p_hidden then reports else 0 end where id = p_id;
+  elsif p_kind = 'guide' then
+    update guides set hidden = p_hidden, reports = case when p_hidden then reports else 0 end where id = p_id;
+  else
+    raise exception 'bad_kind';
+  end if;
+  return found;
+end $$;
+revoke all on function public.admin_moderate(text, uuid, boolean) from public, anon;
+grant execute on function public.admin_moderate(text, uuid, boolean) to authenticated;

@@ -867,14 +867,19 @@ body[data-page="workshop"]::before { content: ""; position: absolute; z-index: -
 @media (max-width: 640px) { .t-ingame .tile-img { height: 190px; flex: none; } }
 
 /* ---------- гайды ---------- */
-.guide-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(290px, 1fr)); gap: 16px; }
-.guide-card { position: relative; display: flex; flex-direction: column; gap: 8px; padding: 22px 22px 18px; border-radius: 20px; background: linear-gradient(180deg, var(--card), oklch(0.19 0.008 var(--h) / .5)); border: 1px solid var(--line); text-decoration: none; overflow: hidden; }
-.guide-card::after { content: ""; position: absolute; left: 22px; right: 22px; top: 0; height: 1px; background: var(--grad); opacity: .5; }
-.guide-card.in { transition: border-color .25s, transform .3s var(--ease), opacity .7s var(--ease); }
-.guide-card.in:hover { border-color: var(--accent-line); transform: translateY(-4px); }
-.gc-tag { align-self: flex-start; padding: 3px 9px; border-radius: 7px; background: var(--accent-soft); color: var(--accent-hi); font: 600 10px var(--disp); letter-spacing: .07em; text-transform: uppercase; }
+.guide-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(290px, 1fr)); gap: 18px; }
+.guide-card { position: relative; display: flex; flex-direction: column; border-radius: 20px; background: linear-gradient(180deg, var(--card), oklch(0.19 0.008 var(--h) / .5)); border: 1px solid var(--line); text-decoration: none; overflow: hidden; }
+.guide-card::after { content: ""; position: absolute; left: 22px; right: 22px; top: 0; height: 1px; background: var(--grad); opacity: .5; z-index: 2; }
+.guide-card.in { transition: border-color .25s, transform .4s var(--ease), box-shadow .4s var(--ease), opacity .7s var(--ease); }
+.guide-card.in:hover { border-color: var(--accent-line); transform: translateY(-4px); box-shadow: 0 24px 50px -28px oklch(0 0 0 / .9); }
+.gc-cover { position: relative; display: block; aspect-ratio: 16 / 9; overflow: hidden; background: var(--bg-2); }
+.gc-cover::after { content: ""; position: absolute; inset: 0; background: linear-gradient(180deg, transparent 55%, oklch(0.19 0.01 var(--h) / .85)); }
+.gc-cover img { width: 100%; height: 100%; object-fit: cover; display: block; transition: transform .8s var(--ease), filter .5s; filter: saturate(.9); }
+.guide-card:hover .gc-cover img { transform: scale(1.06); filter: saturate(1.1); }
+.gc-body { display: flex; flex: 1; flex-direction: column; gap: 8px; padding: 6px 22px 18px; margin-top: -18px; position: relative; z-index: 1; }
+.gc-tag { align-self: flex-start; padding: 3px 9px; border-radius: 7px; background: var(--accent-soft); color: var(--accent-hi); font: 600 10px var(--disp); letter-spacing: .07em; text-transform: uppercase; -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); }
 .guide-card b { font-size: 18.5px; font-weight: 700; letter-spacing: -.015em; line-height: 1.25; }
-.guide-card > span:not(.gc-tag) { flex: 1; color: var(--muted); font-size: 14px; }
+.gc-body > span:not(.gc-tag) { flex: 1; color: var(--muted); font-size: 14px; }
 .guide-card small { display: flex; align-items: center; gap: 6px; margin-top: 6px; color: var(--faint); font: 12px var(--mono); }
 .guide-card small .i { width: 14px; height: 14px; }
 
@@ -883,31 +888,6 @@ body[data-page="workshop"]::before { content: ""; position: absolute; z-index: -
 .page-head .kicker { margin-bottom: 14px; }
 .page-head h1 { margin: 0; font-size: clamp(38px, 5.4vw, 66px); line-height: 1; letter-spacing: -.045em; font-weight: 800; animation: rise .6s var(--ease) both; }
 .page-head p { margin: 16px 0 0; max-width: 640px; color: var(--muted); font-size: 18px; animation: rise .6s var(--ease) .08s both; }
-.guides-layout { display: grid; grid-template-columns: 250px minmax(0, 1fr); gap: 56px; align-items: start; margin-top: 72px; }
-.guide-toc { position: sticky; top: calc(var(--nav-h) + 20px); display: flex; flex-direction: column; gap: 2px; padding-left: 14px; border-left: 1px solid var(--line); }
-.guide-toc::before { content: "Содержание"; margin-bottom: 8px; color: var(--faint); font: 600 11px var(--mono); letter-spacing: .08em; text-transform: uppercase; }
-.guide-toc a { position: relative; padding: 6px 0; color: var(--muted); text-decoration: none; font-size: 14px; line-height: 1.35; transition: color .15s; }
-.guide-toc a:hover, .guide-toc a.on { color: var(--ink); }
-.guide-toc a.on::before { content: ""; position: absolute; left: -15px; top: 6px; bottom: 6px; width: 2px; border-radius: 2px; background: var(--grad); }
-.article { max-width: 760px; margin-bottom: 64px; padding-bottom: 64px; border-bottom: 1px solid var(--line); scroll-margin-top: calc(var(--nav-h) + 20px); }
-.article:last-child { border-bottom: 0; }
-.article h2 { margin: 12px 0 16px; font-size: clamp(26px, 3vw, 34px); letter-spacing: -.03em; line-height: 1.15; }
-.article h3 { margin: 30px 0 10px; font-size: 19px; letter-spacing: -.01em; }
-.article p, .article li { color: var(--ink-2); font-size: 16px; line-height: 1.7; }
-.article p { margin: 0 0 14px; }
-.article ol, .article ul { margin: 0 0 14px; padding-left: 22px; }
-.article li + li { margin-top: 6px; }
-.article li::marker { color: var(--accent-hi); font-weight: 700; }
-.article b { color: var(--ink); }
-.article code { padding: 1px 6px; border-radius: 6px; background: var(--bg-2); border: 1px solid var(--line); color: var(--ink); font: 13.5px var(--mono); }
-.article kbd { padding: 1px 6px; border-radius: 6px; background: var(--card-2); border-bottom: 2px solid var(--line-strong); font: 12.5px var(--mono); }
-.path { display: flex; align-items: center; gap: 10px; margin: 6px 0 16px; padding: 12px 12px 12px 16px; border-radius: 13px; background: var(--bg-2); border: 1px solid var(--line); }
-.path code { flex: 1; min-width: 0; overflow-x: auto; padding: 0; border: 0; background: none; white-space: nowrap; font-size: 13.5px; }
-.tip { display: flex; gap: 12px; margin: 18px 0; padding: 14px 16px; border-radius: 14px; background: oklch(0.82 0.13 80 / .07); border: 1px solid oklch(0.82 0.13 80 / .22); color: oklch(0.9 0.06 80); font-size: 15px; line-height: 1.55; }
-.tip::before { content: "★"; color: var(--gold); }
-.tip.warn { background: color-mix(in oklab, var(--c1) 8%, transparent); border-color: color-mix(in oklab, var(--c1) 30%, transparent); color: oklch(0.88 0.05 30); }
-.tip.warn::before { content: "!"; color: var(--red); font-weight: 800; }
-.art-cta { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 22px; }
 
 /* ---------- профиль и вход ---------- */
 .profile { min-height: 72vh; padding-top: calc(var(--nav-h) + 34px); }
@@ -1071,8 +1051,6 @@ textarea.pf-bio:focus { outline: 0; border-color: var(--accent); background: var
   .compare { height: 420px; flex: none; }
   .t-mosaic, .t-ingame { min-height: 230px; }
   .t-tools .tools { margin: 24px 16px 0; }
-  .guides-layout { grid-template-columns: 1fr; gap: 0; margin-top: 48px; }
-  .guide-toc { display: none; }
 }
 /* меню прячется в «бургер»: ссылки выпадают листом под полосой */
 @media (max-width: 820px) {
@@ -1125,7 +1103,6 @@ textarea.pf-bio:focus { outline: 0; border-color: var(--accent); background: var
   .big-num b { font-size: 56px; }
   .pf-head { --pfp: 18px; }
   .pf-nick { font-size: 26px; }
-  .article p, .article li { font-size: 15.5px; }
 }
 
 /* ---------- админ: значок, плашка в окне сетки/фона, метки в «Модерации» ---------- */
