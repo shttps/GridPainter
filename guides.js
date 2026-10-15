@@ -150,7 +150,17 @@
     if (signedIn()) f.push(['mine', 'Мои']);
     if (isAdmin()) f.push(['queue', 'На проверке']);
     if (!f.some(([k]) => k === L.filter)) L.filter = 'all';
-    $('#gFilter').innerHTML = f.map(([k, t]) => `<button class="chip${k === L.filter ? ' on' : ''}" role="tab" aria-selected="${k === L.filter}" data-f="${k}">${t}</button>`).join('');
+    $('#gFilter').innerHTML = '<span class="chip-ind"></span>' + f.map(([k, t]) => `<button class="chip${k === L.filter ? ' on' : ''}" role="tab" aria-selected="${k === L.filter}" data-f="${k}">${t}</button>`).join('');
+    moveInd(false);
+  }
+  // бегунок под выбранным фильтром переезжает от чипа к чипу
+  function moveInd(animate = true) {
+    const box = $('#gFilter'), ind = $('.chip-ind', box), on = $('.chip.on', box);
+    if (!ind || !on) return;
+    if (!animate) ind.style.transition = 'none';
+    ind.style.width = on.offsetWidth + 'px';
+    ind.style.transform = `translateX(${on.offsetLeft}px)`;
+    if (!animate) { void ind.offsetWidth; ind.style.transition = ''; }
   }
   function renderGrid() {
     const grid = $('#gGrid'), more = $('#gMore');
@@ -194,12 +204,16 @@
     renderFeature(); renderFilters(); loadPeople();
     $('#gFilter').onclick = e => {
       const b = e.target.closest('[data-f]'); if (!b || b.dataset.f === L.filter) return;
-      L.filter = b.dataset.f; renderFilters(); loadPeople();
+      L.filter = b.dataset.f;
+      $$('#gFilter .chip').forEach(c => { const on = c === b; c.classList.toggle('on', on); c.setAttribute('aria-selected', on); });
+      moveInd(); loadPeople();
     };
     let t = 0;
     $('#gSearch').oninput = e => { clearTimeout(t); t = setTimeout(() => { L.q = e.target.value.trim(); loadPeople(); }, 300); };
     $('#gMore').onclick = e => { if (e.target.closest('#gMoreBtn')) loadPeople(true); };
     ACC?.enabled && ACC.onChange(() => { renderFilters(); });
+    addEventListener('resize', () => moveInd(false));
+    document.fonts?.ready.then(() => moveInd(false));
   }
 
   // ======================= страница поверх списка: открыть / закрыть =======================
@@ -218,7 +232,7 @@
   function mount(html, cls) {
     cleanup.forEach(f => f()); cleanup = [];
     tg.className = 'tg ' + cls;
-    tg.dataset.theme = load('gs.tg.theme', 'dark');
+    tg.dataset.theme = load('gs.tg.theme2', 'dark');
     tg.innerHTML = html;
     tg.hidden = false; tg.scrollTop = 0;
     document.documentElement.classList.add('tg-on');
@@ -260,7 +274,7 @@
 
   // ======================= читалка =======================
   function topBar(extra = '') {
-    const dark = tg.dataset.theme === 'dark' || load('gs.tg.theme', 'dark') === 'dark';
+    const dark = tg.dataset.theme === 'dark' || load('gs.tg.theme2', 'dark') === 'dark';
     return `<div class="tg-top"><div class="tg-top-in">
       <button class="tg-btn tg-back" data-act="back">${icon('back')}<span>Гайды</span></button>
       <span class="tg-top-mid"></span>${extra}
@@ -359,10 +373,19 @@
       }
     };
   }
+  // смена темы: новая расходится кругом от кнопки, иконка солнца/луны проворачивается
   function toggleTheme(btn) {
-    const t = tg.dataset.theme === 'dark' ? 'light' : 'dark';
-    const set = () => { tg.dataset.theme = t; save('gs.tg.theme', t); btn.innerHTML = icon(t === 'dark' ? 'sun' : 'moon'); };
-    vt(set);
+    const t = tg.dataset.theme === 'light' ? 'dark' : 'light';
+    const r = btn.getBoundingClientRect(), html = document.documentElement;
+    html.style.setProperty('--vx', r.left + r.width / 2 + 'px'); html.style.setProperty('--vy', r.top + r.height / 2 + 'px');
+    const set = () => {
+      tg.dataset.theme = t; save('gs.tg.theme2', t);
+      btn.innerHTML = icon(t === 'dark' ? 'sun' : 'moon');
+      btn.classList.remove('spin'); void btn.offsetWidth; btn.classList.add('spin');
+    };
+    html.classList.add('vt-theme');
+    const tr = vt(set);
+    if (tr) tr.finished.finally(() => html.classList.remove('vt-theme')); else html.classList.remove('vt-theme');
   }
   async function openReader(id, official) {
     tg.dataset.href = official ? '#' + id : '#g/' + id;

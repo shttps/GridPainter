@@ -1658,3 +1658,34 @@ body[data-page="grid"] { padding-top: calc(var(--nav-h) + 18px); background: rad
 @keyframes bpubDraw { from { stroke-dashoffset: 1; } }
 @keyframes bpubWave { from { transform: scale(1); opacity: .9; } to { transform: scale(2.1); opacity: 0; } }
 @keyframes bpubZoom { from { transform: scale(1.12); } }
+
+/* ---------- поздравление с огоньком: раз в день, когда серия обновилась ---------- */
+.modal.sheet:has(.sk-congrats) { width: min(420px, 100%); overflow: hidden; }
+.sk-congrats { padding-top: 26px; }
+.sk-congrats::before { content: ""; position: absolute; inset: -40% -20% auto; height: 340px; z-index: -1; background: radial-gradient(closest-side, color-mix(in oklab, var(--glow) 32%, transparent), transparent); animation: skcAura 3s ease-in-out .4s infinite alternate both; pointer-events: none; }
+@keyframes skcAura { from { opacity: .55; transform: scale(.92); } to { opacity: 1; transform: scale(1.06); } }
+.skc-stage { position: relative; display: grid; place-items: center; width: 220px; height: 180px; }
+.skc-stage .sk-fire { animation: skcIgnite 1s var(--spring) .1s both; }
+@keyframes skcIgnite { 0% { transform: scale(.2) translateY(30px); opacity: 0; filter: brightness(2.5); } 55% { transform: scale(1.12); opacity: 1; } 100% { transform: none; filter: none; } }
+.skc-ring { position: absolute; left: 50%; top: 58%; width: 60px; height: 60px; margin: -30px 0 0 -30px; border-radius: 50%; border: 2px solid var(--f2); box-shadow: 0 0 18px var(--glow), inset 0 0 12px var(--glow); opacity: 0; animation: skcRing 1.1s cubic-bezier(.2, .8, .2, 1) .55s both; }
+.skc-ring.r2 { border-color: var(--f1); animation-delay: .72s; animation-duration: 1.3s; }
+@keyframes skcRing { 0% { transform: scale(.3); opacity: .95; } 100% { transform: scale(4.2); opacity: 0; } }
+.skc-sparks { position: absolute; left: 50%; top: 58%; width: 0; height: 0; }
+.skc-sparks i { position: absolute; left: 0; top: 0; width: var(--sz); height: var(--sz); margin: calc(var(--sz) / -2); border-radius: 50%; background: var(--f2); box-shadow: 0 0 8px var(--f1), 0 0 2px #fff; opacity: 0; animation: skcSpark 1.2s cubic-bezier(.15, .7, .3, 1) var(--dl) both; }
+@keyframes skcSpark { 0% { transform: translate(0, 0) scale(1.4); opacity: 1; } 70% { opacity: 1; } 100% { transform: translate(var(--tx), calc(var(--ty) + 40px)) scale(.2); opacity: 0; } }
+.skc-kicker { margin-top: 2px; color: var(--f2); font: 700 12px var(--disp); letter-spacing: .1em; text-transform: uppercase; text-shadow: 0 0 18px var(--glow); animation: rise .6s var(--ease) .5s both; }
+.skc-num { animation-delay: .6s; }
+.skc-roll { display: inline-flex; flex-direction: column; height: 1em; overflow: hidden; vertical-align: top; }
+.skc-num:has(.skc-roll) { background: none; }
+.skc-roll span { display: block; line-height: 1; background: linear-gradient(180deg, #fff 20%, var(--f2) 60%, var(--f1)); -webkit-background-clip: text; background-clip: text; color: transparent; animation: skcRoll .7s var(--spring) 1.15s both; }
+@keyframes skcRoll { from { transform: translateY(0); } to { transform: translateY(-100%); } }
+.sk-congrats .sk-label { animation-delay: .68s; }
+.sk-congrats .sk-tier { animation-delay: .74s; }
+.skc-up { animation: rise .6s var(--ease) .74s both, skcPulse 1.6s ease-in-out 1.6s 3; }
+@keyframes skcPulse { 50% { box-shadow: inset 0 0 0 1px var(--glow), 0 0 22px color-mix(in oklab, var(--glow) 60%, transparent); } }
+.sk-congrats .sk-msg { animation-delay: .8s; }
+.sk-congrats .skc-today i { animation: skcDay .8s var(--spring) 1.5s both; }
+@keyframes skcDay { 0% { transform: scale(0); filter: brightness(3); } 60% { transform: scale(1.35); } 100% { transform: none; filter: none; } }
+.skc-actions { display: flex; gap: 8px; width: 100%; margin-top: 10px; animation: rise .6s var(--ease) .95s both; }
+.skc-actions .btn { flex: 1; }
+@media (prefers-reduced-motion: reduce) { .skc-ring, .skc-sparks { display: none; } }

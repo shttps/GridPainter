@@ -21,8 +21,9 @@
 .gl-bar { position: sticky; top: calc(var(--nav-h) - 8px); z-index: 5; display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 44px 0 6px; padding: 10px 0; }
 .gl-bar::before { content: ""; position: absolute; inset: 0 -16px; z-index: -1; background: linear-gradient(180deg, var(--bg) 70%, transparent); opacity: 0; transition: opacity .3s; }
 .navbar.scrolled ~ .wrap .gl-bar::before, .gl-bar.stuck::before { opacity: 1; }
-.gl-filter .chip.on { background: var(--card-2); box-shadow: 0 0 0 1px var(--line-strong); }
-.gl-filter .chip { transition: color .2s, background .25s, box-shadow .25s; }
+.gl-filter .chip { transition: color .25s, transform .25s var(--spring); }
+.gl-filter .chip:active { transform: scale(.94); }
+.gl-filter .chip-ind { width: 0; }
 .gl-search { display: flex; align-items: center; gap: 8px; width: min(300px, 100%); height: 42px; padding: 0 14px; border-radius: 12px; background: var(--card); border: 1px solid var(--line); color: var(--faint); transition: border-color .2s, box-shadow .2s; }
 .gl-search:focus-within { border-color: var(--accent-line); box-shadow: 0 0 0 4px var(--accent-soft); color: var(--ink); }
 .gl-search input { flex: 1; min-width: 0; border: 0; outline: 0; background: none; font-size: 14px; }
@@ -83,7 +84,7 @@ html.tg-on, html.tg-on body { overflow: hidden; }
   scrollbar-width: thin; scrollbar-color: var(--line-strong) transparent;
   transition: background .4s, color .4s;
 }
-.tg[data-theme="dark"] {
+.tg:not([data-theme="light"]) {
   --paper: #131110; --tx: rgba(255, 255, 255, .86); --tx-2: rgba(255, 255, 255, .72); --tx-3: #8f8a84; --rule: rgba(255, 255, 255, .1); --soft: #1d1a18; --link: oklch(0.76 0.15 50);
   --card: oklch(0.19 0.01 var(--h)); --card-2: oklch(0.235 0.011 var(--h)); --line: oklch(0.27 0.012 var(--h)); --line-strong: oklch(0.35 0.014 var(--h)); --ink: oklch(0.96 0.006 60); --ink-2: oklch(0.82 0.012 60); --muted: oklch(0.66 0.014 50); --faint: oklch(0.5 0.014 45); --bg-2: oklch(0.17 0.009 var(--h));
   color-scheme: dark;
@@ -181,10 +182,10 @@ html.tg-on, html.tg-on body { overflow: hidden; }
 .tg-note > div { min-width: 0; padding-top: 3px; }
 .tg-note.warn { background: oklch(0.96 0.03 30); color: oklch(0.36 0.09 30); }
 .tg-note.warn > i { background: oklch(0.9 0.07 30); color: oklch(0.52 0.18 30); }
-.tg[data-theme="dark"] .tg-note { background: oklch(0.82 0.13 80 / .08); color: oklch(0.9 0.06 80); }
-.tg[data-theme="dark"] .tg-note > i { background: oklch(0.82 0.13 80 / .15); color: var(--c3); }
-.tg[data-theme="dark"] .tg-note.warn { background: color-mix(in oklab, var(--c1) 10%, transparent); color: oklch(0.88 0.05 30); }
-.tg[data-theme="dark"] .tg-note.warn > i { background: color-mix(in oklab, var(--c1) 20%, transparent); color: oklch(0.72 0.18 30); }
+.tg:not([data-theme="light"]) .tg-note { background: oklch(0.82 0.13 80 / .08); color: oklch(0.9 0.06 80); }
+.tg:not([data-theme="light"]) .tg-note > i { background: oklch(0.82 0.13 80 / .15); color: var(--c3); }
+.tg:not([data-theme="light"]) .tg-note.warn { background: color-mix(in oklab, var(--c1) 10%, transparent); color: oklch(0.88 0.05 30); }
+.tg:not([data-theme="light"]) .tg-note.warn > i { background: color-mix(in oklab, var(--c1) 20%, transparent); color: oklch(0.72 0.18 30); }
 .tg-note code { background: rgba(0, 0, 0, .06); }
 .tg-head .tg-note { margin-top: 20px; }
 .tg-code { position: relative; display: flex; align-items: flex-start; gap: 10px; padding: 14px 14px 14px 18px; border-radius: 12px; background: var(--soft); border: 1px solid var(--rule); }
@@ -405,3 +406,14 @@ html.tg-on, html.tg-on body { overflow: hidden; }
   }
   .gf.tilting { transform: perspective(1600px) translateY(calc(var(--hov, 0) * -4px)) rotateX(calc(var(--rx, 0deg) * .5)) rotateY(calc(var(--ry, 0deg) * .5)) !important; }
 }
+
+/* переключатели: тема кругом от кнопки, иконка с поворотом, выбор темы гайда с пружиной */
+html.vt-theme::view-transition-old(root) { animation: none; }
+html.vt-theme::view-transition-new(root) { animation: themeIn .65s cubic-bezier(.65, 0, .35, 1); }
+@keyframes themeIn { from { clip-path: circle(0 at var(--vx, 50%) var(--vy, 0)); } to { clip-path: circle(150vmax at var(--vx, 50%) var(--vy, 0)); } }
+.tg-btn.spin .i { animation: iconSpin .6s var(--spring); }
+@keyframes iconSpin { from { transform: rotate(-140deg) scale(.3); opacity: 0; } }
+.tw-tag.on { animation: tagPop .45s var(--spring); }
+@keyframes tagPop { 0% { transform: scale(.86); } 60% { transform: scale(1.1); } 100% { transform: scale(1.04); } }
+.tw-tag:active { transform: scale(.94); }
+.tw-fig { transition: outline-color .2s, width .45s var(--ease); }

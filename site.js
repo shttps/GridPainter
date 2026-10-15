@@ -159,7 +159,7 @@ function renderAccount() {
     ? `<a class="nav-user${s ? ' has-streak' : ''}${PAGE === 'profile' && !new URLSearchParams(location.search).get('u') ? ' on' : ''}" href="profile.html" title="Мой профиль">${avatarHTML(p?.avatar, p?.nick || u.email)}<span class="nav-nick">${esc(p?.nick || 'Профиль')}</span></a>${s ? streakHTML(s) : ''}`
     : `<a class="btn sm nav-login" href="profile.html${PAGE !== 'profile' && PAGE !== 'home' ? '?next=' + encodeURIComponent(location.pathname.split('/').pop() + location.search) : ''}">${icon('user')}Войти</a>`;
   if (u && !s) loadStreak(u.id).then(renderAccount);
-  else if (s?.fresh) { s.fresh = false; celebrateStreak(box, s); }
+  else if (s?.fresh) { s.fresh = false; celebrateStreak(box, s); congratsStreak(s); }
   const chip = $('.nav-streak', box);
   if (chip) { chip.onclick = () => openStreak(s); $('.nav-user', box).style.setProperty('--sw', chip.offsetWidth + 'px'); }
 }
@@ -317,6 +317,41 @@ function openStreak(s) {
   const el = $('.sk-num', m.root), t0 = performance.now(), dur = Math.min(1400, 500 + n * 60);
   const step = now => { const k = Math.min(1, (now - t0) / dur); el.textContent = Math.round(n * (1 - Math.pow(1 - k, 3))); if (k < 1 && el.isConnected) requestAnimationFrame(step); };
   if (matchMedia('(prefers-reduced-motion: reduce)').matches) el.textContent = n; else { requestAnimationFrame(step); setTimeout(() => { el.textContent = n; }, dur + 200); }
+}
+// окно-поздравление раз в день, когда огонёк обновился: пламя вспыхивает, искры разлетаются, число дней перекатывается
+function congratsStreak(s) {
+  if (readJSON('gs.streak.congrats') === s.day) return;
+  writeJSON('gs.streak.congrats', s.day);
+  const calm = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const show = () => {
+    const n = s.streak, t = streakTier(n), was = streakTier(Math.max(1, s.prev)), [, tname] = STREAK_TIERS[t - 1];
+    const grew = s.prev > 0 && n === s.prev + 1, broke = s.prev > 1 && n === 1, up = grew && t > was;
+    const title = !s.prev || (n === 1 && !broke) ? 'Огонёк зажжён!' : broke ? 'Огонёк снова горит' : n >= s.best && n > 1 ? 'Новый рекорд!' : `+1 день к огоньку`;
+    const note = broke ? `Серия на ${daysText(s.prev)} прервалась — но ты вернулся, и это главное.`
+      : n === 1 ? 'Заходи каждый день — огонёк будет разгораться всё ярче.'
+      : `Ты на Grid Studio ${daysText(n)} подряд. Загляни завтра — не дай ему погаснуть!`;
+    const sparks = Array.from({ length: 18 }, (_, i) => { const a = i / 18 * Math.PI * 2 + Math.random() * .3, d = 70 + Math.random() * 60; return `<i style="--tx:${(Math.cos(a) * d).toFixed(0)}px;--ty:${(Math.sin(a) * d - 30).toFixed(0)}px;--dl:${(.55 + Math.random() * .2).toFixed(2)}s;--sz:${(3 + Math.random() * 4).toFixed(1)}px"></i>`; }).join('');
+    const WD = ['Вс', 'Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб'];
+    const week = Array.from({ length: 7 }, (_, i) => { const d = new Date(); d.setDate(d.getDate() - (6 - i)); return { wd: WD[d.getDay()], on: 6 - i < n, today: i === 6 }; });
+    const m = openSheet(`<div class="sh-body streak-sheet sk-congrats t${t}">
+      <div class="skc-stage"><i class="skc-ring"></i><i class="skc-ring r2"></i><span class="skc-sparks">${sparks}</span>${fireHTML()}</div>
+      <span class="skc-kicker">${esc(title)}</span>
+      <b class="sk-num skc-num">${grew && !calm ? `<span class="skc-roll"><span>${s.prev}</span><span>${n}</span></span>` : n}</b>
+      <span class="sk-label">${plural(n, 'день', 'дня', 'дней')} подряд</span>
+      ${up ? `<span class="sk-tier skc-up">Новый уровень · ${esc(tname)}</span>` : `<span class="sk-tier">${esc(tname)}</span>`}
+      <p class="sk-msg">${esc(note)}</p>
+      <div class="sk-week">${week.map((d, i) => `<span class="${d.on ? 'on' : ''}${d.today ? ' today skc-today' : ''}" style="--i:${i}"><i>${d.on ? FLAME : ''}</i><small>${d.wd}</small></span>`).join('')}</div>
+      <div class="skc-actions"><button class="btn primary" data-skc="ok">Так держать!</button><button class="btn ghost" data-skc="more">Подробнее</button></div>
+    </div>`);
+    m.root.addEventListener('click', e => {
+      const b = e.target.closest('[data-skc]'); if (!b) return;
+      m.close(); if (b.dataset.skc === 'more') setTimeout(() => openStreak(s), 120);
+    });
+  };
+  // не перебиваем другое окно: ждём, пока закроется (но не дольше 20 секунд)
+  let tries = 0;
+  const wait = () => { if (!$('#modalRoot')?.children.length) show(); else if (++tries < 40) setTimeout(wait, 500); };
+  setTimeout(wait, 1400);
 }
 function celebrateStreak(box, s) {
   const chip = $('.nav-streak', box); if (!chip) return;
