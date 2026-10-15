@@ -6,8 +6,7 @@
 .gl-write { flex: none; animation: rise .6s var(--ease) .16s both; }
 
 .gl-feature { margin-top: 8px; }
-.gf { position: relative; display: grid; grid-template-columns: minmax(0, 1.45fr) minmax(0, 1fr); border-radius: 26px; overflow: hidden; border: 1px solid var(--line); background: linear-gradient(120deg, var(--card), oklch(0.17 0.01 var(--h))); text-decoration: none; animation: rise .7s var(--ease) .12s both; isolation: isolate; transition: border-color .3s, box-shadow .5s var(--ease), transform .5s var(--ease); }
-.gf::before { content: ""; position: absolute; inset: -1px; z-index: -1; background: radial-gradient(600px 300px at 80% 0%, color-mix(in oklab, var(--c2) 16%, transparent), transparent 70%); }
+.gf { position: relative; display: grid; grid-template-columns: minmax(0, 1.45fr) minmax(0, 1fr); border-radius: 26px; overflow: hidden; border: 1px solid var(--line); background: radial-gradient(600px 300px at 80% 0%, color-mix(in oklab, var(--c2) 16%, transparent), transparent 70%), linear-gradient(120deg, var(--card), oklch(0.17 0.01 var(--h))); text-decoration: none; animation: rise .7s var(--ease) .12s both; isolation: isolate; transition: border-color .3s, box-shadow .5s var(--ease), transform .5s var(--ease); }
 .gf:hover { border-color: var(--accent-line); transform: translateY(-3px); box-shadow: 0 40px 80px -40px oklch(0 0 0 / .9), 0 0 0 1px color-mix(in oklab, var(--c2) 18%, transparent); }
 .gf-cover { position: relative; display: block; min-height: 320px; overflow: hidden; background: var(--bg-2); }
 .gf-cover::after { content: ""; position: absolute; inset: 0; background: linear-gradient(90deg, transparent 60%, oklch(0.18 0.01 var(--h) / .9)); }
@@ -374,4 +373,35 @@ html.tg-on, html.tg-on body { overflow: hidden; }
 @media (prefers-reduced-motion: reduce) {
   .tg .rv { opacity: 1; transform: none; }
   .tg-fig img, .gcd-cover img { opacity: 1; filter: none; transform: none; }
+}
+
+/* наведение на карточки — как в Мастерской: наклон, свет под курсором, светящийся край и параллакс обложки
+   (--hov/--mx/--my/--px/--py и класс .tilting ведёт общий движок в site.js) */
+@media (hover: hover) and (pointer: fine) {
+  :is(.gcd:not(.sk), .gf)::before {
+    content: ""; position: absolute; z-index: -1; inset: 0; border-radius: inherit; pointer-events: none; opacity: var(--hov, 0);
+    background: radial-gradient(420px circle at var(--mx, 50%) var(--my, 50%), color-mix(in oklab, var(--c2) 13%, transparent), transparent 60%);
+  }
+  :is(.gcd:not(.sk), .gf)::after {
+    content: ""; position: absolute; z-index: 4; inset: 0; border-radius: inherit; padding: 1px; pointer-events: none; opacity: var(--hov, 0);
+    background: radial-gradient(260px circle at var(--mx, 50%) var(--my, 50%), color-mix(in oklab, var(--accent-hi) 85%, transparent), transparent 70%);
+    -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor;
+    mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
+  }
+  .gcd:not(.sk):hover, .gf:hover { border-color: color-mix(in oklab, var(--accent-line) 45%, var(--line-strong)); box-shadow: 0 34px 60px -34px #000e, 0 22px 50px -30px color-mix(in oklab, var(--c1) 60%, transparent); }
+  .gcd-body > b, .gf-body > b { transition: color .35s var(--ease); }
+  .gcd:hover .gcd-body > b, .gf:hover .gf-body > b { color: var(--accent-hi); }
+  /* блик по обложке */
+  :is(.gcd-cover, .gf-cover)::before {
+    content: ""; position: absolute; z-index: 1; inset: 0; pointer-events: none; opacity: calc(var(--hov, 0) * .9); mix-blend-mode: soft-light;
+    background: radial-gradient(70% 90% at var(--mx, 50%) var(--my, 50%), #fff9, transparent 70%);
+  }
+  .gcd-write .gcd-plus { box-shadow: 0 14px 30px -12px color-mix(in oklab, var(--c1) calc(60% + var(--hov, 0) * 40%), transparent); }
+}
+@media (hover: hover) and (pointer: fine) and (prefers-reduced-motion: no-preference) {
+  .tilting :is(.gcd-cover > img.ok, .gf-cover > img, .gcd-art) {
+    transform: translate3d(calc(var(--px, 0) * -7px), calc(var(--py, 0) * -5px), 0) scale(calc(1.002 + var(--hov, 0) * .055)) !important;
+    transition: opacity .4s !important;
+  }
+  .gf.tilting { transform: perspective(1600px) translateY(calc(var(--hov, 0) * -4px)) rotateX(calc(var(--rx, 0deg) * .5)) rotateY(calc(var(--ry, 0deg) * .5)) !important; }
 }

@@ -709,7 +709,7 @@ document.addEventListener('click', e => { if (e.target.closest('[data-bg-dota]')
 // наведение на карточки (главная, Мастерская, профиль): наклон за курсором, свет и параллакс превью — стили в конце site.css.
 // Курсор задаёт цель, а значения догоняют её экспоненциально в одном rAF на все карточки — без рывков на любом fps.
 // Большие плитки наклоняются слабее: угол делится на ширину. При «меньше анимации» остаётся только свет.
-const TILT = { home: '.fcard, .fwide, .gcard:not(.sk), .guide-card.in, .tile.in:not(.t-compare)', workshop: '.gcard:not(.sk), .bcard, .ws-head', profile: '.gcard:not(.sk), .bcard, .ach-item', background: '.bgb-screen, .bgb-src-card' }[PAGE];
+const TILT = { home: '.fcard, .fwide, .gcard:not(.sk), .guide-card.in, .tile.in:not(.t-compare)', workshop: '.gcard:not(.sk), .bcard, .ws-head', profile: '.gcard:not(.sk), .bcard, .ach-item', background: '.bgb-screen, .bgb-src-card', guides: '.gcd:not(.sk), .gf' }[PAGE];
 if (TILT && matchMedia('(hover: hover) and (pointer: fine)').matches) {
   const calm = matchMedia('(prefers-reduced-motion: reduce)'), live = new Map();
   let raf = 0, last = 0;

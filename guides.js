@@ -218,7 +218,7 @@
   function mount(html, cls) {
     cleanup.forEach(f => f()); cleanup = [];
     tg.className = 'tg ' + cls;
-    tg.dataset.theme = load('gs.tg.theme', 'light');
+    tg.dataset.theme = load('gs.tg.theme', 'dark');
     tg.innerHTML = html;
     tg.hidden = false; tg.scrollTop = 0;
     document.documentElement.classList.add('tg-on');
@@ -260,7 +260,7 @@
 
   // ======================= читалка =======================
   function topBar(extra = '') {
-    const dark = tg.dataset.theme === 'dark' || load('gs.tg.theme', 'light') === 'dark';
+    const dark = tg.dataset.theme === 'dark' || load('gs.tg.theme', 'dark') === 'dark';
     return `<div class="tg-top"><div class="tg-top-in">
       <button class="tg-btn tg-back" data-act="back">${icon('back')}<span>Гайды</span></button>
       <span class="tg-top-mid"></span>${extra}
