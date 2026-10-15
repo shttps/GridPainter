@@ -145,7 +145,7 @@ button:focus { outline: none; }
 @keyframes auA { to { transform: translate(160px, 110px) scale(1.18); } }
 @keyframes auB { to { transform: translate(-140px, 160px) scale(1.25); } }
 @keyframes auC { to { transform: translate(-180px, -60px) scale(1.1); } }
-/* видео под всем фоном: фон из Мастерской «На главную» или туман (docs/hero-bg.webm). Любой ролик
+/* под всем фоном — фон из Мастерской «На главную», если он есть. Любой ролик
    тонируется под тему — тёплый графит, приглушено, слева темнее, чтобы заголовок читался. */
 .bg-media { position: absolute; inset: 0; background: var(--bg); }
 .bg-media > video, .bg-media > img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: 0; transition: opacity 1.6s var(--ease);
@@ -157,10 +157,11 @@ button:focus { outline: none; }
 .bg-media::after { content: ""; position: absolute; z-index: 2; inset: 0;
   background: linear-gradient(90deg, oklch(0.14 0.008 var(--h) / .78) 0%, oklch(0.14 0.008 var(--h) / .35) 45%, transparent 75%),
     linear-gradient(180deg, oklch(0.14 0.008 var(--h) / .5) 0%, transparent 22%); }
-/* сполохи над видео — тише, иначе красный забивает картинку */
-.bg-media ~ .au-1 { opacity: .18; }
-.bg-media ~ .au-2 { opacity: .1; }
-.bg-media ~ .au-3 { opacity: .12; }
+/* сполохи над фоном — тише, иначе красный забивает картинку; пока фона нет — обычной яркости */
+.au-1, .au-2, .au-3 { transition: opacity 1.6s var(--ease); }
+.bg-media.has ~ .au-1 { opacity: .18; }
+.bg-media.has ~ .au-2 { opacity: .1; }
+.bg-media.has ~ .au-3 { opacity: .12; }
 .hero-credit { position: absolute; z-index: 4; right: 24px; top: calc(var(--nav-h) + 6px); display: flex; align-items: center; gap: 6px; max-width: min(360px, 60vw); padding: 5px 11px; border-radius: 99px; background: oklch(0.14 0.008 var(--h) / .6); border: 1px solid oklch(1 0 0 / .07); color: var(--muted); font-size: 12px; text-decoration: none; backdrop-filter: blur(8px); animation: fade .6s var(--ease) both; transition: color .2s, border-color .2s; }
 .hero-credit span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .hero-credit .i { width: 14px; height: 14px; }

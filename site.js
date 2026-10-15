@@ -1424,7 +1424,7 @@ async function dimFor(src) {
     return Math.min(0.95, Math.max(0.35, 0.27 / Math.max(0.01, sum / (d.length / 4) / 255))).toFixed(2);
   } catch { return 0.45; }
 }
-// Фон первого экрана: фон из Мастерской, который админ отметил «На главную», а пока таких нет — туман с фонарями.
+// Фон первого экрана: фон из Мастерской, который админ отметил «На главную»; если таких нет — только сполохи и символы.
 // Любой фон тонируется под сайт (CSS .bg-media). На телефоне и при экономии трафика тяжёлое видео не грузим —
 // хватает постера; при «уменьшении движения» видео стоит на первом кадре.
 // Видео-фон без рывка на стыке: за FADE секунд до конца поверх запускается копия того же ролика с начала
@@ -1456,35 +1456,33 @@ function heroBackdrop() {
   const box = $('#heroMedia'); if (!box) return;
   const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
   const lite = matchMedia('(max-width: 900px)').matches || navigator.connection?.saveData;
-  const first = $('video', box);
-  // туман с фонарями — запасной: показываем, только если фона «На главную» нет или он не загрузился (иначе он мелькает до фона)
-  let done = false;
-  const fog = () => { if (done) return; done = true; first.classList.add('on'); if (!still) { crossLoop(first); first.play().catch(() => {}); } };
-  const slow = setTimeout(fog, 6000);
+  // фон — только тот, что админ отметил «На главную»; нет его или не загрузился — остаются сполохи и символы.
+  // Показываем, когда бы он ни загрузился, и подпись — вместе с ним, а не раньше.
   API.bg.featured().then(async list => {
-    if (!list.length) return fog();
+    if (!list.length) return;
     const b = list[Math.floor(Math.random() * list.length)];
     const video = b.kind === 'video' && !lite && !still;
     const el = document.createElement(video ? 'video' : 'img');
     if (video) Object.assign(el, { muted: true, loop: true, playsInline: true, autoplay: true, poster: b.poster });
     el.alt = ''; el.setAttribute('aria-hidden', 'true'); el.className = 'feat';
-    // яркий фон приглушаем сильнее: средняя яркость постера → множитель, чтобы любой был не светлее тумана
+    // яркий фон приглушаем сильнее: средняя яркость постера → множитель
     el.style.setProperty('--bgk', await dimFor(b.poster));
-    // показываем, только когда есть что показать, — и плавно гасим туман под ним
-    el.addEventListener(video ? 'playing' : 'load', () => {
-      if (done) return; done = true; clearTimeout(slow);
-      el.classList.add('on'); first.classList.remove('on');
-      if (video) crossLoop(el);
-      setTimeout(() => { first.pause(); first.remove(); }, 1800);
-    }, { once: true });
-    el.addEventListener('error', fog, { once: true });
+    const show = () => {
+      if (!el.isConnected || el.classList.contains('on')) return;
+      el.classList.add('on'); box.classList.add('has');
+      const credit = $('#heroCredit');
+      credit.href = bgPageUrl(b.id);
+      credit.innerHTML = `${icon('image')}<span>Фон: «${esc(b.title)}» — ${esc(b.author || 'Игрок')}</span>`;
+      credit.hidden = false;
+    };
+    // у ролика сразу виден постер (он уже скачан ради яркости), а само видео подхватит, когда начнёт играть
+    if (video) el.addEventListener('playing', () => crossLoop(el), { once: true });
+    else el.addEventListener('load', show, { once: true });
+    el.addEventListener('error', () => { el.remove(); box.classList.remove('has'); $('#heroCredit').hidden = true; }, { once: true });
     el.src = video || b.kind !== 'video' ? b.file : b.poster;
     box.append(el);
-    const credit = $('#heroCredit');
-    credit.href = bgPageUrl(b.id);
-    credit.innerHTML = `${icon('image')}<span>Фон: «${esc(b.title)}» — ${esc(b.author || 'Игрок')}</span>`;
-    credit.hidden = false;
-  }).catch(fog);
+    if (video) requestAnimationFrame(show);
+  }).catch(() => {});
 }
 
 // Фон главной: поле ASCII-символов. Яркость клетки — сумма нескольких бегущих волн, у курсора светлее;

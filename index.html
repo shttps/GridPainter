@@ -14,15 +14,15 @@
 <link rel="preload" href="docs/hero-art.webp" as="image" fetchpriority="high">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600;700&family=Unbounded:wght@500;600;700&display=swap">
-<link rel="stylesheet" href="site.css?v=66">
+<link rel="stylesheet" href="site.css?v=67">
 </head>
 <body data-page="home">
 
 <!-- первый экран: слева заголовок и разделы сайта, справа — редактор на наклонённом ноутбуке -->
 <section class="landing" id="hero">
-  <!-- фон: видео (фон из Мастерской «На главную» или туман), цветные сполохи темы, поле ASCII-символов, которое переливается волнами и светится у курсора, зерно, виньетка -->
+  <!-- фон: фон из Мастерской «На главную» (если админ его отметил), цветные сполохи темы, поле ASCII-символов, которое переливается волнами и светится у курсора, зерно, виньетка -->
   <div class="hero-bg" aria-hidden="true">
-    <div class="bg-media" id="heroMedia"><video src="docs/hero-bg.webm" poster="docs/hero-bg.webp" muted loop playsinline preload="none"></video></div>
+    <div class="bg-media" id="heroMedia"></div>
     <div class="aurora au-1"></div><div class="aurora au-2"></div><div class="aurora au-3"></div>
     <canvas class="bg-glyphs" id="bgGlyphs"></canvas>
     <div class="bg-grain"></div>
@@ -206,6 +206,6 @@
 <script src="braille-arts.js?v=1"></script>
 <script src="achievements.js?v=2"></script>
 <script src="guides-data.js?v=1"></script>
-<script src="site.js?v=82"></script>
+<script src="site.js?v=83"></script>
 </body>
 </html>
