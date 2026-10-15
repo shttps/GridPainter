@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="220" height="48" viewBox="0 0 220 48" fill="none" role="img" aria-labelledby="title">
+  <title id="title">Открыть редактор</title>
+  <rect x="1" y="1" width="218" height="46" rx="5" fill="#241a16" stroke="#f56333" stroke-width="2"/>
+  <text x="22" y="30" fill="#ff9a76" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif" font-size="16" font-weight="600">Открыть редактор</text>
+  <path d="M190 29l8-8m-7 0h7v7" stroke="#ff9a76" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

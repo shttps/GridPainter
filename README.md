@@ -10,11 +10,13 @@
 </p>
 
 <p align="center">
-  <a href="https://shttps.github.io/GridPainter/editor.html"><b>Открыть редактор ↗</b></a>
-  &nbsp; / &nbsp;
-  <a href="https://shttps.github.io/GridPainter/workshop.html">Мастерская</a>
-  &nbsp; / &nbsp;
-  <a href="https://shttps.github.io/GridPainter/guides.html">Гайды</a>
+  <a href="https://shttps.github.io/GridPainter/editor.html"><img src="docs/readme-button-editor.svg" width="220" height="48" alt="Открыть редактор"></a>
+  <a href="https://shttps.github.io/GridPainter/workshop.html"><img src="docs/readme-button-workshop.svg" width="180" height="48" alt="Мастерская"></a>
+  <a href="https://shttps.github.io/GridPainter/guides.html"><img src="docs/readme-button-guides.svg" width="130" height="48" alt="Гайды"></a>
+</p>
+
+<p align="center">
+  <a href="https://shttps.github.io/GridPainter/"><img src="docs/tour.gif" width="800" alt="Обзор сайта Grid Studio: главная, Мастерская сеток и фоны меню"></a>
 </p>
 
 ### Сделано в Grid Studio

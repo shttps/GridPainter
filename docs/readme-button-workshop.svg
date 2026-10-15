@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="180" height="48" viewBox="0 0 180 48" fill="none" role="img" aria-labelledby="title">
+  <title id="title">Мастерская</title>
+  <rect x="1" y="1" width="178" height="46" rx="5" fill="#151a22" stroke="#46505e" stroke-width="2"/>
+  <text x="22" y="30" fill="#e6edf3" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif" font-size="16" font-weight="600">Мастерская</text>
+  <path d="M150 29l8-8m-7 0h7v7" stroke="#a7b3c2" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>
